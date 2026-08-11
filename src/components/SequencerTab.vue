@@ -33,7 +33,7 @@
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="showRandomizeDialog = false">{{ texts.cancel }}</v-btn>
-          <v-btn @click="confirmRandomize"><Shuffle :size="16" class="mr-1" />{{ texts.randomizeRun }}</v-btn>
+          <v-btn @click="confirmRandomize"><Dices :size="16" class="mr-1" />{{ texts.randomizeRun }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -169,7 +169,7 @@
           </v-col>
           <v-col cols="auto" class="mr-2">
             <v-btn @click="showRandomizeDialog = true">
-              <Shuffle :size="16" class="mr-1" />
+              <Dices :size="16" class="mr-1" />
               {{ texts.randomize }}
             </v-btn>
           </v-col>
@@ -270,7 +270,7 @@ import PresetLibraryDialog from '@/components/PresetLibraryDialog.vue';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
 import { MOTION_PARAM_LABELS, type SequenceState } from '@/types/sequence';
 import { countBarsInSmf, extractStepNotes, parseSmf } from '@/utils/smfImport';
-import { AudioLines, Check, FileUp, Library, Piano, Shuffle, Trash2, Upload, X } from '@lucide/vue';
+import { AudioLines, Check, Dices, FileUp, Library, Piano, Trash2, Upload, X } from '@lucide/vue';
 import { MidiSequenceCapture, type SequencePlaybackResolution } from '@/utils/midiSequenceCapture';
 
 const seqStore = useSequencerStore();
