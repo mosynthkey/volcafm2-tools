@@ -12,7 +12,7 @@
       <v-card class="algorithm-picker-card pa-4">
         <div class="algorithm-picker-header">
           <v-card-title>Algorithmを選択</v-card-title>
-          <v-btn variant="text" @click="showAlgorithmPicker = false">閉じる</v-btn>
+          <DialogCloseButton @click="showAlgorithmPicker = false" />
         </div>
         <div class="algorithm-picker-grid">
           <button v-for="algorithm in 32" :key="algorithm" type="button" class="algorithm-option"
@@ -189,6 +189,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { Library, Upload } from '@lucide/vue';
 import AlgorithmDiagram from '@/components/AlgorithmDiagram.vue';
 import AppToggle from '@/components/AppToggle.vue';
+import DialogCloseButton from '@/components/DialogCloseButton.vue';
 import KnobControl from '@/components/KnobControl.vue';
 import PresetLibraryDialog from '@/components/PresetLibraryDialog.vue';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';

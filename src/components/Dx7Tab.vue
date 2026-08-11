@@ -43,13 +43,11 @@ const userLanguage = navigator.language.startsWith('ja') ? 'ja' : 'en';
 const BUTTON_TEXTS = {
   ja: {
     detect: 'volca fm2を検出',
-    download: 'ダウンロード',
-    close: '閉じる'
+    download: 'ダウンロード'
   },
   en: {
     detect: 'Detect volca fm2',
-    download: 'Download',
-    close: 'Close'
+    download: 'Download'
   }
 };
 

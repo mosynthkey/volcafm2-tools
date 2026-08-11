@@ -3,7 +3,7 @@
     <v-card class="preset-library pa-4">
       <div class="library-header">
         <v-card-title>{{ title }}</v-card-title>
-        <v-btn variant="text" @click="emit('update:modelValue', false)">閉じる</v-btn>
+        <DialogCloseButton @click="emit('update:modelValue', false)" />
       </div>
 
       <div class="save-row">
@@ -45,6 +45,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { FolderOpen, Save, Trash2 } from '@lucide/vue';
+import DialogCloseButton from '@/components/DialogCloseButton.vue';
 import { deletePreset, listPresets, savePreset, type PresetKind, type PresetRecord } from '@/utils/presetLibrary';
 
 const props = defineProps<{
