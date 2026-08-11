@@ -726,6 +726,13 @@ const heldNotes = ref<Set<number>>(new Set());
 const chordBuffer = ref<Set<number>>(new Set());
 let unsubscribeNoteEvent: (() => void) | null = null;
 
+const finishStepInput = () => {
+  stepInputActive.value = false;
+  heldNotes.value.clear();
+  chordBuffer.value.clear();
+  handleSend();
+};
+
 const commitChord = () => {
   const step = stepCursor.value;
   for (const pitch of chordBuffer.value) {
@@ -733,8 +740,7 @@ const commitChord = () => {
   }
   chordBuffer.value.clear();
   if (step === 15) {
-    stepInputActive.value = false;
-    heldNotes.value.clear();
+    finishStepInput();
     return;
   }
   stepCursor.value++;
@@ -763,9 +769,7 @@ const toggleStepInput = () => {
 
 const stepNext = () => {
   if (stepCursor.value === 15) {
-    stepInputActive.value = false;
-    heldNotes.value.clear();
-    chordBuffer.value.clear();
+    finishStepInput();
     return;
   }
   stepCursor.value++;
