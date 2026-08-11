@@ -52,10 +52,14 @@ const paths = [
 const CurveGlyph = defineComponent({
   props: { curve: { type: Number, required: true }, direction: { type: String, required: true } },
   setup(glyphProps) {
-    return () => h('svg', { viewBox: '0 0 64 39', 'aria-hidden': 'true' }, [
+    return () => h('svg', { class: 'curve-glyph', viewBox: '0 0 64 39', 'aria-hidden': 'true' }, [
       h('path', {
         d: paths[glyphProps.curve] ?? paths[0],
         transform: glyphProps.direction === 'right' ? 'translate(64 0) scale(-1 1)' : undefined,
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': 3,
+        'stroke-linecap': 'round',
       }),
     ]);
   },
@@ -65,16 +69,15 @@ const CurveGlyph = defineComponent({
 <style scoped>
 .curve-control { display: grid; min-width: 0; justify-items: center; align-content: start; gap: 5px; }
 .curve-control > label { width: 100%; min-height: 18px; color: #ad9e96; font-size: var(--volca-type-label); line-height: 1.25; text-align: center; }
-.curve-trigger { width: 92px; height: 64px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5px; padding: 7px 9px; border: 1px solid rgba(206,179,147,.3); border-radius: 9px; background: #251c1e; color: #d8ccc4; cursor: pointer; }
+.curve-trigger { width: 112px; height: 64px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 5px; padding: 7px 9px; border: 1px solid rgba(206,179,147,.3); border-radius: 9px; background: #251c1e; color: #d8ccc4; cursor: pointer; }
 .curve-trigger:hover { border-color: rgba(206,179,147,.62); background: #2d2224; }
 .curve-trigger:focus-visible, .curve-option:focus-visible { outline: 2px solid #e1cab0; outline-offset: 2px; }
-.curve-trigger svg { width: 52px; height: 36px; }
+.curve-trigger svg { width: 58px; height: 36px; color: #ceb393; }
 .curve-trigger span { font-size: var(--volca-type-label); font-weight: 700; }
-svg path { fill: none; stroke: #ceb393; stroke-width: 3; stroke-linecap: round; }
-.curve-menu { display: grid; grid-template-columns: repeat(2, 108px); gap: 7px; padding: 8px; border: 1px solid rgba(206,179,147,.3); border-radius: 11px; background: #2b2022; box-shadow: 0 12px 32px rgba(0,0,0,.38); }
+.curve-menu { display: grid; grid-template-columns: repeat(2, 124px); gap: 7px; padding: 8px; border: 1px solid rgba(206,179,147,.3); border-radius: 11px; background: #2b2022; box-shadow: 0 12px 32px rgba(0,0,0,.38); }
 .curve-option { height: 70px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px; padding: 7px 9px; border: 1px solid rgba(206,179,147,.16); border-radius: 8px; background: #251c1e; color: #d8ccc4; cursor: pointer; }
 .curve-option:hover { border-color: rgba(206,179,147,.55); background: #35282a; }
 .curve-option.selected { border-color: #ceb393; background: rgba(206,179,147,.16); color: #f1e9e1; }
-.curve-option svg { width: 62px; height: 42px; }
+.curve-option svg { width: 64px; height: 42px; color: #ceb393; }
 .curve-option span { font-size: var(--volca-type-label); font-weight: 750; }
 </style>
