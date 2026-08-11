@@ -63,6 +63,7 @@
 import { defineComponent, h, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { SoundOperator } from '@/types/soundProgram';
+import { dx7EnvelopePoints } from '@/utils/dx7Envelope';
 import { formatOperatorFrequency } from '@/utils/operatorFrequency';
 
 defineProps<{ operators: SoundOperator[] }>();
@@ -129,22 +130,7 @@ const adjustWithKeyboard = (event: KeyboardEvent, operatorIndex: number, field: 
 };
 
 const frequencyLabel = formatOperatorFrequency;
-const levelPercent = (level: number) => Math.pow(Math.max(0, level - 31) / 68, 1.12);
-const segmentDuration = (rate: number, from: number, to: number) => {
-  const rising = to > from;
-  return Math.max(.0001, Math.max(rising ? .003 : .008, (rising ? 38 : 318) * Math.exp(-(rising ? .087 : .098) * rate))
-    * Math.abs(levelPercent(to) - levelPercent(from)));
-};
-const envelopePoints = (operator: SoundOperator) => {
-  const levels = operator.egLevels, rates = operator.egRates;
-  const durations = [segmentDuration(rates[0], levels[3], levels[0]), segmentDuration(rates[1], levels[0], levels[1]), segmentDuration(rates[2], levels[1], levels[2]), segmentDuration(rates[3], levels[2], levels[3])];
-  const hold = Math.max(1, durations[0] + durations[1] + durations[2]) * .16;
-  const scale = 172 / (durations.reduce((sum, value) => sum + value, hold));
-  const xs = [4, 4 + durations[0] * scale];
-  xs.push(xs[1] + durations[1] * scale, xs[1] + (durations[1] + durations[2]) * scale, xs[1] + (durations[1] + durations[2] + hold) * scale, 176);
-  const y = (level: number) => 58 - level * (54 / 99);
-  return [levels[3], levels[0], levels[1], levels[2], levels[2], levels[3]].map((level, index) => `${xs[index]},${y(level)}`).join(' ');
-};
+const envelopePoints = (operator: SoundOperator) => dx7EnvelopePoints(operator.egRates, operator.egLevels, 180, 62);
 const curveSegment = (startX: number, startY: number, endX: number, endY: number, curve: number) => {
   if (curve === 0 || curve === 3) return `L${endX} ${endY}`;
   const controlY = curve === 1 ? startY : endY;

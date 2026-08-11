@@ -192,6 +192,7 @@ import AppDialog from '@/components/dialogs/AppDialog.vue';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
 import type { SoundOperator, SoundProgram } from '@/types/soundProgram';
 import { createInitialSoundProgram, decodeSoundProgram, encodeSoundProgram } from '@/utils/soundProgramCodec';
+import { dx7EnvelopeGeometry, dx7EnvelopePoints } from '@/utils/dx7Envelope';
 import { formatOperatorFrequency } from '@/utils/operatorFrequency';
 import { useI18n } from 'vue-i18n';
 import { lfoControls, macroControls, operatorFrequencyControls, type OperatorNumberKey, type ProgramNumberKey } from '@/features/sound/soundControlDefinitions';
@@ -288,8 +289,8 @@ const envelopeGeometry = (rates: number[], levels: number[], width: number, heig
   const y = (level: number) => height - 12 - level * ((height - 24) / 99);
   return [levels[3], levels[0], levels[1], levels[2], levels[2], levels[3]].map((level, index) => ({ x: xs[index], y: y(level) }));
 };
-const envelopeCircles = (rates: number[], levels: number[]) => envelopeGeometry(rates, levels, 420, 170).slice(1, 5);
-const envelopePoints = (rates: number[], levels: number[]) => envelopeGeometry(rates, levels, 420, 170).map(point => `${point.x},${point.y}`).join(' ');
+const envelopeCircles = (rates: number[], levels: number[]) => dx7EnvelopeGeometry(rates, levels, 420, 170).slice(1, 5);
+const envelopePoints = (rates: number[], levels: number[]) => dx7EnvelopePoints(rates, levels, 420, 170);
 const pitchEnvelopePoints = computed(() => envelopeGeometry(program.value.pitchEgRates, program.value.pitchEgLevels, 320, 90).map(point => `${point.x},${point.y}`).join(' '));
 const NumberControl = KnobControl;
 </script>
