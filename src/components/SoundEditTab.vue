@@ -45,7 +45,7 @@
         <aside class="sound-panel operator-nav">
           <div class="algorithm-control">
             <AlgorithmDiagram :algorithm="program.algorithm" :enabled="program.operators.map(operator => operator.enabled)"
-              :selected-operator="selectedOperator" pickable @select="selectOperator" @open="showAlgorithmPicker = true" />
+              :selected-operator="selectedOperator" pickable large-nodes @select="selectOperator" @open="showAlgorithmPicker = true" />
             <div class="algorithm-legend" aria-label="Algorithm diagram legend">
               <span><i class="route"></i>{{ t('sound.modulation') }}</span>
               <span><i class="feedback"></i>{{ t('sound.feedback') }}</span>
