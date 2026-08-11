@@ -15,7 +15,7 @@ defineEmits<{ 'update:modelValue': [value: boolean] }>();
 </script>
 
 <style scoped>
-.app-toggle { position: relative; width: 64px; height: 64px; min-width: 64px; min-height: 64px; max-width: 64px; max-height: 64px; align-self: flex-start; flex: 0 0 64px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: #ad9e96; cursor: pointer; }
+.app-toggle { position: relative; width: 64px; height: 64px; min-width: 64px; min-height: 64px; max-width: 64px; max-height: 64px; align-self: center; flex: 0 0 64px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: #ad9e96; cursor: pointer; }
 .app-toggle::before { position: absolute; inset: 15px 0; border: 1px solid rgba(206,179,147,.3); border-radius: 9px; background: #251c1e; content: ''; transition: background .16s ease, border-color .16s ease; }
 .app-toggle:hover::before { border-color: rgba(206,179,147,.65); }
 .app-toggle:focus-visible { outline: 2px solid #ceb393; outline-offset: 2px; }

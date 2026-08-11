@@ -177,7 +177,7 @@ const connectionTone = computed(() => {
   --volca-accent-soft: rgba(206, 179, 147, 0.12);
   --volca-text: #f1e9e1;
   --volca-muted: #a99a91;
-  --volca-type-label: 12px;
+  --volca-type-label: 14px;
   --volca-type-body: 14px;
   --volca-type-heading: 18px;
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

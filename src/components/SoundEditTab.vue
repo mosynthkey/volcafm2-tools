@@ -317,7 +317,7 @@ const NumberControl = KnobControl;
 .operator-heading { position: sticky; top: 0; z-index: 3; background: #302426; }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; color: #ad9e96; font-size: var(--volca-type-label); }
 .toggle-row.stacked-control { flex-direction: column; align-items: center; justify-content: flex-start; gap: 5px; }
-.toggle-row.stacked-control > span { min-height: 15px; line-height: 1.25; text-align: center; }
+.toggle-row.stacked-control > span { width: 100%; min-height: 18px; line-height: 1.25; text-align: center; }
 .control-grid.three .toggle-row { flex-direction: column; justify-content: flex-start; }
 .edit-section, .global-section { padding: 13px; border-bottom: 1px solid rgba(206,179,147,.15); }
 .section-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }.section-heading h4, .global-section h4 { margin: 0; font-size: var(--volca-type-heading); }.section-heading span { color: #ad9e96; font-size: var(--volca-type-label); }

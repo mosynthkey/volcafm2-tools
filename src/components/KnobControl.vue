@@ -57,7 +57,7 @@ const onKeydown = (event: KeyboardEvent) => {
 
 <style scoped>
 .knob-control { display: grid; min-width: 64px; justify-items: center; gap: 4px; color: #ad9e96; font-size: var(--volca-type-label); line-height: 1.25; text-align: center; }
-.knob-label { width: 100%; min-height: 15px; overflow: hidden; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.knob-label { width: 100%; min-height: 18px; overflow: hidden; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
 .knob { position: relative; width: 64px; height: 64px; display: block; cursor: ns-resize; touch-action: none; }
 .knob svg { width: 100%; height: 100%; overflow: visible; }
 .knob-track, .knob-value { fill: none; stroke-width: 5; stroke-linecap: round; }
