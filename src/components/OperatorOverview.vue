@@ -34,7 +34,7 @@
               @keydown="adjustWithKeyboard($event, index, item.field, item.min, item.max, item.rawValue)">
               <span>{{ item.value }}</span><MiniKnob :value="item.rawValue" :min="item.min" :max="item.max" />
             </button>
-            <span v-else>{{ item.value }}</span>
+            <MiniCurve v-else-if="item.curve !== undefined" :curve="item.curve" :direction="item.direction" />
           </dd></div>
         </template>
       </dl>
@@ -71,6 +71,17 @@ const emit = defineEmits<{
 }>();
 const { t } = useI18n();
 const curveNames = ['−LN', '−EX', '+EX', '+LN'];
+const curvePaths = ['M3 4 L33 15', 'M3 4 C17 4 29 7 33 15', 'M3 15 C17 15 29 12 33 4', 'M3 15 L33 4'];
+const MiniCurve = defineComponent({
+  props: { curve: { type: Number, required: true }, direction: { type: String, required: true } },
+  setup(props) {
+    return () => h('svg', { class: 'mini-curve', viewBox: '0 0 36 19', role: 'img', 'aria-label': curveNames[props.curve] }, [
+      h('path', { d: curvePaths[props.curve] ?? curvePaths[0],
+        transform: props.direction === 'right' ? 'translate(36 0) scale(-1 1)' : undefined,
+        fill: 'none', stroke: '#ceb393', 'stroke-width': 2, 'stroke-linecap': 'round' }),
+    ]);
+  },
+});
 const MiniKnob = defineComponent({
   props: { value: { type: Number, required: true }, min: { type: Number, required: true }, max: { type: Number, required: true } },
   setup(props) {
@@ -158,7 +169,8 @@ const parameters = (operator: SoundOperator) => [
   { label: 'Break', value: operator.breakPoint, rawValue: operator.breakPoint, field: 'breakPoint' as const, min: 0, max: 99 },
   { label: 'L Depth', value: operator.leftDepth, rawValue: operator.leftDepth, field: 'leftDepth' as const, min: 0, max: 99 },
   { label: 'R Depth', value: operator.rightDepth, rawValue: operator.rightDepth, field: 'rightDepth' as const, min: 0, max: 99 },
-  { label: 'L Curve', value: curveNames[operator.leftCurve] }, { label: 'R Curve', value: curveNames[operator.rightCurve] },
+  { label: 'L Curve', value: curveNames[operator.leftCurve], curve: operator.leftCurve, direction: 'right' },
+  { label: 'R Curve', value: curveNames[operator.rightCurve], curve: operator.rightCurve, direction: 'left' },
 ];
 </script>
 
@@ -181,6 +193,7 @@ const parameters = (operator: SoundOperator) => [
 .drag-value { min-width: 42px; display: inline-grid; grid-template-columns: minmax(18px, auto) 16px; align-items: center; justify-content: end; gap: 3px; padding: 1px 3px 1px 4px; border: 0; border-radius: 4px; background: rgba(206,179,147,.08); color: #e1cab0; font: inherit; font-weight: 750; cursor: ns-resize; touch-action: none; }
 .drag-value:hover { background: rgba(206,179,147,.18); color: #fff8f1; }.drag-value:focus-visible { outline: 1px solid #e1cab0; outline-offset: 1px; }
 .mini-knob { width: 16px; height: 16px; overflow: visible; }
+.mini-curve { width: 38px; height: 19px; display: block; }
 .eg-values { display: grid; grid-template-columns: 38px repeat(4, 1fr); gap: 1px; margin: 0 7px 7px; overflow: hidden; border-radius: 5px; background: rgba(206,179,147,.1); }
 .eg-values span, .eg-values > button { padding: 3px 4px; background: #271d1f; font-size: 11px; line-height: 1.25; }.eg-values span { color: #9f918a; }.eg-values > button { width: 100%; grid-template-columns: minmax(14px, auto) 14px; gap: 2px; border-radius: 0; color: #d8ccc4; text-align: center; font-variant-numeric: tabular-nums; }.eg-values .mini-knob { width: 14px; height: 14px; }
 @media (max-width: 1120px) { .operator-overview { grid-template-columns: 1fr; } }
