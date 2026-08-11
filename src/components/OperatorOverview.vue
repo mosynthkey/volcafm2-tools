@@ -76,11 +76,14 @@ const MiniKnob = defineComponent({
   setup(props) {
     return () => {
       const percent = Math.max(0, Math.min(100, ((props.value - props.min) / Math.max(1, props.max - props.min)) * 100));
+      const angle = (135 + percent * 2.7) * (Math.PI / 180);
+      const pointerX = 9 + Math.cos(angle) * 5.2;
+      const pointerY = 9 + Math.sin(angle) * 5.2;
       return h('svg', { class: 'mini-knob', viewBox: '0 0 18 18', 'aria-hidden': 'true' }, [
         h('path', { d: 'M4.05 13.95A7 7 0 1 1 13.95 13.95', pathLength: 100, fill: 'none',
           stroke: 'rgba(206,179,147,.2)', 'stroke-width': 2.4, 'stroke-linecap': 'round' }),
-        h('path', { d: 'M4.05 13.95A7 7 0 1 1 13.95 13.95', pathLength: 100, fill: 'none',
-          stroke: '#ceb393', 'stroke-width': 2.4, 'stroke-linecap': 'round', 'stroke-dasharray': `${percent} 100` }),
+        h('line', { x1: 9, y1: 9, x2: pointerX, y2: pointerY,
+          stroke: '#ceb393', 'stroke-width': 2.2, 'stroke-linecap': 'round' }),
       ]);
     };
   },
