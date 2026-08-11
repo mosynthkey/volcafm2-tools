@@ -65,11 +65,14 @@
             <p class="capture-copy">{{ texts.captureDescription }}</p>
             <div class="capture-resolution mt-4">
               <div class="capture-resolution__label">{{ texts.captureResolution }}</div>
-              <v-btn-toggle v-model="captureResolution" mandatory divided>
-                <v-btn :value="1">1/1</v-btn>
-                <v-btn :value="2">1/2</v-btn>
-                <v-btn :value="4">1/4</v-btn>
-              </v-btn-toggle>
+              <div class="resolution-options" role="group" :aria-label="texts.captureResolution">
+                <button v-for="resolution in ([1, 2, 4] as SequencePlaybackResolution[])" :key="resolution"
+                  type="button" class="resolution-option" :class="{ selected: captureResolution === resolution }"
+                  :aria-pressed="captureResolution === resolution" @click="captureResolution = resolution">
+                  <Check v-if="captureResolution === resolution" :size="15" aria-hidden="true" />
+                  <span>1/{{ resolution }}</span>
+                </button>
+              </div>
             </div>
             <ol class="capture-steps">
               <li>{{ texts.captureStep1 }}</li>
@@ -249,7 +252,7 @@ import PresetLibraryDialog from '@/components/PresetLibraryDialog.vue';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
 import { MOTION_PARAM_LABELS, type SequenceState } from '@/types/sequence';
 import { countBarsInSmf, extractStepNotes, parseSmf } from '@/utils/smfImport';
-import { AudioLines, FileUp, Library, Piano, Trash2, Upload, X } from '@lucide/vue';
+import { AudioLines, Check, FileUp, Library, Piano, Trash2, Upload, X } from '@lucide/vue';
 import { MidiSequenceCapture, type SequencePlaybackResolution } from '@/utils/midiSequenceCapture';
 
 const seqStore = useSequencerStore();
@@ -928,9 +931,13 @@ const endDrag = () => {
   font-size: var(--volca-type-body);
 }
 
-.capture-resolution :deep(.v-btn) {
-  min-width: 64px;
-}
+.resolution-options { height: 40px; display: grid; grid-template-columns: repeat(3, 72px); padding: 3px; border: 1px solid rgba(206,179,147,.3); border-radius: 9px; background: #251c1e; }
+.resolution-option { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 10px; border: 0; border-right: 1px solid rgba(206,179,147,.18); background: transparent; color: #b9aaa2; font: inherit; font-size: var(--volca-type-body); font-weight: 650; cursor: pointer; }
+.resolution-option:last-child { border-right: 0; }
+.resolution-option:hover { background: rgba(206,179,147,.09); color: #f1e9e1; }
+.resolution-option.selected { border-radius: 6px; background: #ceb393; color: #33282a; font-weight: 800; box-shadow: inset 0 1px rgba(255,255,255,.3); }
+.resolution-option.selected + .resolution-option { border-left-color: transparent; }
+.resolution-option:focus-visible { z-index: 1; outline: 2px solid #e1cab0; outline-offset: 2px; border-radius: 6px; }
 
 .capture-progress {
   margin: 10px 0 0;
