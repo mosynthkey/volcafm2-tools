@@ -127,9 +127,9 @@
               <NumberControl v-model="selected.leftDepth" :label="t('sound.leftDepth')" :min="0" :max="99" />
               <NumberControl v-model="selected.breakPoint" :label="t('sound.breakPoint')" :min="0" :max="99" />
               <NumberControl v-model="selected.rightDepth" :label="t('sound.rightDepth')" :min="0" :max="99" />
-              <div class="select-control"><label>{{ t('sound.leftCurve') }}</label><v-select v-model="selected.leftCurve" :items="curveItems" :aria-label="t('sound.leftCurve')" density="compact" hide-details /></div>
+              <CurveSelector v-model="selected.leftCurve" :label="t('sound.leftCurve')" direction="left" />
               <NumberControl v-model="selected.rateScaling" :label="t('sound.rateScaling')" :min="0" :max="7" />
-              <div class="select-control"><label>{{ t('sound.rightCurve') }}</label><v-select v-model="selected.rightCurve" :items="curveItems" :aria-label="t('sound.rightCurve')" density="compact" hide-details /></div>
+              <CurveSelector v-model="selected.rightCurve" :label="t('sound.rightCurve')" direction="right" />
             </div>
           </section>
         </main>
@@ -171,6 +171,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { Library, Upload } from '@lucide/vue';
 import AlgorithmDiagram from '@/components/AlgorithmDiagram.vue';
 import AppToggle from '@/components/AppToggle.vue';
+import CurveSelector from '@/components/CurveSelector.vue';
 import KnobControl from '@/components/KnobControl.vue';
 import PresetLibraryDialog from '@/components/PresetLibraryDialog.vue';
 import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue';
@@ -242,10 +243,6 @@ const loadSoundPreset = (data: unknown) => {
   program.value = data as SoundProgram;
   sendProgram();
 };
-const curveItems = [
-  { title: '− Linear', value: 0 }, { title: '− Exponential', value: 1 },
-  { title: '+ Exponential', value: 2 }, { title: '+ Linear', value: 3 },
-];
 const lfoWaveItems = ['Triangle', 'Saw Down', 'Saw Up', 'Square', 'Sine', 'Sample & Hold']
   .map((title, value) => ({ title, value }));
 
