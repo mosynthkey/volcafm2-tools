@@ -26,6 +26,18 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="showRandomizeDialog" max-width="440">
+      <v-card class="pa-4">
+        <v-card-title>{{ texts.randomizeTitle }}</v-card-title>
+        <v-card-text>{{ texts.randomizeDescription }}</v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showRandomizeDialog = false">{{ texts.cancel }}</v-btn>
+          <v-btn @click="confirmRandomize"><Shuffle :size="16" class="mr-1" />{{ texts.randomizeRun }}</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="showProgramFetchErrorDialog" max-width="440">
       <v-card class="pa-4">
         <v-card-title>{{ texts.programFetchFailedTitle }}</v-card-title>
@@ -155,6 +167,12 @@
               {{ texts.clear }}
             </v-btn>
           </v-col>
+          <v-col cols="auto" class="mr-2">
+            <v-btn @click="showRandomizeDialog = true">
+              <Shuffle :size="16" class="mr-1" />
+              {{ texts.randomize }}
+            </v-btn>
+          </v-col>
           <v-spacer />
           <v-col cols="auto" class="mr-2">
             <v-btn @click="triggerImport">
@@ -252,7 +270,7 @@ import PresetLibraryDialog from '@/components/PresetLibraryDialog.vue';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
 import { MOTION_PARAM_LABELS, type SequenceState } from '@/types/sequence';
 import { countBarsInSmf, extractStepNotes, parseSmf } from '@/utils/smfImport';
-import { AudioLines, Check, FileUp, Library, Piano, Trash2, Upload, X } from '@lucide/vue';
+import { AudioLines, Check, FileUp, Library, Piano, Shuffle, Trash2, Upload, X } from '@lucide/vue';
 import { MidiSequenceCapture, type SequencePlaybackResolution } from '@/utils/midiSequenceCapture';
 
 const seqStore = useSequencerStore();
@@ -272,6 +290,10 @@ const TEXTS = {
     velocity: 'ベロシティ',
     gate: 'ゲート %',
     clear: 'クリア',
+    randomize: 'ランダマイズ',
+    randomizeTitle: 'ステップをランダマイズ',
+    randomizeDescription: 'ノートとモーションを含む16ステップの順番をランダムに入れ替えます。',
+    randomizeRun: '入れ替える',
     captureButton: 'シーケンス取り込み',
     captureTitle: 'シーケンス取り込み',
     captureDescription: 'volca fm2の現在のシーケンスを1周再生し、MIDIノートと16ステップを取り込みます。',
@@ -320,6 +342,10 @@ const TEXTS = {
     velocity: 'Velocity',
     gate: 'Gate %',
     clear: 'Clear',
+    randomize: 'Randomize',
+    randomizeTitle: 'Randomize steps',
+    randomizeDescription: 'Shuffle the order of all 16 steps, including notes and motion values.',
+    randomizeRun: 'Shuffle',
     captureButton: 'Capture sequence',
     captureTitle: 'Capture sequence',
     captureDescription: 'Play the current volca fm2 sequence once and capture its MIDI notes as 16 steps.',
@@ -362,6 +388,7 @@ const TEXTS = {
 const texts = computed(() => TEXTS[userLanguage]);
 const selectedMotionIndex = ref(0);
 const showLibrary = ref(false);
+const showRandomizeDialog = ref(false);
 const motionSelectItems = computed(() =>
   MOTION_PARAM_LABELS.map((p, i) => ({ label: p.en, value: i }))
 );
@@ -549,6 +576,11 @@ const cancelMidiCapture = () => {
 const handleSend = () => {
   const bytes = seqStore.buildSysEx();
   midiStore.sendCurrentSequenceDump(bytes);
+};
+
+const confirmRandomize = () => {
+  seqStore.randomizeSteps();
+  showRandomizeDialog.value = false;
 };
 
 const sequenceSnapshot = (): SequenceState => ({

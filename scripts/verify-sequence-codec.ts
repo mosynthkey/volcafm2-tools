@@ -17,6 +17,7 @@ import {
     unpack7to8,
 } from '../src/utils/sequenceCodec';
 import { MOTION_PARAM_COUNT, NUM_OF_STEPS, type SequenceNote, type SequenceState } from '../src/types/sequence';
+import { reorderSequenceSteps } from '../src/utils/sequenceRandomizer';
 
 let failCount = 0;
 
@@ -119,6 +120,26 @@ check(
         !enabled || sampleState.motionValues[p].every((v, s) => v === decodedState.motionValues[p][s])
     )
 );
+
+// ---------------------------------------------------------------------------
+// 5) ステップ並べ替え: ノート/タイとモーションが同じ順列で移動すること
+// ---------------------------------------------------------------------------
+console.log('[5] Step reorder');
+const reversedOrder = Array.from({ length: NUM_OF_STEPS }, (_, step) => NUM_OF_STEPS - 1 - step);
+const reordered = reorderSequenceSteps(sampleState, reversedOrder);
+const activePitches = (state: SequenceState, step: number) => state.notes
+    .filter(note => note.startStep <= step && note.startStep + note.length > step)
+    .map(note => note.pitch).sort((left, right) => left - right);
+check(
+    'notes follow the step permutation',
+    reversedOrder.every((oldStep, newStep) => JSON.stringify(activePitches(reordered, newStep)) === JSON.stringify(activePitches(sampleState, oldStep)))
+);
+check(
+    'motion values follow the step permutation',
+    reordered.motionValues.every((values, parameter) => values.every((value, step) => value === sampleState.motionValues[parameter][reversedOrder[step]]))
+);
+check('program/velocity/gate stay unchanged', reordered.programNo === sampleState.programNo
+    && reordered.velocity === sampleState.velocity && reordered.gatePercent === sampleState.gatePercent);
 
 // ---------------------------------------------------------------------------
 console.log('');

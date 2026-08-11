@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { createEmptySequenceState, MOTION_PARAM_COUNT, NUM_OF_STEPS, NUM_OF_VOICES_PER_STEP, type SequenceNote, type SequenceState } from '../types/sequence';
 import { encodeCurrentSequenceDump } from '../utils/sequenceCodec';
+import { createRandomStepOrder, reorderSequenceSteps } from '../utils/sequenceRandomizer';
 
 export const useSequencerStore = defineStore('sequencer', () => {
     const initial = createEmptySequenceState();
@@ -68,6 +69,18 @@ export const useSequencerStore = defineStore('sequencer', () => {
         motionValues.value = state.motionValues;
     };
 
+    const randomizeSteps = (random: () => number = Math.random) => {
+        const state = reorderSequenceSteps({
+            programNo: programNo.value,
+            velocity: velocity.value,
+            gatePercent: gatePercent.value,
+            notes: notes.value,
+            motionEnabled: motionEnabled.value,
+            motionValues: motionValues.value,
+        }, createRandomStepOrder(random));
+        loadFromDecoded(state);
+    };
+
     const buildSysEx = (channel = 0) => encodeCurrentSequenceDump({
         programNo: programNo.value,
         velocity: velocity.value,
@@ -91,6 +104,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
         setMotionValue,
         clearAll,
         loadFromDecoded,
+        randomizeSteps,
         buildSysEx,
     };
 });
