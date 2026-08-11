@@ -2,8 +2,6 @@
   <v-container>
     <div
       v-if="midiStore.connectionState === MIDIConnectionState.DETECTED || midiStore.connectionState === MIDIConnectionState.RECEIVING || midiStore.connectionState === MIDIConnectionState.RECEIVED">
-      <v-divider class="my-4" />
-
       <v-card v-for="(cartridge, index) in 2" :key="index" class="mb-4 pa-4" style="margin: 0 auto;">
         <v-row align="center">
           <v-col>
