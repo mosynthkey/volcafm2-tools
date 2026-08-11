@@ -123,11 +123,12 @@
 
           <section class="edit-section keyboard-scaling">
             <div class="section-heading"><h4>{{ t('sound.keyboardScaling') }}</h4><span>{{ t('sound.keyResponse') }}</span></div>
-            <div class="control-grid five">
-              <NumberControl v-model="selected.breakPoint" :label="t('sound.breakPoint')" :min="0" :max="99" />
+            <div class="control-grid scaling-grid">
               <NumberControl v-model="selected.leftDepth" :label="t('sound.leftDepth')" :min="0" :max="99" />
+              <NumberControl v-model="selected.breakPoint" :label="t('sound.breakPoint')" :min="0" :max="99" />
               <NumberControl v-model="selected.rightDepth" :label="t('sound.rightDepth')" :min="0" :max="99" />
               <div class="select-control"><label>{{ t('sound.leftCurve') }}</label><v-select v-model="selected.leftCurve" :items="curveItems" :aria-label="t('sound.leftCurve')" density="compact" hide-details /></div>
+              <NumberControl v-model="selected.rateScaling" :label="t('sound.rateScaling')" :min="0" :max="7" />
               <div class="select-control"><label>{{ t('sound.rightCurve') }}</label><v-select v-model="selected.rightCurve" :items="curveItems" :aria-label="t('sound.rightCurve')" density="compact" hide-details /></div>
             </div>
           </section>
@@ -316,7 +317,7 @@ const NumberControl = KnobControl;
 .control-grid.three .toggle-row { flex-direction: column; justify-content: flex-start; }
 .edit-section, .global-section { padding: 13px; border-bottom: 1px solid rgba(206,179,147,.15); }
 .section-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }.section-heading h4, .global-section h4 { margin: 0; font-size: var(--volca-type-heading); }.section-heading span { color: #ad9e96; font-size: var(--volca-type-label); }
-.control-grid { display: grid; gap: 8px; }.control-grid.five { grid-template-columns: repeat(3, minmax(72px,.8fr)) repeat(2, minmax(120px,1.3fr)); }.control-grid.four { grid-template-columns: repeat(4, minmax(92px,1fr)); }.control-grid.three { grid-template-columns: repeat(3, minmax(84px,1fr)); align-items: start; }.control-grid.two { grid-template-columns: 1fr 1fr; }
+.control-grid { display: grid; gap: 8px; }.control-grid.scaling-grid { grid-template-columns: repeat(3, minmax(120px,1fr)); }.control-grid.four { grid-template-columns: repeat(4, minmax(92px,1fr)); }.control-grid.three { grid-template-columns: repeat(3, minmax(84px,1fr)); align-items: start; }.control-grid.two { grid-template-columns: 1fr 1fr; }
 .select-control { display: grid; align-content: start; gap: 5px; min-width: 0; }
 .select-control > label { color: #ad9e96; font-size: var(--volca-type-label); line-height: 1.25; }
 .select-control > :deep(.v-input) { margin-block: 12px; }

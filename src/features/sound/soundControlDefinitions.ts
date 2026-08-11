@@ -8,7 +8,6 @@ export const operatorFrequencyControls: NumberControlDefinition<OperatorNumberKe
   { key: 'coarse', label: 'sound.coarse', min: 0, max: 31 }, { key: 'fine', label: 'sound.fine', min: 0, max: 99 },
   { key: 'detune', label: 'sound.detune', min: 0, max: 14, displayOffset: -7 }, { key: 'outputLevel', label: 'sound.outputLevel', min: 0, max: 99 },
   { key: 'ampModSensitivity', label: 'sound.ampModSens', min: 0, max: 3 }, { key: 'keyVelocitySensitivity', label: 'sound.keyVelocity', min: 0, max: 7 },
-  { key: 'rateScaling', label: 'sound.rateScaling', min: 0, max: 7 },
 ]
 
 export const macroControls: NumberControlDefinition<ProgramNumberKey>[] = [
@@ -21,4 +20,3 @@ export const lfoControls: NumberControlDefinition<ProgramNumberKey>[] = [
   { key: 'pitchModDepth', label: 'sound.pitchModDepth', min: 0, max: 99 }, { key: 'ampModDepth', label: 'sound.ampModDepth', min: 0, max: 99 },
   { key: 'pitchModSensitivity', label: 'sound.pitchModSens', min: 0, max: 7 },
 ]
-
