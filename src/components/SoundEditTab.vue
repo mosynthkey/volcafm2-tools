@@ -45,7 +45,8 @@
         <aside class="sound-panel operator-nav">
           <div class="algorithm-control">
             <AlgorithmDiagram :algorithm="program.algorithm" :enabled="program.operators.map(operator => operator.enabled)"
-              :selected-operator="selectedOperator" @select="selectedOperator = $event" />
+              :selected-operator="selectedOperator" pickable @select="selectedOperator = $event"
+              @open="showAlgorithmPicker = true" />
             <div class="algorithm-legend" aria-label="Algorithm diagram legend">
               <span><i class="route"></i>{{ t('sound.modulation') }}</span>
               <span><i class="feedback"></i>{{ t('sound.feedback') }}</span>
@@ -53,9 +54,8 @@
             </div>
           </div>
           <div class="global-mini-grid">
-            <button type="button" class="algorithm-picker-trigger" @click="showAlgorithmPicker = true">
-              <span>{{ t('sound.algorithm') }}</span><strong>{{ program.algorithm + 1 }}</strong>
-            </button>
+            <NumberControl :model-value="program.algorithm + 1" :label="t('sound.algorithm')" :min="1" :max="32"
+              @update:model-value="program.algorithm = $event - 1" />
             <NumberControl v-model="program.feedback" :label="t('sound.feedback')" :min="0" :max="7" />
             <div class="toggle-row stacked-control"><span>{{ t('sound.oscKeySync') }}</span><AppToggle v-model="program.oscillatorSync" :aria-label="t('sound.oscKeySync')" /></div>
           </div>
@@ -295,11 +295,6 @@ const NumberControl = KnobControl;
 .algorithm-option.selected { border-color: #ceb393; background: rgba(206,179,147,.12); color: #f1e9e1; }
 .algorithm-option strong { display: block; margin-bottom: 7px; font-size: var(--volca-type-body); }
 .algorithm-option :deep(.algorithm-diagram) { height: 142px; pointer-events: none; }
-.algorithm-picker-trigger { min-width: 82px; display: grid; justify-items: center; gap: 5px; padding: 6px 10px; border: 1px solid rgba(206,179,147,.24); border-radius: 8px; background: #251c1e; color: #ad9e96; cursor: pointer; }
-.algorithm-picker-trigger:hover { border-color: #ceb393; color: #f1e9e1; }
-.algorithm-picker-trigger:focus-visible { outline: 2px solid #ceb393; outline-offset: 2px; }
-.algorithm-picker-trigger span { font-size: var(--volca-type-label); }
-.algorithm-picker-trigger strong { color: #ceb393; font-size: var(--volca-type-body); }
 .sound-workspace { display: grid; flex: 1 1 auto; min-height: 0; grid-template-columns: 380px minmax(520px, 1fr) 330px; gap: 10px; overflow: auto; }
 .sound-panel { min-height: 0; border: 1px solid rgba(206,179,147,.18); border-radius: 11px; background: rgba(48,36,38,.72); overflow: auto; }
 .panel-title { display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 10px 12px; border-bottom: 1px solid rgba(206,179,147,.16); }
