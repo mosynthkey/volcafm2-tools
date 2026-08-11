@@ -105,76 +105,65 @@
 
     <v-card class="pa-4 sequencer-card">
       <v-row align="center" no-gutters class="sequencer-toolbar">
-        <v-col cols="auto" class="mr-4 program-control">
-          <span class="program-control__label">{{ texts.program }}</span>
-          <v-text-field type="number" v-model.number="seqStore.programNo" :aria-label="texts.program" min="0" max="63"
-            density="compact" hide-details class="program-control__input" />
-          <v-btn @click="midiStore.requestCurrentVoiceProgramNo" :disabled="!canSend"
-            :loading="midiStore.currentProgramFetchState === 'loading-programs' || midiStore.currentProgramFetchState === 'requesting'"
-            :class="{ dimmed: !canSend }">
-            {{ texts.getCurrentProgram }}
-          </v-btn>
-        </v-col>
-        <v-col cols="auto" class="mr-4">
-          <v-text-field type="number" v-model.number="seqStore.velocity" :label="texts.velocity" min="1" max="127"
-            density="compact" hide-details style="width: 110px" />
-        </v-col>
-        <v-col cols="auto" class="mr-4">
-          <v-text-field type="number" v-model.number="seqStore.gatePercent" :label="texts.gate" min="0" max="100"
-            density="compact" hide-details style="width: 110px" />
-        </v-col>
-        <v-col v-if="!stepInputActive" cols="auto" class="mr-2">
-          <v-btn @click="openCaptureDialog" :disabled="!canSend" :class="{ dimmed: !canSend }">
-            <AudioLines :size="16" class="mr-1" />
-            {{ texts.captureButton }}
-          </v-btn>
-        </v-col>
-        <v-col cols="auto" class="mr-2">
-          <v-btn @click="toggleStepInput" :color="stepInputActive ? '#CEB393' : undefined">
-            <Piano :size="16" class="mr-1" />
-            {{ stepInputActive ? texts.stepInputOn : texts.stepInputOff }}
-          </v-btn>
-        </v-col>
-        <v-col v-if="!stepInputActive" cols="auto" class="mr-2">
-          <v-btn @click="seqStore.clearAll">
-            <Trash2 :size="16" class="mr-1" />
-            {{ texts.clear }}
-          </v-btn>
-        </v-col>
         <template v-if="stepInputActive">
-          <v-col cols="auto" class="mr-1">
-            <v-btn icon @click="stepPrev" :title="texts.stepPrev">
-              <SkipBack :size="16" />
-            </v-btn>
-          </v-col>
-          <v-col cols="auto" class="mr-1 step-indicator">
-            {{ texts.stepIndicator(stepCursor + 1) }}
-          </v-col>
-          <v-col cols="auto" class="mr-1">
-            <v-btn icon @click="stepNext" :title="texts.stepNext">
-              <SkipForward :size="16" />
-            </v-btn>
-          </v-col>
-          <v-col cols="auto" class="mr-2">
-            <v-btn icon @click="stepCursor = 0" :title="texts.stepReset">
-              <RotateCcw :size="16" />
+          <v-col cols="auto">
+            <v-btn icon @click="toggleStepInput" :title="texts.stepInputExit" :aria-label="texts.stepInputExit">
+              <X :size="18" />
             </v-btn>
           </v-col>
         </template>
-        <v-spacer />
-        <v-col cols="auto" class="mr-2">
-          <v-btn @click="triggerImport">
-            <FileUp :size="16" class="mr-1" />
-            {{ texts.importSmf }}
-          </v-btn>
-          <input ref="fileInputRef" type="file" accept=".mid,.midi" style="display:none" @change="handleFileChange" />
-        </v-col>
-        <v-col cols="auto">
-          <v-btn @click="handleSend" :disabled="!canSend" :class="{ dimmed: !canSend }">
-            {{ texts.send }}
-            <Upload :size="16" class="ml-1" />
-          </v-btn>
-        </v-col>
+        <template v-else>
+          <v-col cols="auto" class="mr-4 program-control">
+            <span class="program-control__label">{{ texts.program }}</span>
+            <v-text-field type="number" v-model.number="seqStore.programNo" :aria-label="texts.program" min="0" max="63"
+              density="compact" hide-details class="program-control__input" />
+            <v-btn @click="midiStore.requestCurrentVoiceProgramNo" :disabled="!canSend"
+              :loading="midiStore.currentProgramFetchState === 'loading-programs' || midiStore.currentProgramFetchState === 'requesting'"
+              :class="{ dimmed: !canSend }">
+              {{ texts.getCurrentProgram }}
+            </v-btn>
+          </v-col>
+          <v-col cols="auto" class="mr-4">
+            <v-text-field type="number" v-model.number="seqStore.velocity" :label="texts.velocity" min="1" max="127"
+              density="compact" hide-details style="width: 110px" />
+          </v-col>
+          <v-col cols="auto" class="mr-4">
+            <v-text-field type="number" v-model.number="seqStore.gatePercent" :label="texts.gate" min="0" max="100"
+              density="compact" hide-details style="width: 110px" />
+          </v-col>
+          <v-col cols="auto" class="mr-2">
+            <v-btn @click="openCaptureDialog" :disabled="!canSend" :class="{ dimmed: !canSend }">
+              <AudioLines :size="16" class="mr-1" />
+              {{ texts.captureButton }}
+            </v-btn>
+          </v-col>
+          <v-col cols="auto" class="mr-2">
+            <v-btn @click="toggleStepInput">
+              <Piano :size="16" class="mr-1" />
+              {{ texts.stepInputOff }}
+            </v-btn>
+          </v-col>
+          <v-col cols="auto" class="mr-2">
+            <v-btn @click="seqStore.clearAll">
+              <Trash2 :size="16" class="mr-1" />
+              {{ texts.clear }}
+            </v-btn>
+          </v-col>
+          <v-spacer />
+          <v-col cols="auto" class="mr-2">
+            <v-btn @click="triggerImport">
+              <FileUp :size="16" class="mr-1" />
+              {{ texts.importSmf }}
+            </v-btn>
+            <input ref="fileInputRef" type="file" accept=".mid,.midi" style="display:none" @change="handleFileChange" />
+          </v-col>
+          <v-col cols="auto">
+            <v-btn @click="handleSend" :disabled="!canSend" :class="{ dimmed: !canSend }">
+              {{ texts.send }}
+              <Upload :size="16" class="ml-1" />
+            </v-btn>
+          </v-col>
+        </template>
       </v-row>
       <v-alert v-if="importResult?.ok" type="success" density="compact" class="mt-3" variant="tonal">
         {{ texts.importOk(importResult.count, importResult.totalBars) }}
@@ -216,29 +205,38 @@
               :class="{ beat: (s - 1) % 4 === 0, cursor: stepInputActive && s - 1 === stepCursor }">
               <div class="motion-fill"
                 :style="{ height: (seqStore.motionValues[selectedMotionIndex][s - 1] / 127 * 100) + '%' }"></div>
+              <input v-if="editingMotionStep === s - 1" v-model.number="motionEditValue" type="number" min="0"
+                max="127" class="motion-value-input" :aria-label="`Motion step ${s}`"
+                @pointerdown.stop @dblclick.stop @blur="commitMotionValue" @keydown.enter.prevent="commitMotionValue"
+                @keydown.escape.prevent="cancelMotionValueEdit" />
+              <span v-else class="motion-value" title="Double-click to edit" @pointerdown.stop
+                @dblclick.stop="beginMotionValueEdit(s - 1)">
+                {{ seqStore.motionValues[selectedMotionIndex][s - 1] }}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       <div class="motion-control mt-2">
-        <span class="motion-control__label">Motion</span>
-        <v-switch v-model="seqStore.motionEnabled[selectedMotionIndex]" hide-details density="compact"
-          :aria-label="texts.motionEnable" />
+        <span class="motion-control__label">{{ texts.motionTarget }}</span>
         <v-select :items="motionSelectItems" item-title="label" item-value="value" v-model="selectedMotionIndex"
           aria-label="Motion parameter" density="compact" hide-details class="motion-control__select" />
+        <span class="motion-control__state-label">On/Off</span>
+        <v-switch v-model="seqStore.motionEnabled[selectedMotionIndex]" hide-details density="compact"
+          :aria-label="texts.motionEnable" />
       </div>
     </v-card>
   </v-container>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useSequencerStore } from '@/stores/sequencerStore';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
 import { MOTION_PARAM_LABELS } from '@/types/sequence';
 import { countBarsInSmf, extractStepNotes, parseSmf } from '@/utils/smfImport';
-import { AudioLines, FileUp, Piano, RotateCcw, SkipBack, SkipForward, Trash2, Upload } from '@lucide/vue';
+import { AudioLines, FileUp, Piano, Trash2, Upload, X } from '@lucide/vue';
 import { MidiSequenceCapture, type SequencePlaybackResolution } from '@/utils/midiSequenceCapture';
 
 const seqStore = useSequencerStore();
@@ -280,17 +278,19 @@ const TEXTS = {
     import: 'インポート',
     importOk: (n: number, totalBars: number) => `SMFから${n}音をインポートしました。(全${totalBars}小節中の指定小節)`,
     importError: 'インポート失敗',
-    send: 'volca fm2へ送信',
+    send: '送信',
     sendFailedTitle: '送信できませんでした',
     sendNak: '送信しましたがvolca fm2がエラーを返しました(NAK)。',
     sendError: '送信できませんでした。接続を確認してください。',
-    stepInputOn: 'ステップ入力: ON',
-    stepInputOff: 'ステップ入力: OFF',
+    stepInputOn: 'ステップ入力',
+    stepInputOff: 'ステップ入力',
+    stepInputExit: 'ステップ入力を終了',
     stepIndicator: (n: number) => `ステップ ${n}/16`,
     stepPrev: '前のステップへ',
     stepNext: '次のステップへ (無音のまま進む)',
     stepReset: '先頭に戻す',
     motionParam: 'パラメーター',
+    motionTarget: 'モーションの対象',
     motionEnable: 'このパラメーターのモーションを有効化',
   },
   en: {
@@ -326,17 +326,19 @@ const TEXTS = {
     import: 'Import',
     importOk: (n: number, totalBars: number) => `Imported ${n} note(s) from the SMF. (bar out of ${totalBars} total)`,
     importError: 'Import failed',
-    send: 'Send to volca fm2',
+    send: 'Send',
     sendFailedTitle: 'Send failed',
     sendNak: 'Sent, but volca fm2 returned an error (NAK).',
     sendError: 'Failed to send. Please check your connection.',
-    stepInputOn: 'Step Input: ON',
-    stepInputOff: 'Step Input: OFF',
+    stepInputOn: 'Step Input',
+    stepInputOff: 'Step Input',
+    stepInputExit: 'Exit step input',
     stepIndicator: (n: number) => `Step ${n}/16`,
     stepPrev: 'Previous step',
     stepNext: 'Next step (leave silent)',
     stepReset: 'Reset to step 1',
     motionParam: 'Parameter',
+    motionTarget: 'Motion target',
     motionEnable: 'Enable motion for this parameter',
   },
 };
@@ -375,6 +377,9 @@ let captureClockTimeout: ReturnType<typeof setTimeout> | null = null;
 let captureStartDelay: ReturnType<typeof setTimeout> | null = null;
 let captureStartedAt = 0;
 let lastCaptureClockAt = 0;
+let ignoredDuplicateMessages = 0;
+const recentCaptureMessages = new Map<string, number>();
+const CAPTURE_DUPLICATE_WINDOW_MS = 5;
 
 const captureLog = (message: string) => midiStore.addLog(`[CAPTURE] ${message}`);
 const midiHex = (data: Uint8Array) => Array.from(data)
@@ -413,7 +418,7 @@ const finishMidiCapture = () => {
     return;
   }
   const result = midiCapture.finish();
-  captureLog(`Finishing capture: clocks=${result.clockCount}, rawNotes=${result.notes.length}, velocity=${result.velocity}, gate=${result.gatePercent}%`);
+  captureLog(`Finishing capture: clocks=${result.clockCount}, rawNotes=${result.notes.length}, velocity=${result.velocity}, gate=${result.gatePercent}%, ignoredDuplicates=${ignoredDuplicateMessages}`);
   clearCaptureResources();
   midiStore.sendMidiMessage(new Uint8Array([0xfc]));
 
@@ -438,12 +443,24 @@ const beginMidiCaptureAfterStop = () => {
   if (capturePhase.value !== 'capturing') return;
   midiCapture = new MidiSequenceCapture(captureResolution.value);
   lastCaptureClockAt = 0;
+  ignoredDuplicateMessages = 0;
+  recentCaptureMessages.clear();
   captureLog(`Starting. resolution=1/${captureResolution.value}, clocksPerStep=${midiCapture.clocksPerStep}, expectedClocks=${midiCapture.clocksPerPattern}, MIDI IN="${midiStore.selectedMidiIn ?? 'none'}", MIDI OUT="${midiStore.selectedMidiOut ?? 'none'}"`);
 
   unsubscribeMidiCapture = midiStore.onMidiMessage((data, inputName) => {
     if (inputName !== midiStore.selectedMidiIn) return;
     const status = data[0];
     const now = performance.now();
+    const signature = Array.from(data).join(',');
+    const previousMessageAt = recentCaptureMessages.get(signature);
+    recentCaptureMessages.set(signature, now);
+    if (previousMessageAt !== undefined && now - previousMessageAt <= CAPTURE_DUPLICATE_WINDOW_MS) {
+      ignoredDuplicateMessages++;
+      if (ignoredDuplicateMessages === 1 || ignoredDuplicateMessages % 16 === 0) {
+        captureLog(`Ignored duplicate MIDI message #${ignoredDuplicateMessages}: ${midiHex(data)} (${(now - previousMessageAt).toFixed(1)}ms after original)`);
+      }
+      return;
+    }
     const messageType = status & 0xf0;
     if (status === 0xf8) {
       const interval = lastCaptureClockAt === 0 ? 0 : now - lastCaptureClockAt;
@@ -714,6 +731,31 @@ const cellNoteLabel = (step: number, pitch: number) => {
 };
 
 const isDragging = ref(false);
+const editingMotionStep = ref<number | null>(null);
+const motionEditValue = ref(0);
+
+const beginMotionValueEdit = (step: number) => {
+  editingMotionStep.value = step;
+  motionEditValue.value = seqStore.motionValues[selectedMotionIndex.value][step];
+  nextTick(() => {
+    const input = document.querySelector<HTMLInputElement>('.motion-value-input');
+    input?.focus();
+    input?.select();
+  });
+};
+
+const commitMotionValue = () => {
+  if (editingMotionStep.value === null) return;
+  const value = Number(motionEditValue.value);
+  if (Number.isFinite(value)) {
+    seqStore.setMotionValue(selectedMotionIndex.value, editingMotionStep.value, value);
+  }
+  editingMotionStep.value = null;
+};
+
+const cancelMotionValueEdit = () => {
+  editingMotionStep.value = null;
+};
 
 const applyDrag = (paramIndex: number, ev: PointerEvent) => {
   if (!seqStore.motionEnabled[paramIndex]) return;
@@ -995,6 +1037,13 @@ const endDrag = () => {
   font-weight: 650;
 }
 
+.motion-control__state-label {
+  margin-left: 4px;
+  color: #b9aaa2;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 .motion-control :deep(.v-switch) {
   flex: 0 0 auto;
 }
@@ -1024,6 +1073,7 @@ const endDrag = () => {
 }
 
 .motion-col {
+  position: relative;
   display: flex;
   align-items: flex-end;
 }
@@ -1033,7 +1083,46 @@ const endDrag = () => {
 }
 
 .motion-fill {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
   width: 100%;
   background: #CEB393;
+}
+
+.motion-value,
+.motion-value-input {
+  position: absolute;
+  top: 6px;
+  right: 3px;
+  left: 3px;
+  z-index: 2;
+  color: #f1e9e1;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 22px;
+  text-align: center;
+}
+
+.motion-value {
+  cursor: text;
+  user-select: none;
+}
+
+.motion-value-input {
+  height: 24px;
+  padding: 0 2px;
+  border: 1px solid #CEB393;
+  border-radius: 4px;
+  outline: none;
+  background: #382b2d;
+  appearance: textfield;
+}
+
+.motion-value-input::-webkit-inner-spin-button,
+.motion-value-input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
 }
 </style>

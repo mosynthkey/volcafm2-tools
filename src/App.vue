@@ -44,12 +44,17 @@
 
     <v-main>
       <div class="app-layout">
-        <aside class="sidebar">
+        <aside class="sidebar" :class="{ 'is-collapsed': sidebarCollapsed }">
           <div class="sidebar-brand">
             <div class="brand-mark" aria-hidden="true"><span>FM</span><b>2</b></div>
             <div class="brand-copy">
               <h1>volca fm2 tool</h1>
             </div>
+            <button class="sidebar-toggle" type="button" :aria-label="sidebarToggleLabel"
+              :title="sidebarToggleLabel" @click="sidebarCollapsed = !sidebarCollapsed">
+              <PanelLeftOpen v-if="sidebarCollapsed" :size="18" />
+              <PanelLeftClose v-else :size="18" />
+            </button>
           </div>
           <div class="sidebar-rule" />
           <div class="sidebar-label">TOOLS</div>
@@ -88,7 +93,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Download, Info, Piano } from '@lucide/vue';
+import { Download, Info, PanelLeftClose, PanelLeftOpen, Piano } from '@lucide/vue';
 import Dx7Tab from './components/Dx7Tab.vue';
 import LogPanel from './components/LogPanel.vue';
 import SequencerTab from './components/SequencerTab.vue';
@@ -97,7 +102,11 @@ import { MIDIConnectionState, useMidiStore } from './stores/midiStore';
 const midiStore = useMidiStore();
 const showInfo = ref(false);
 const activeTab = ref('dx7');
+const sidebarCollapsed = ref(false);
 const userLanguage = navigator.language.startsWith('ja') ? 'ja' : 'en';
+const sidebarToggleLabel = computed(() => sidebarCollapsed.value
+  ? (userLanguage === 'ja' ? '左ペインを広げる' : 'Expand sidebar')
+  : (userLanguage === 'ja' ? '左ペインを小さくする' : 'Collapse sidebar'));
 
 onMounted(() => midiStore.initMIDI());
 
@@ -176,6 +185,11 @@ body { overflow: hidden; }
 .brand-mark b { position: absolute; right: 5px; bottom: 2px; font-size: 8px; }
 .brand-copy h1 { margin: 0; font-size: 18px; line-height: 1.15; letter-spacing: -.015em; font-weight: 680; }
 .sidebar-brand { display: flex; align-items: center; gap: 11px; min-height: 48px; padding: 4px 8px 16px; }
+.brand-copy { min-width: 0; flex: 1; }
+.sidebar-toggle { width: 34px; height: 34px; display: grid; flex: 0 0 34px; place-items: center; padding: 0; border: 1px solid var(--volca-line); border-radius: 8px; background: transparent; color: var(--volca-muted); cursor: pointer; transition: color .18s ease, background .18s ease, transform .1s ease; }
+.sidebar-toggle:hover { color: var(--volca-text); background: rgba(255,255,255,.055); }
+.sidebar-toggle:active { transform: scale(.96); }
+.sidebar-toggle:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
 .sidebar-rule { height: 1px; margin: 0 5px 18px; background: var(--volca-line); }
 .midi-state { display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 7px 10px; border: 1px solid var(--volca-line); border-radius: 9px; color: var(--volca-muted); background: rgba(255,255,255,.025); font-size: 13px; font-weight: 600; }
 .status-light, .device-dot { width: 7px; height: 7px; border-radius: 50%; background: #746769; box-shadow: 0 0 0 3px rgba(116,103,105,.12); }
@@ -185,7 +199,18 @@ body { overflow: hidden; }
 .nav-item:active, .about-button:active { transform: scale(.97); }
 .volca-app .v-main { height: 100vh; display: flex; flex-direction: column; padding: 0 !important; }
 .app-layout { display: flex; min-height: 0; flex: 1 1 auto; }
-.sidebar { width: 256px; flex: 0 0 256px; display: flex; flex-direction: column; gap: 5px; padding: 14px 11px 12px; border-right: 1px solid var(--volca-line); background: rgba(42,32,33,.68); backdrop-filter: blur(24px) saturate(135%); }
+.sidebar { width: 256px; flex: 0 0 256px; display: flex; flex-direction: column; gap: 5px; padding: 14px 11px 12px; border-right: 1px solid var(--volca-line); background: rgba(42,32,33,.68); backdrop-filter: blur(24px) saturate(135%); transition: width .2s ease, flex-basis .2s ease; }
+.sidebar.is-collapsed { width: 76px; flex-basis: 76px; }
+.sidebar.is-collapsed .sidebar-brand { justify-content: center; padding-inline: 0; }
+.sidebar.is-collapsed .brand-mark,
+.sidebar.is-collapsed .brand-copy,
+.sidebar.is-collapsed .sidebar-label,
+.sidebar.is-collapsed .nav-item > span:last-child,
+.sidebar.is-collapsed .midi-state > span:last-child,
+.sidebar.is-collapsed .about-button span { display: none; }
+.sidebar.is-collapsed .nav-item,
+.sidebar.is-collapsed .about-button,
+.sidebar.is-collapsed .midi-state { justify-content: center; padding: 8px; }
 .sidebar-label { padding: 0 10px 8px; color: #9b8d8d; font-size: 11px; font-weight: 750; letter-spacing: .12em; }
 .nav-item { width: 100%; display: flex; align-items: center; gap: 11px; min-height: 62px; padding: 9px 11px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--volca-muted); text-align: left; cursor: pointer; transition: background .18s ease, border-color .18s ease, color .18s ease, transform .1s ease; }
 .nav-item:hover { color: var(--volca-text); background: rgba(255,255,255,.045); }
@@ -222,7 +247,7 @@ body { overflow: hidden; }
 .connection-card .v-card-actions { padding-top: 12px; }
 .connection-card .v-btn { border-radius: 9px; background: var(--volca-accent) !important; color: #33282a !important; font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none; }
 @keyframes status-pulse { 50% { opacity: .45; transform: scale(.82); } }
-@media (max-width: 900px) { .sidebar { width: 76px; flex-basis: 76px; } .sidebar-brand { justify-content: center; padding-inline: 0; } .brand-copy, .sidebar-label, .nav-item > span:last-child, .midi-state > span:last-child, .about-button span { display: none; } .nav-item, .about-button, .midi-state { justify-content: center; padding: 8px; } .workspace .v-container { padding: 16px; } }
+@media (max-width: 900px) { .sidebar { width: 76px; flex-basis: 76px; } .sidebar-brand { justify-content: center; padding-inline: 0; } .sidebar-toggle, .brand-copy, .sidebar-label, .nav-item > span:last-child, .midi-state > span:last-child, .about-button span { display: none; } .nav-item, .about-button, .midi-state { justify-content: center; padding: 8px; } .workspace .v-container { padding: 16px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition-duration: .01ms !important; } }
 @media (prefers-reduced-transparency: reduce) { .sidebar, .workspace .v-card { backdrop-filter: none; background: var(--volca-panel-solid) !important; } }
 </style>
