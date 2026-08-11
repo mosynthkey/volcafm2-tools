@@ -6,8 +6,11 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import { X } from '@lucide/vue';
 
-withDefaults(defineProps<{ label?: string }>(), { label: '閉じる' });
+const props = defineProps<{ label?: string }>();
+const { t } = useI18n();
+const label = props.label ?? t('common.close');
 const emit = defineEmits<{ click: [] }>();
 </script>

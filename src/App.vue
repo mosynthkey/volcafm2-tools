@@ -1,12 +1,6 @@
 <template>
   <v-app class="volca-app">
-    <v-dialog v-model="showInfo" max-width="440">
-      <v-card class="about-card">
-        <div class="dialog-title-row">
-          <v-card-title>volca fm2 tool</v-card-title>
-          <DialogCloseButton :label="t('common.close')" @click="showInfo = false" />
-        </div>
-        <v-card-text>
+    <AppDialog v-model="showInfo" title="volca fm2 tool" max-width="440">
           {{ t('app.description') }}<br><br>
           Version 1.0.0<br>
           Copyright (c) 2025, Masaki Ono.
@@ -14,53 +8,35 @@
             <span>{{ t('app.showLog') }}</span>
             <AppToggle v-model="showLog" :aria-label="t('app.showLog')" />
           </div>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
+    </AppDialog>
 
-    <v-dialog :model-value="showProgramLoadModal" max-width="500" persistent>
-      <v-card class="program-load-card pa-4">
-        <v-card-title>{{ t('app.loadingPrograms.title') }}</v-card-title>
-        <v-card-text>
-          <p class="program-load-copy">{{ t('app.loadingPrograms.description') }}</p>
-          <v-progress-linear :model-value="programLoadProgress" height="8" rounded />
-          <div class="program-load-status">
-            <span>{{ midiStore.currentProgramFetchProgress }}/64</span>
-            <strong>{{ currentProgramLoadName }}</strong>
-          </div>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
+    <AppProgressDialog :model-value="showProgramLoadModal" :title="t('app.loadingPrograms.title')"
+      :description="t('app.loadingPrograms.description')" :value="programLoadProgress">
+      <template #status>
+        <div class="program-load-status">
+          <span>{{ midiStore.currentProgramFetchProgress }}/64</span><strong>{{ currentProgramLoadName }}</strong>
+        </div>
+      </template>
+    </AppProgressDialog>
 
-    <v-dialog
-      :model-value="showConnectionModal"
-      max-width="560"
-      persistent
-      no-click-animation
-    >
-      <v-card class="connection-card">
+    <AppDialog :model-value="showConnectionModal" :title="connectionTexts.title" max-width="560" persistent :closable="false">
         <div class="connection-card__icon" aria-hidden="true">
           <Piano :size="22" />
         </div>
-        <v-card-title>{{ connectionTexts.title }}</v-card-title>
-        <v-card-text>
           <ol class="connection-steps">
             <li>{{ connectionTexts.step1 }}</li>
             <li>{{ connectionTexts.step2 }}</li>
             <li>{{ connectionTexts.step3 }}</li>
           </ol>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
+        <template #actions>
           <v-btn
             :loading="midiStore.connectionState === MIDIConnectionState.SEARCHING || midiStore.connectionState === MIDIConnectionState.INITIALIZING"
             @click="midiStore.detectVolcaFM2"
           >
             {{ connectionTexts.retry }}
           </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        </template>
+    </AppDialog>
 
     <v-main>
       <div class="app-layout">
@@ -122,7 +98,8 @@ import { useI18n } from 'vue-i18n';
 import { Download, Info, PanelLeftClose, PanelLeftOpen, Piano, SlidersHorizontal } from '@lucide/vue';
 import Dx7Tab from './components/Dx7Tab.vue';
 import AppToggle from './components/AppToggle.vue';
-import DialogCloseButton from './components/DialogCloseButton.vue';
+import AppDialog from './components/dialogs/AppDialog.vue';
+import AppProgressDialog from './components/dialogs/AppProgressDialog.vue';
 import LogPanel from './components/LogPanel.vue';
 import SequencerTab from './components/SequencerTab.vue';
 import SoundEditTab from './components/SoundEditTab.vue';

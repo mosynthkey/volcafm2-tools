@@ -3,10 +3,11 @@ import { ref } from 'vue';
 import { createMidiMessageRouter } from '@/midi/midiMessageRouter';
 import { formatMidiBytes, MidiTransport } from '@/midi/midiTransport';
 import {
-    countVoiceDifferences, createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry,
-    createProgramRequest, decodeCurrentVoice, decodeVoiceName, isCurrentVoiceDump, isDeviceInquiryReply,
+    createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry,
+    createProgramRequest, decodeCurrentVoice, isCurrentVoiceDump, isDeviceInquiryReply,
     isProgramDump, isStatusReply, statusLabel, unpackProgramDump,
 } from '@/midi/volcaFm2Protocol';
+import { loadProgramReferences, matchCurrentVoice } from '@/midi/programLoader';
 
 type MIDIAccess = globalThis.MIDIAccess;
 type MIDIInput = globalThis.MIDIInput;
@@ -149,26 +150,10 @@ export const useMidiStore = defineStore('midi', () => {
                         return;
                     }
                     const voiceData = currentProgramData.slice(0, 128);
-                    const currentName = decodeVoiceName(voiceData);
-                    const candidates = programData.value
-                        .map((stored, programNo) => ({
-                            programNo,
-                            name: programNames.value[programNo]?.name.trim() ?? '',
-                            differences: countVoiceDifferences(voiceData, stored),
-                        }))
-                        .filter(candidate => candidate.name === currentName);
-                    const pool = candidates.length > 0
-                        ? candidates
-                        : programData.value.map((stored, programNo) => ({
-                            programNo,
-                            name: programNames.value[programNo]?.name.trim() ?? '',
-                            differences: countVoiceDifferences(voiceData, stored),
-                        }));
-                    const match = pool.sort((a, b) => a.differences - b.differences)[0];
-                    if (!match) throw new Error('No stored program data is available for comparison.');
+                    const match = matchCurrentVoice(voiceData, programData.value, programNames.value);
                     matchedProgramNo.value = match.programNo;
                     currentProgramFetchState.value = 'received';
-                    log(`Current voice matched program #${match.programNo} "${currentName}" (byte differences=${match.differences}, nameCandidates=${candidates.length}).`);
+                    log(`Current voice matched program #${match.programNo} "${match.currentName}" (byte differences=${match.differences}, nameCandidates=${match.nameCandidateCount}).`);
                 } catch (error) {
                     currentProgramFetchState.value = 'error';
                     log(`Current voice matching failed: ${error}`);
@@ -229,21 +214,12 @@ export const useMidiStore = defineStore('midi', () => {
 
         connectionState.value = MIDIConnectionState.RECEIVING;
         log('Preloading all 64 program dumps (adaptive response timing)...');
-        const missing: number[] = [];
-        for (let programNo = 0; programNo < 64; programNo++) {
-            if (programData.value[programNo]) continue;
-            let timeoutMs = 120;
-            let received = false;
-            for (let attempt = 1; attempt <= 4; attempt++) {
-                const request = createProgramRequest(programNo);
-                output.send(request);
-                received = await waitForProgram(programNo, timeoutMs);
-                if (received) break;
-                log(`Program #${programNo} timed out after ${timeoutMs}ms (attempt ${attempt}/4); backing off.`);
-                timeoutMs *= 2;
-            }
-            if (!received) missing.push(programNo);
-        }
+        const missing = await loadProgramReferences({
+            hasProgram: programNo => Boolean(programData.value[programNo]),
+            request: programNo => output.send(createProgramRequest(programNo)),
+            waitFor: waitForProgram,
+            log,
+        });
         currentProgramFetchProgress.value = programData.value.filter(Boolean).length;
         if (missing.length === 0) {
             connectionState.value = MIDIConnectionState.RECEIVED;

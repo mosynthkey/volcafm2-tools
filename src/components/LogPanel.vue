@@ -2,9 +2,9 @@
   <div class="log-panel" :class="{ collapsed: !expanded }">
     <div class="log-panel-header" @click="expanded = !expanded">
       <v-icon size="small" class="mr-2">{{ expanded ? 'mdi-chevron-down' : 'mdi-chevron-up' }}</v-icon>
-      <span class="log-title">{{ texts.title }} ({{ midiStore.logs.length }})</span>
+      <span class="log-title">{{ t('app.log') }} ({{ midiStore.logs.length }})</span>
       <v-spacer />
-      <v-btn size="small" variant="text" @click.stop="midiStore.clearLogs">{{ texts.clear }}</v-btn>
+      <v-btn size="small" variant="text" @click.stop="midiStore.clearLogs">{{ t('sequence.clear') }}</v-btn>
     </div>
     <textarea v-if="expanded" ref="logBoxRef" class="log-box" readonly :value="logText"></textarea>
   </div>
@@ -13,8 +13,10 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { useMidiStore } from '@/stores/midiStore';
+import { useI18n } from 'vue-i18n';
 
 const midiStore = useMidiStore();
+const { t } = useI18n();
 const expanded = ref(true);
 const logBoxRef = ref<HTMLTextAreaElement | null>(null);
 
@@ -28,12 +30,6 @@ watch(logText, () => {
   });
 });
 
-const userLanguage = navigator.language.startsWith('ja') ? 'ja' : 'en';
-const TEXTS = {
-  ja: { title: 'ログ', clear: 'クリア' },
-  en: { title: 'Log', clear: 'Clear' },
-};
-const texts = computed(() => TEXTS[userLanguage]);
 </script>
 
 <style scoped>

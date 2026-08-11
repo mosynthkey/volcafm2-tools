@@ -1,52 +1,40 @@
 <template>
   <v-container class="sound-container">
-    <v-dialog v-model="showError" max-width="440">
-      <v-card class="pa-4">
-        <v-card-title>Sound Edit</v-card-title>
-        <v-card-text>volca fm2とのMIDI IN/OUT接続を確認してください。</v-card-text>
-        <v-card-actions><v-spacer /><v-btn @click="showError = false">OK</v-btn></v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AppErrorDialog v-model="showError" :title="t('sound.title')" :message="t('sound.connectionError')" />
 
-    <v-dialog v-model="showAlgorithmPicker" max-width="1040">
-      <v-card class="algorithm-picker-card pa-4">
-        <div class="algorithm-picker-header">
-          <v-card-title>Algorithmを選択</v-card-title>
-          <DialogCloseButton @click="showAlgorithmPicker = false" />
-        </div>
+    <AppDialog v-model="showAlgorithmPicker" :title="t('sound.selectAlgorithm')" max-width="1040" card-class="algorithm-picker-card">
         <div class="algorithm-picker-grid">
           <button v-for="algorithm in 32" :key="algorithm" type="button" class="algorithm-option"
             :class="{ selected: program.algorithm === algorithm - 1 }" @click="selectAlgorithm(algorithm - 1)">
-            <strong>Algorithm {{ algorithm }}</strong>
+            <strong>{{ t('sound.algorithm') }} {{ algorithm }}</strong>
             <AlgorithmDiagram :algorithm="algorithm - 1" :enabled="program.operators.map(operator => operator.enabled)"
               :selected-operator="-1" />
           </button>
         </div>
-      </v-card>
-    </v-dialog>
+    </AppDialog>
 
-    <PresetLibraryDialog v-model="showLibrary" kind="sound" title="Sound Library"
-      :suggested-name="program.name.trim() || 'Untitled Sound'" :snapshot="soundSnapshot" @load="loadSoundPreset" />
+    <PresetLibraryDialog v-model="showLibrary" kind="sound" :title="t('sound.library')"
+      :suggested-name="program.name.trim() || t('sound.untitled')" :snapshot="soundSnapshot" @load="loadSoundPreset" />
 
     <v-card class="sound-card pa-4">
       <div class="sound-toolbar">
         <div>
-          <h2>Sound Edit</h2>
+          <h2>{{ t('sound.title') }}</h2>
         </div>
-        <v-text-field v-model="program.name" label="Voice Name" maxlength="10" counter="10"
+        <v-text-field v-model="program.name" :label="t('sound.voiceName')" maxlength="10" counter="10"
           density="compact" hide-details class="voice-name" />
         <v-btn @click="midiStore.requestCurrentVoiceDump" :disabled="!canSend"
           :loading="midiStore.soundEditState === 'requesting'">
-          現在の音色を取得
+          {{ t('sound.getCurrent') }}
         </v-btn>
         <v-spacer />
-        <v-btn variant="text" @click="resetProgram">初期化</v-btn>
+        <v-btn variant="text" @click="resetProgram">{{ t('sound.initialize') }}</v-btn>
         <v-btn class="send-button" :class="{ 'needs-send': hasUnsavedChanges }" @click="sendProgram"
           :disabled="!canSend" :loading="midiStore.soundEditState === 'sending'">
-          送信
+          {{ t('common.send') }}
           <Upload :size="16" class="ml-1" />
         </v-btn>
-        <v-btn icon variant="text" title="Sound Library" aria-label="Sound Library" @click="showLibrary = true">
+        <v-btn icon variant="text" :title="t('sound.library')" :aria-label="t('sound.library')" @click="showLibrary = true">
           <Library :size="19" />
         </v-btn>
       </div>
@@ -59,34 +47,33 @@
             <AlgorithmDiagram :algorithm="program.algorithm" :enabled="program.operators.map(operator => operator.enabled)"
               :selected-operator="selectedOperator" @select="selectedOperator = $event" />
             <div class="algorithm-legend" aria-label="Algorithm diagram legend">
-              <span><i class="route"></i>Modulation</span>
-              <span><i class="feedback"></i>Feedback</span>
-              <span><i class="output"></i>Carrier / Output</span>
+              <span><i class="route"></i>{{ t('sound.modulation') }}</span>
+              <span><i class="feedback"></i>{{ t('sound.feedback') }}</span>
+              <span><i class="output"></i>{{ t('sound.carrierOutput') }}</span>
             </div>
           </div>
           <div class="global-mini-grid">
             <button type="button" class="algorithm-picker-trigger" @click="showAlgorithmPicker = true">
-              <span>Algorithm</span><strong>{{ program.algorithm + 1 }}</strong>
+              <span>{{ t('sound.algorithm') }}</span><strong>{{ program.algorithm + 1 }}</strong>
             </button>
-            <NumberControl v-model="program.feedback" label="Feedback" :min="0" :max="7" />
-            <div class="toggle-row stacked-control"><span>OSC Key Sync</span><AppToggle v-model="program.oscillatorSync" aria-label="OSC Key Sync" /></div>
+            <NumberControl v-model="program.feedback" :label="t('sound.feedback')" :min="0" :max="7" />
+            <div class="toggle-row stacked-control"><span>{{ t('sound.oscKeySync') }}</span><AppToggle v-model="program.oscillatorSync" :aria-label="t('sound.oscKeySync')" /></div>
           </div>
 
           <div class="left-utility-grid">
             <section class="global-section volca-macros">
-              <h4>volca fm2 Macros</h4>
+              <h4>{{ t('sound.macros') }}</h4>
               <div class="control-grid two">
-                <NumberControl v-model="program.modulatorAttack" label="Mod Attack" :min="-63" :max="63" />
-                <NumberControl v-model="program.modulatorDecay" label="Mod Decay" :min="-63" :max="63" />
-                <NumberControl v-model="program.carrierAttack" label="Carrier Attack" :min="-63" :max="63" />
-                <NumberControl v-model="program.carrierDecay" label="Carrier Decay" :min="-63" :max="63" />
+                <NumberControl v-for="control in macroControls" :key="control.key"
+                  :model-value="programNumber(control.key)" :label="t(control.label)" :min="control.min" :max="control.max"
+                  @update:model-value="setProgramNumber(control.key, $event)" />
               </div>
             </section>
             <section class="global-section transpose-section">
-              <h4>Transpose</h4>
+              <h4>{{ t('sound.transpose') }}</h4>
               <div class="transpose-controls">
-                <NumberControl v-model="program.transpose" label="Semitone" :min="0" :max="48" :display-offset="-24" />
-                <NumberControl v-model="program.octave" label="volca Octave" :min="-2" :max="2" />
+                <NumberControl v-model="program.transpose" :label="t('sound.semitone')" :min="0" :max="48" :display-offset="-24" />
+                <NumberControl v-model="program.octave" :label="t('sound.octave')" :min="-2" :max="2" />
               </div>
             </section>
           </div>
@@ -95,34 +82,30 @@
 
         <main class="sound-panel operator-editor">
           <div class="panel-title operator-heading">
-            <h3>Operator {{ selectedOperator + 1 }}</h3>
-            <AppToggle v-model="selected.enabled" :aria-label="`Operator ${selectedOperator + 1}`" />
+            <h3>{{ t('sound.operator', { count: selectedOperator + 1 }) }}</h3>
+            <AppToggle v-model="selected.enabled" :aria-label="t('sound.operator', { count: selectedOperator + 1 })" />
           </div>
 
           <section class="edit-section">
-            <div class="section-heading"><h4>Frequency &amp; Output</h4><span>{{ frequencyLabel(selected) }}</span></div>
+            <div class="section-heading"><h4>{{ t('sound.frequencyOutput') }}</h4><span>{{ frequencyLabel(selected) }}</span></div>
             <div class="control-grid four">
               <div class="mode-control">
-                <label>Mode</label>
-                <div class="mode-segment" role="group" aria-label="Oscillator mode">
+                <label>{{ t('sound.mode') }}</label>
+                <div class="mode-segment" role="group" :aria-label="t('sound.oscillatorMode')">
                   <button type="button" :class="{ active: selected.oscillatorMode === 0 }"
-                    :aria-pressed="selected.oscillatorMode === 0" @click="selected.oscillatorMode = 0">Ratio</button>
+                    :aria-pressed="selected.oscillatorMode === 0" @click="selected.oscillatorMode = 0">{{ t('sound.ratio') }}</button>
                   <button type="button" :class="{ active: selected.oscillatorMode === 1 }"
-                    :aria-pressed="selected.oscillatorMode === 1" @click="selected.oscillatorMode = 1">Fixed</button>
+                    :aria-pressed="selected.oscillatorMode === 1" @click="selected.oscillatorMode = 1">{{ t('sound.fixed') }}</button>
                 </div>
               </div>
-              <NumberControl v-model="selected.coarse" label="Coarse" :min="0" :max="31" />
-              <NumberControl v-model="selected.fine" label="Fine" :min="0" :max="99" />
-              <NumberControl v-model="selected.detune" label="Detune" :min="0" :max="14" :display-offset="-7" />
-              <NumberControl v-model="selected.outputLevel" label="Output Level" :min="0" :max="99" />
-              <NumberControl v-model="selected.ampModSensitivity" label="Amp Mod Sens" :min="0" :max="3" />
-              <NumberControl v-model="selected.keyVelocitySensitivity" label="Key Velocity" :min="0" :max="7" />
-              <NumberControl v-model="selected.rateScaling" label="Rate Scaling" :min="0" :max="7" />
+              <NumberControl v-for="control in operatorFrequencyControls" :key="control.key"
+                :model-value="operatorNumber(control.key)" :label="t(control.label)" :min="control.min" :max="control.max"
+                :display-offset="control.displayOffset" @update:model-value="setOperatorNumber(control.key, $event)" />
             </div>
           </section>
 
           <section class="edit-section">
-            <div class="section-heading"><h4>Amplitude Envelope</h4><span>Rate / Level</span></div>
+            <div class="section-heading"><h4>{{ t('sound.amplitudeEnvelope') }}</h4><span>{{ t('sound.rateLevel') }}</span></div>
             <div class="envelope-layout">
               <svg class="envelope-graph" viewBox="0 0 420 170" role="img" aria-label="Amplitude envelope">
                 <path class="envelope-grid" d="M0 35H420M0 85H420M0 135H420M105 0V170M210 0V170M315 0V170" />
@@ -131,21 +114,21 @@
               </svg>
               <div class="envelope-values">
                 <NumberControl v-for="index in 4" :key="`r${index}`" v-model="selected.egRates[index - 1]"
-                  :label="`Rate ${index}`" :min="0" :max="99" compact />
+                  :label="t('sound.rate', { count: index })" :min="0" :max="99" compact />
                 <NumberControl v-for="index in 4" :key="`l${index}`" v-model="selected.egLevels[index - 1]"
-                  :label="`Level ${index}`" :min="0" :max="99" compact />
+                  :label="t('sound.level', { count: index })" :min="0" :max="99" compact />
               </div>
             </div>
           </section>
 
           <section class="edit-section keyboard-scaling">
-            <div class="section-heading"><h4>Keyboard Scaling</h4><span>Level response across keys</span></div>
+            <div class="section-heading"><h4>{{ t('sound.keyboardScaling') }}</h4><span>{{ t('sound.keyResponse') }}</span></div>
             <div class="control-grid five">
-              <NumberControl v-model="selected.breakPoint" label="Break Point" :min="0" :max="99" />
-              <NumberControl v-model="selected.leftDepth" label="Left Depth" :min="0" :max="99" />
-              <NumberControl v-model="selected.rightDepth" label="Right Depth" :min="0" :max="99" />
-              <div class="select-control"><label>Left Curve</label><v-select v-model="selected.leftCurve" :items="curveItems" aria-label="Left Curve" density="compact" hide-details /></div>
-              <div class="select-control"><label>Right Curve</label><v-select v-model="selected.rightCurve" :items="curveItems" aria-label="Right Curve" density="compact" hide-details /></div>
+              <NumberControl v-model="selected.breakPoint" :label="t('sound.breakPoint')" :min="0" :max="99" />
+              <NumberControl v-model="selected.leftDepth" :label="t('sound.leftDepth')" :min="0" :max="99" />
+              <NumberControl v-model="selected.rightDepth" :label="t('sound.rightDepth')" :min="0" :max="99" />
+              <div class="select-control"><label>{{ t('sound.leftCurve') }}</label><v-select v-model="selected.leftCurve" :items="curveItems" :aria-label="t('sound.leftCurve')" density="compact" hide-details /></div>
+              <div class="select-control"><label>{{ t('sound.rightCurve') }}</label><v-select v-model="selected.rightCurve" :items="curveItems" :aria-label="t('sound.rightCurve')" density="compact" hide-details /></div>
             </div>
           </section>
         </main>
@@ -153,19 +136,17 @@
         <aside class="sound-panel global-editor">
           <section class="global-section">
             <h4>LFO</h4>
-            <div class="select-control"><label>Waveform</label><v-select v-model="program.lfoWave" :items="lfoWaveItems" aria-label="Waveform" density="compact" hide-details /></div>
+            <div class="select-control"><label>{{ t('sound.waveform') }}</label><v-select v-model="program.lfoWave" :items="lfoWaveItems" :aria-label="t('sound.waveform')" density="compact" hide-details /></div>
             <div class="control-grid three mt-2">
-              <NumberControl v-model="program.lfoSpeed" label="Speed" :min="0" :max="99" />
-              <NumberControl v-model="program.lfoDelay" label="Delay" :min="0" :max="99" />
-              <NumberControl v-model="program.pitchModDepth" label="Pitch Mod Depth" :min="0" :max="99" />
-              <NumberControl v-model="program.ampModDepth" label="Amp Mod Depth" :min="0" :max="99" />
-              <NumberControl v-model="program.pitchModSensitivity" label="Pitch Mod Sens" :min="0" :max="7" />
-              <div class="toggle-row stacked-control"><span>LFO Key Sync</span><AppToggle v-model="program.lfoSync" aria-label="LFO Key Sync" /></div>
+              <NumberControl v-for="control in lfoControls" :key="control.key"
+                :model-value="programNumber(control.key)" :label="t(control.label)" :min="control.min" :max="control.max"
+                @update:model-value="setProgramNumber(control.key, $event)" />
+              <div class="toggle-row stacked-control"><span>{{ t('sound.lfoKeySync') }}</span><AppToggle v-model="program.lfoSync" :aria-label="t('sound.lfoKeySync')" /></div>
             </div>
           </section>
 
           <section class="global-section">
-            <h4>Pitch Envelope</h4>
+            <h4>{{ t('sound.pitchEnvelope') }}</h4>
             <svg class="pitch-envelope" viewBox="0 0 320 90" aria-label="Pitch envelope">
               <path class="envelope-grid" d="M0 45H320M80 0V90M160 0V90M240 0V90" />
               <polyline class="envelope-line" :points="pitchEnvelopePoints" />
@@ -189,14 +170,18 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { Library, Upload } from '@lucide/vue';
 import AlgorithmDiagram from '@/components/AlgorithmDiagram.vue';
 import AppToggle from '@/components/AppToggle.vue';
-import DialogCloseButton from '@/components/DialogCloseButton.vue';
 import KnobControl from '@/components/KnobControl.vue';
 import PresetLibraryDialog from '@/components/PresetLibraryDialog.vue';
+import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue';
+import AppDialog from '@/components/dialogs/AppDialog.vue';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
 import type { SoundOperator, SoundProgram } from '@/types/soundProgram';
 import { createInitialSoundProgram, decodeSoundProgram, encodeSoundProgram } from '@/utils/soundProgramCodec';
+import { useI18n } from 'vue-i18n';
+import { lfoControls, macroControls, operatorFrequencyControls, type OperatorNumberKey, type ProgramNumberKey } from '@/features/sound/soundControlDefinitions';
 
 const midiStore = useMidiStore();
+const { t } = useI18n();
 const program = ref(createInitialSoundProgram());
 const selectedOperator = ref(0);
 const showError = ref(false);
@@ -206,6 +191,10 @@ const currentVoiceRequestPending = ref(true);
 const loadedProgramSignature = ref<string | null>(null);
 let unsubscribeProgramChange: (() => void) | null = null;
 const selected = computed(() => program.value.operators[selectedOperator.value]);
+const operatorNumber = (key: OperatorNumberKey) => selected.value[key] as number;
+const setOperatorNumber = (key: OperatorNumberKey, value: number) => { (selected.value[key] as number) = value; };
+const programNumber = (key: ProgramNumberKey) => program.value[key] as number;
+const setProgramNumber = (key: ProgramNumberKey, value: number) => { (program.value[key] as number) = value; };
 const canSend = computed(() => [MIDIConnectionState.DETECTED, MIDIConnectionState.RECEIVING, MIDIConnectionState.RECEIVED]
   .includes(midiStore.connectionState));
 const programSignature = () => Array.from(encodeSoundProgram(program.value)).join(',');

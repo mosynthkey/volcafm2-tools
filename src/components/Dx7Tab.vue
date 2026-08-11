@@ -5,13 +5,13 @@
       <v-card v-for="(cartridge, index) in 2" :key="index" class="mb-4 pa-4" style="margin: 0 auto;">
         <v-row align="center">
           <v-col>
-            <v-card-title>Cartridge {{ index + 1 }}</v-card-title>
+            <v-card-title>{{ t('dx7.cartridge', { count: index + 1 }) }}</v-card-title>
           </v-col>
           <v-col class="text-right">
             <v-btn @click="midiStore.downloadSysEx(index === 0)"
               :disabled="midiStore.connectionState !== MIDIConnectionState.RECEIVED"
               :class="{ dimmed: midiStore.connectionState !== MIDIConnectionState.RECEIVED }">
-              {{ buttonTexts.download }}
+              {{ t('dx7.download') }}
               <Download :size="16" class="ml-1" />
             </v-btn>
           </v-col>
@@ -30,28 +30,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
 import { Download } from '@lucide/vue';
+import { useI18n } from 'vue-i18n';
 
 const midiStore = useMidiStore();
-
-const userLanguage = navigator.language.startsWith('ja') ? 'ja' : 'en';
-
-const BUTTON_TEXTS = {
-  ja: {
-    detect: 'volca fm2を検出',
-    download: 'ダウンロード'
-  },
-  en: {
-    detect: 'Detect volca fm2',
-    download: 'Download'
-  }
-};
-
-const buttonTexts = computed(() => {
-  return BUTTON_TEXTS[userLanguage];
-});
+const { t } = useI18n();
 </script>
 
 <style scoped>

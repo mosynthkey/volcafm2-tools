@@ -7,10 +7,10 @@
       </div>
 
       <div class="save-row">
-        <v-text-field v-model="saveName" label="名前" maxlength="40" density="compact" hide-details
+        <v-text-field v-model="saveName" :label="t('library.name')" maxlength="40" density="compact" hide-details
           @keydown.enter.prevent="saveCurrent" />
         <v-btn :disabled="!saveName.trim()" :loading="busy === 'save'" @click="saveCurrent">
-          <Save :size="17" class="mr-1" />保存
+          <Save :size="17" class="mr-1" />{{ t('common.save') }}
         </v-btn>
       </div>
 
@@ -19,20 +19,20 @@
       </v-alert>
 
       <div class="library-list" :aria-busy="busy === 'load-list'">
-        <div v-if="busy === 'load-list'" class="library-empty">読み込み中…</div>
+        <div v-if="busy === 'load-list'" class="library-empty">{{ t('common.loading') }}</div>
         <div v-else-if="records.length === 0" class="library-empty">
-          まだ保存されたデータはありません。
+          {{ t('library.empty') }}
         </div>
         <div v-for="record in records" v-else :key="record.id" class="library-item">
           <div class="library-meta">
             <strong>{{ record.name }}</strong><small>{{ formatDate(record.updatedAt) }}</small>
           </div>
-          <v-btn size="small" @click="loadRecord(record)">読み込む</v-btn>
+          <v-btn size="small" @click="loadRecord(record)">{{ t('common.load') }}</v-btn>
           <template v-if="deleteTarget === record.id">
-            <v-btn size="small" variant="text" @click="deleteTarget = null">戻る</v-btn>
-            <v-btn size="small" color="error" :loading="busy === record.id" @click="removeRecord(record.id)">削除</v-btn>
+            <v-btn size="small" variant="text" @click="deleteTarget = null">{{ t('common.back') }}</v-btn>
+            <v-btn size="small" color="error" :loading="busy === record.id" @click="removeRecord(record.id)">{{ t('common.delete') }}</v-btn>
           </template>
-          <v-btn v-else class="library-delete-button" icon variant="text" size="small" :aria-label="`${record.name}を削除`"
+          <v-btn v-else class="library-delete-button" icon variant="text" size="small" :aria-label="t('library.deleteLabel', { name: record.name })"
             @click="deleteTarget = record.id">
             <Trash2 :size="17" />
           </v-btn>
@@ -44,6 +44,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { Save, Trash2 } from '@lucide/vue';
 import DialogCloseButton from '@/components/DialogCloseButton.vue';
 import { deletePreset, listPresets, savePreset, type PresetKind, type PresetRecord } from '@/utils/presetLibrary';
@@ -59,6 +60,7 @@ const emit = defineEmits<{
   'update:modelValue': [value: boolean];
   load: [data: unknown];
 }>();
+const { t, locale } = useI18n();
 
 const records = ref<PresetRecord[]>([]);
 const saveName = ref('');
@@ -72,7 +74,7 @@ const refresh = async () => {
   try {
     records.value = await listPresets(props.kind);
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '保存データを読み込めませんでした。';
+    errorMessage.value = error instanceof Error ? error.message : t('library.loadError');
   } finally {
     busy.value = null;
   }
@@ -98,7 +100,7 @@ const saveCurrent = async () => {
     await savePreset(props.kind, name, snapshot);
     await refresh();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '保存できませんでした。';
+    errorMessage.value = error instanceof Error ? error.message : t('library.saveError');
   } finally {
     busy.value = null;
   }
@@ -121,13 +123,13 @@ const removeRecord = async (id: string) => {
     deleteTarget.value = null;
     await refresh();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '削除できませんでした。';
+    errorMessage.value = error instanceof Error ? error.message : t('library.deleteError');
   } finally {
     busy.value = null;
   }
 };
 
-const formatDate = (timestamp: number) => new Intl.DateTimeFormat(navigator.language, {
+const formatDate = (timestamp: number) => new Intl.DateTimeFormat(locale.value, {
   dateStyle: 'medium', timeStyle: 'short',
 }).format(timestamp);
 </script>

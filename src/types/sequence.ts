@@ -4,21 +4,8 @@ export const NUM_OF_VOICES_PER_STEP = 6;
 export const MOTION_PARAM_COUNT = 13;
 
 // SysEx MOTION Parameter / MOTION Data のオフセット順 (volca fm2 ファームウェア MOPARAM enum と一致)
-export const MOTION_PARAM_LABELS: { ja: string; en: string }[] = [
-    { ja: 'トランスポーズ', en: 'Transpose' },
-    { ja: 'ベロシティ', en: 'Velocity' },
-    { ja: 'アルゴリズム', en: 'Algorithm' },
-    { ja: 'モジュレーター アタック', en: 'Modulator Attack' },
-    { ja: 'モジュレーター ディケイ', en: 'Modulator Decay' },
-    { ja: 'キャリア アタック', en: 'Carrier Attack' },
-    { ja: 'キャリア ディケイ', en: 'Carrier Decay' },
-    { ja: 'LFO レート', en: 'LFO Rate' },
-    { ja: 'LFO ピッチデプス', en: 'LFO Pitch Depth' },
-    { ja: 'アルペジオ タイプ', en: 'Arp Type' },
-    { ja: 'アルペジオ ディビジョン', en: 'Arp Div' },
-    { ja: 'コーラス デプス', en: 'Chorus Depth' },
-    { ja: 'リバーブ デプス', en: 'Reverb Depth' },
-];
+export const MOTION_PARAM_KEYS = ['transpose', 'velocity', 'algorithm', 'modulatorAttack', 'modulatorDecay',
+    'carrierAttack', 'carrierDecay', 'lfoRate', 'lfoPitchDepth', 'arpType', 'arpDivision', 'chorusDepth', 'reverbDepth'] as const;
 
 // ピアノロール上の1ノート。連続した複数ステップにまたがる場合はTIE(タイ)として
 // エンコードされ、アタックからリリースまで音が継続する(=「ステップをつなげた和音」)。

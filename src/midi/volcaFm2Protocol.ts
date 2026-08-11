@@ -1,4 +1,4 @@
-import { pack8to7, unpack7to8 } from '@/utils/sequenceCodec'
+import { pack8to7, unpack7to8 } from '../utils/sequenceCodec'
 
 export const VOLCA_FM2_ID = { manufacturer: 0x42, familyLsb: 0x2f, familyMsb: 0x01, memberLsb: 0x08, memberMsb: 0x00 } as const
 const prefix = [0xf0, 0x42, 0x30, 0x00, 0x01, 0x2f] as const
@@ -33,4 +33,3 @@ export function countVoiceDifferences(current: Uint8Array, stored: Uint8Array) {
 }
 
 export const statusLabel = (status: number) => ({ 0x23: 'ACK: DATA LOAD COMPLETED', 0x24: 'NAK: DATA LOAD ERROR', 0x25: 'NAK: BUFFER FULL', 0x26: 'NAK: DATA FORMAT ERROR' })[status] ?? 'unknown'
-
