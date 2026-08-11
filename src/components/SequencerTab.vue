@@ -142,6 +142,10 @@
             <span class="program-control__label">{{ texts.program }}</span>
             <v-text-field type="number" v-model.number="seqStore.programNo" :aria-label="texts.program" min="0" max="63"
               density="compact" hide-details class="program-control__input" />
+            <span class="program-control__name" :class="{ empty: !currentProgramName }"
+              :title="currentProgramName || texts.programNameUnknown">
+              {{ currentProgramName || '—' }}
+            </span>
             <v-btn @click="midiStore.requestCurrentVoiceProgramNo" :disabled="!canSend"
               :loading="midiStore.currentProgramFetchState === 'loading-programs' || midiStore.currentProgramFetchState === 'requesting'"
               :class="{ dimmed: !canSend }">
@@ -288,6 +292,7 @@ const userLanguage = navigator.language.startsWith('ja') ? 'ja' : 'en';
 const TEXTS = {
   ja: {
     program: 'プログラム No.',
+    programNameUnknown: '音色名を取得していません',
     getCurrentProgram: '取得',
     programFetchFailedTitle: 'プログラム番号を取得できませんでした',
     programFetchFailed: 'volca fm2とのMIDI IN/OUT接続を確認してください。',
@@ -340,6 +345,7 @@ const TEXTS = {
   },
   en: {
     program: 'Program No.',
+    programNameUnknown: 'Program name is not available',
     getCurrentProgram: 'Get',
     programFetchFailedTitle: 'Could not get the program number',
     programFetchFailed: 'Please check both MIDI IN and MIDI OUT connections to the volca fm2.',
@@ -404,6 +410,11 @@ const canSend = computed(() =>
   midiStore.connectionState === MIDIConnectionState.DETECTED ||
   midiStore.connectionState === MIDIConnectionState.RECEIVED
 );
+const currentProgramName = computed(() => {
+  const programNo = Number(seqStore.programNo);
+  if (!Number.isInteger(programNo) || programNo < 0 || programNo > 63) return '';
+  return midiStore.programNames[programNo]?.name.trim() ?? '';
+});
 const canInsertTie = computed(() => stepCursor.value > 0 && seqStore.stepNoteCount(stepCursor.value - 1) > 0);
 const isFetchingCurrentProgram = computed(() =>
   midiStore.currentProgramFetchState === 'loading-programs' ||
@@ -948,6 +959,8 @@ const endDrag = () => {
   width: 82px;
   flex: 0 0 82px;
 }
+.program-control__name { max-width: 140px; min-width: 72px; overflow: hidden; color: #e1cab0; font-size: var(--volca-type-body); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.program-control__name.empty { color: #8f8180; font-weight: 500; }
 
 .program-fetch-status__copy {
   display: flex;
