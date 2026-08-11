@@ -91,7 +91,11 @@ const saveCurrent = async () => {
   busy.value = 'save';
   errorMessage.value = '';
   try {
-    await savePreset(props.kind, name, props.snapshot());
+    const snapshot = props.snapshot();
+    if (props.kind === 'sound' && snapshot && typeof snapshot === 'object' && 'name' in snapshot) {
+      (snapshot as { name: string }).name = name.slice(0, 10);
+    }
+    await savePreset(props.kind, name, snapshot);
     await refresh();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '保存できませんでした。';
@@ -101,7 +105,11 @@ const saveCurrent = async () => {
 };
 
 const loadRecord = (record: PresetRecord) => {
-  emit('load', JSON.parse(JSON.stringify(record.data)));
+  const data = JSON.parse(JSON.stringify(record.data)) as unknown;
+  if (props.kind === 'sound' && data && typeof data === 'object' && 'name' in data) {
+    (data as { name: string }).name = record.name.slice(0, 10);
+  }
+  emit('load', data);
   emit('update:modelValue', false);
 };
 
