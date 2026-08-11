@@ -45,8 +45,7 @@
         <aside class="sound-panel operator-nav">
           <div class="algorithm-control">
             <AlgorithmDiagram :algorithm="program.algorithm" :enabled="program.operators.map(operator => operator.enabled)"
-              :selected-operator="selectedOperator" pickable @select="selectedOperator = $event"
-              @open="showAlgorithmPicker = true" />
+              :selected-operator="selectedOperator" pickable @select="selectOperator" @open="showAlgorithmPicker = true" />
             <div class="algorithm-legend" aria-label="Algorithm diagram legend">
               <span><i class="route"></i>{{ t('sound.modulation') }}</span>
               <span><i class="feedback"></i>{{ t('sound.feedback') }}</span>
@@ -82,9 +81,15 @@
 
         <main class="sound-panel operator-editor">
           <div class="panel-title operator-heading">
-            <h3>{{ t('sound.operator', { count: selectedOperator + 1 }) }}</h3>
+            <h3>{{ selectedOperator < 0 ? t('sound.allOperators') : t('sound.operator', { count: selectedOperator + 1 }) }}</h3>
+            <button v-if="selectedOperator >= 0" type="button" class="show-all-operators" @click="selectedOperator = -1">
+              {{ t('sound.showAllOperators') }}
+            </button>
           </div>
 
+          <OperatorOverview v-if="selectedOperator < 0" :operators="program.operators" @select="selectedOperator = $event" />
+
+          <template v-else>
           <section class="edit-section">
             <div class="section-heading frequency-heading">
               <h4>{{ t('sound.frequencyOutput') }}</h4>
@@ -137,6 +142,7 @@
               <CurveSelector v-model="selected.rightCurve" :label="t('sound.rightCurve')" direction="left" />
             </div>
           </section>
+          </template>
         </main>
 
         <aside class="sound-panel global-editor">
@@ -178,6 +184,7 @@ import AlgorithmDiagram from '@/components/AlgorithmDiagram.vue';
 import AppToggle from '@/components/AppToggle.vue';
 import CurveSelector from '@/components/CurveSelector.vue';
 import KnobControl from '@/components/KnobControl.vue';
+import OperatorOverview from '@/components/OperatorOverview.vue';
 import PresetLibraryDialog from '@/components/PresetLibraryDialog.vue';
 import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue';
 import AppDialog from '@/components/dialogs/AppDialog.vue';
@@ -190,14 +197,14 @@ import { lfoControls, macroControls, operatorFrequencyControls, type OperatorNum
 const midiStore = useMidiStore();
 const { t } = useI18n();
 const program = ref(createInitialSoundProgram());
-const selectedOperator = ref(0);
+const selectedOperator = ref(-1);
 const showError = ref(false);
 const showAlgorithmPicker = ref(false);
 const showLibrary = ref(false);
 const currentVoiceRequestPending = ref(true);
 const loadedProgramSignature = ref<string | null>(null);
 let unsubscribeProgramChange: (() => void) | null = null;
-const selected = computed(() => program.value.operators[selectedOperator.value]);
+const selected = computed(() => program.value.operators[Math.max(0, selectedOperator.value)]);
 const operatorNumber = (key: OperatorNumberKey) => selected.value[key] as number;
 const setOperatorNumber = (key: OperatorNumberKey, value: number) => { (selected.value[key] as number) = value; };
 const programNumber = (key: ProgramNumberKey) => program.value[key] as number;
@@ -241,6 +248,9 @@ const resetProgram = () => { program.value = createInitialSoundProgram(); };
 const selectAlgorithm = (algorithm: number) => {
   program.value.algorithm = algorithm;
   showAlgorithmPicker.value = false;
+};
+const selectOperator = (operatorIndex: number) => {
+  selectedOperator.value = selectedOperator.value === operatorIndex ? -1 : operatorIndex;
 };
 const sendProgram = () => midiStore.sendCurrentVoiceDump(encodeSoundProgram(program.value));
 const soundSnapshot = () => JSON.parse(JSON.stringify(program.value)) as SoundProgram;
@@ -313,6 +323,9 @@ const NumberControl = KnobControl;
 .algorithm-legend i.feedback { background: #72d5ca; }.algorithm-legend i.output { background: #e7bd76; }
 .global-mini-grid { display: grid; grid-template-columns: 1fr 1fr minmax(118px, 1.25fr); align-items: start; gap: 10px; padding: 2px 12px 14px; border-bottom: 1px solid rgba(206,179,147,.16); }
 .operator-heading { position: sticky; top: 0; z-index: 3; background: #302426; }
+.show-all-operators { padding: 5px 8px; border: 1px solid rgba(206,179,147,.28); border-radius: 7px; background: transparent; color: #c7b9b0; font: inherit; font-size: var(--volca-type-label); cursor: pointer; }
+.show-all-operators:hover { border-color: rgba(206,179,147,.58); background: rgba(206,179,147,.08); color: #f1e9e1; }
+.show-all-operators:focus-visible { outline: 2px solid #e1cab0; outline-offset: 2px; }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; color: #ad9e96; font-size: var(--volca-type-label); }
 .toggle-row.stacked-control { flex-direction: column; align-items: center; justify-content: flex-start; gap: 5px; }
 .toggle-row.stacked-control > span { width: 100%; min-height: 18px; line-height: 1.25; text-align: center; }
