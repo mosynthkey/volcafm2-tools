@@ -56,7 +56,6 @@
             <NumberControl :model-value="program.algorithm + 1" :label="t('sound.algorithm')" :min="1" :max="32"
               @update:model-value="program.algorithm = $event - 1" />
             <NumberControl v-model="program.feedback" :label="t('sound.feedback')" :min="0" :max="7" />
-            <div class="toggle-row stacked-control"><span>{{ t('sound.oscKeySync') }}</span><AppToggle v-model="program.oscillatorSync" :aria-label="t('sound.oscKeySync')" /></div>
           </div>
 
           <div class="left-utility-grid">
@@ -155,6 +154,7 @@
                 :model-value="programNumber(control.key)" :label="t(control.label)" :min="control.min" :max="control.max"
                 @update:model-value="setProgramNumber(control.key, $event)" />
               <div class="toggle-row stacked-control"><span>{{ t('sound.lfoKeySync') }}</span><AppToggle v-model="program.lfoSync" :aria-label="t('sound.lfoKeySync')" /></div>
+              <div class="toggle-row stacked-control"><span>{{ t('sound.oscKeySync') }}</span><AppToggle v-model="program.oscillatorSync" :aria-label="t('sound.oscKeySync')" /></div>
             </div>
           </section>
 
@@ -329,7 +329,7 @@ const NumberControl = KnobControl;
 .algorithm-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .algorithm-legend i { width: 13px; height: 2px; display: inline-block; background: #f1e9e1; }
 .algorithm-legend i.feedback { background: #72d5ca; }.algorithm-legend i.output { background: #e7bd76; }
-.global-mini-grid { display: grid; grid-template-columns: 1fr 1fr minmax(118px, 1.25fr); align-items: start; gap: 10px; padding: 2px 12px 14px; border-bottom: 1px solid rgba(206,179,147,.16); }
+.global-mini-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 10px; padding: 2px 12px 14px; border-bottom: 1px solid rgba(206,179,147,.16); }
 .operator-heading { position: sticky; top: 0; z-index: 3; background: #302426; }
 .show-all-operators { padding: 5px 8px; border: 1px solid rgba(206,179,147,.28); border-radius: 7px; background: transparent; color: #c7b9b0; font: inherit; font-size: var(--volca-type-label); cursor: pointer; }
 .show-all-operators:hover { border-color: rgba(206,179,147,.58); background: rgba(206,179,147,.08); color: #f1e9e1; }
