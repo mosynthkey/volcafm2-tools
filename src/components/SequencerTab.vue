@@ -722,7 +722,9 @@ const handleNoteEvent = (note: number, on: boolean) => {
 };
 
 const toggleStepInput = () => {
-  stepInputActive.value = !stepInputActive.value;
+  const starting = !stepInputActive.value;
+  stepInputActive.value = starting;
+  if (starting) stepCursor.value = 0;
   heldNotes.value.clear();
   chordBuffer.value.clear();
 };
