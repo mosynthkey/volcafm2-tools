@@ -11,6 +11,7 @@
     "type-check": "vue-tsc --build --force",
     "verify:sequence": "tsx scripts/verify-sequence-codec.ts",
     "verify:smf": "tsx scripts/verify-smf-import.ts",
+    "verify:sound": "tsx scripts/verify-sound-program.ts",
     "midi:tool": "tsx scripts/midi-sequence-tool.ts"
   },
   "dependencies": {

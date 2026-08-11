@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { unpack7to8 } from '../utils/sequenceCodec';
+import { pack8to7, unpack7to8 } from '../utils/sequenceCodec';
 import { useSequencerStore } from './sequencerStore';
 
 type MIDIAccess = globalThis.MIDIAccess;
@@ -30,6 +30,8 @@ export const useMidiStore = defineStore('midi', () => {
     const currentProgramFetchState = ref<'idle' | 'loading-programs' | 'requesting' | 'received' | 'error'>('idle');
     const currentProgramFetchProgress = ref(0);
     const sequenceWriteState = ref<'idle' | 'sending' | 'ok' | 'nak' | 'error'>('idle');
+    const currentVoiceData = ref<Uint8Array | null>(null);
+    const soundEditState = ref<'idle' | 'requesting' | 'received' | 'sending' | 'ok' | 'error'>('idle');
     const logs = ref<string[]>([]);
 
     const toHex = (bytes: Uint8Array | number[], limit = 24) => {
@@ -166,7 +168,14 @@ export const useMidiStore = defineStore('midi', () => {
                 }
             } else if (isVolcaFM2CurrentVoiceDump(data)) {
                 try {
-                    const voiceData = unpack7to8(data.slice(7, -1), 140).slice(0, 128);
+                    const currentProgramData = unpack7to8(data.slice(7, -1), 140);
+                    currentVoiceData.value = currentProgramData;
+                    if (soundEditState.value === 'requesting') soundEditState.value = 'received';
+                    if (currentProgramFetchState.value !== 'requesting') {
+                        log(`Sound Edit current program received (${currentProgramData.length} bytes).`);
+                        return;
+                    }
+                    const voiceData = currentProgramData.slice(0, 128);
                     const currentName = decodeVoiceName(voiceData);
                     const candidates = programData.value
                         .map((stored, programNo) => ({
@@ -201,6 +210,9 @@ export const useMidiStore = defineStore('midi', () => {
                 log(`Status reply: 0x${data[6].toString(16)} (${STATUS_LABELS[data[6]] ?? 'unknown'})`);
                 if (sequenceWriteState.value === 'sending') {
                     sequenceWriteState.value = data[6] === 0x23 ? 'ok' : 'nak';
+                }
+                if (soundEditState.value === 'sending') {
+                    soundEditState.value = data[6] === 0x23 ? 'ok' : 'error';
                 }
             } else {
                 log(`Unrecognized SysEx (func=0x${data[6]?.toString(16) ?? '??'}).`);
@@ -411,6 +423,37 @@ export const useMidiStore = defineStore('midi', () => {
         }, 4000);
     };
 
+    const requestCurrentVoiceDump = () => {
+        soundEditState.value = 'requesting';
+        log('Requesting CURRENT PROGRAM DATA DUMP for Sound Edit (Func 0x12)...');
+        if (!sendSysEx(new Uint8Array([0xf0, 0x42, 0x30, 0x00, 0x01, 0x2f, 0x12, 0xf7]))) {
+            soundEditState.value = 'error';
+            return;
+        }
+        setTimeout(() => {
+            if (soundEditState.value === 'requesting') {
+                soundEditState.value = 'error';
+                log('Sound Edit current program request timed out.');
+            }
+        }, 4000);
+    };
+
+    const sendCurrentVoiceDump = (programDataBytes: Uint8Array) => {
+        soundEditState.value = 'sending';
+        const message = new Uint8Array([0xf0, 0x42, 0x30, 0x00, 0x01, 0x2f, 0x42, ...pack8to7(programDataBytes), 0xf7]);
+        log('Sending CURRENT PROGRAM DATA DUMP from Sound Edit (Func 0x42)...');
+        if (!sendSysEx(message)) {
+            soundEditState.value = 'error';
+            return;
+        }
+        setTimeout(() => {
+            if (soundEditState.value === 'sending') {
+                soundEditState.value = 'error';
+                log('Sound Edit program write timed out (no ACK/NAK within 4s).');
+            }
+        }, 4000);
+    };
+
     const sendSysEx = (bytes: Uint8Array): boolean => {
         if (!selectedMidiOut.value || !midiAccess.value) return false;
 
@@ -452,6 +495,10 @@ export const useMidiStore = defineStore('midi', () => {
         requestCurrentVoiceProgramNo,
         sequenceWriteState,
         sendCurrentSequenceDump,
+        currentVoiceData,
+        soundEditState,
+        requestCurrentVoiceDump,
+        sendCurrentVoiceDump,
         logs,
         addLog: log,
         clearLogs,

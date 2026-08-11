@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sound Edit — Layout Proposal</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #211a1b;
+      --panel: #382b2d;
+      --panel-2: #302426;
+      --raised: #463638;
+      --line: rgba(206, 179, 147, .18);
+      --line-strong: rgba(206, 179, 147, .42);
+      --accent: #ceb393;
+      --accent-soft: rgba(206, 179, 147, .13);
+      --text: #f1e9e1;
+      --muted: #ad9e96;
+      --carrier: #d7bb98;
+      --modulator: #8caeaa;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { min-width: 1120px; margin: 0; background: var(--bg); color: var(--text); }
+    button, input, select { font: inherit; }
+    button { color: inherit; }
+
+    .app { min-height: 100vh; padding: 20px; }
+    .topbar { display: flex; align-items: center; gap: 14px; min-height: 66px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+    .title { margin-right: 10px; }
+    .title h1 { margin: 0; font-size: 19px; font-weight: 720; letter-spacing: -.02em; }
+    .title small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .field { display: grid; gap: 5px; }
+    .field label, .eyebrow { color: var(--muted); font-size: 10px; font-weight: 760; letter-spacing: .09em; text-transform: uppercase; }
+    input, select { height: 38px; border: 1px solid var(--line); border-radius: 8px; outline: none; background: #251c1e; color: var(--text); }
+    input { width: 100%; padding: 0 10px; }
+    select { padding: 0 30px 0 10px; }
+    input:focus, select:focus, button:focus-visible { border-color: var(--accent); outline: 2px solid rgba(206,179,147,.22); outline-offset: 1px; }
+    .program { width: 88px; }
+    .voice-name { width: 210px; }
+    .spacer { flex: 1; }
+    .button { height: 40px; padding: 0 15px; border: 1px solid rgba(255,255,255,.09); border-radius: 8px; background: var(--accent); color: #33282a; font-size: 13px; font-weight: 760; cursor: pointer; }
+    .button.secondary { border-color: var(--line); background: transparent; color: var(--text); }
+
+    .workspace { display: grid; grid-template-columns: 300px minmax(580px, 1fr) 350px; gap: 12px; margin-top: 12px; }
+    .panel { border: 1px solid var(--line); border-radius: 13px; background: var(--panel); overflow: hidden; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; min-height: 46px; padding: 10px 13px; border-bottom: 1px solid var(--line); }
+    .panel-head h2 { margin: 0; font-size: 14px; font-weight: 720; }
+    .panel-body { padding: 12px; }
+
+    .algorithm-view { height: 186px; display: grid; place-items: center; margin-top: 10px; border: 1px solid var(--line); border-radius: 9px; background: #251c1e; }
+    .algo-svg { width: 240px; height: 150px; }
+    .algo-line { fill: none; stroke: var(--accent); stroke-width: 2; }
+    .algo-op { fill: var(--raised); stroke: var(--line-strong); stroke-width: 1; }
+    .algo-op.carrier { fill: var(--accent-soft); stroke: var(--carrier); }
+    .algo-text { fill: var(--text); font-size: 11px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+    .algorithm-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+
+    .op-list { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
+    .op-card { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 7px; min-height: 60px; padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: #302426; text-align: left; cursor: pointer; }
+    .op-card[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+    .op-number { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 7px; background: var(--raised); font-size: 13px; font-weight: 800; }
+    .op-card.carrier .op-number { color: #33282a; background: var(--carrier); }
+    .op-meta b, .op-meta small { display: block; }
+    .op-meta b { font-size: 12px; }
+    .op-meta small { margin-top: 2px; color: var(--muted); font-size: 10px; }
+    .led { width: 9px; height: 9px; border-radius: 50%; background: #716467; }
+    .led.on { background: #9fc592; box-shadow: 0 0 0 3px rgba(159,197,146,.12); }
+
+    .operator-detail { min-height: 690px; }
+    .operator-title { display: flex; align-items: center; gap: 9px; }
+    .role { padding: 3px 7px; border-radius: 99px; background: rgba(140,174,170,.15); color: #b6d1ce; font-size: 10px; font-weight: 720; }
+    .switch { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
+    .switch input { width: 34px; height: 18px; accent-color: var(--accent); }
+    .section { padding: 13px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; }
+    .section-title { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+    .section-title h3 { margin: 0; font-size: 12px; font-weight: 720; }
+    .section-title span { color: var(--muted); font-size: 10px; }
+    .control-grid { display: grid; grid-template-columns: repeat(4, minmax(86px, 1fr)); gap: 8px; }
+    .control { display: grid; gap: 5px; }
+    .control label { color: var(--muted); font-size: 10px; }
+    .value-box { height: 37px; display: flex; align-items: center; justify-content: space-between; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: #251c1e; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .value-box output { color: var(--accent); font-weight: 760; }
+    .mode-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; height: 37px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: #251c1e; }
+    .mode-pair button { border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
+    .mode-pair button.active { background: var(--accent); color: #33282a; font-weight: 760; }
+
+    .eg-layout { display: grid; grid-template-columns: minmax(180px, 1.15fr) 1fr; gap: 12px; }
+    .eg-chart { min-height: 155px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: #251c1e; }
+    .eg-chart svg { width: 100%; height: 112px; }
+    .eg-grid { stroke: rgba(206,179,147,.1); stroke-width: 1; }
+    .eg-line { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+    .eg-point { fill: var(--panel); stroke: var(--accent); stroke-width: 2; }
+    .eg-caption { display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; }
+    .eg-values { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; align-content: start; }
+    .eg-values .value-box { height: 32px; padding-inline: 7px; }
+
+    details { border: 1px solid var(--line); border-radius: 9px; background: #302426; }
+    summary { padding: 11px 12px; color: var(--text); font-size: 12px; font-weight: 700; cursor: pointer; }
+    details .details-body { padding: 0 11px 11px; }
+
+    .global-stack { display: grid; gap: 12px; }
+    .global-card { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #302426; }
+    .global-card h3 { margin: 0 0 10px; font-size: 12px; }
+    .global-card .control-grid { grid-template-columns: 1fr 1fr; }
+    .macro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .macro { min-height: 54px; padding: 8px; border-left: 2px solid var(--modulator); border-radius: 6px; background: #251c1e; }
+    .macro.carrier { border-left-color: var(--carrier); }
+    .macro span, .macro b { display: block; }
+    .macro span { color: var(--muted); font-size: 9px; }
+    .macro b { margin-top: 5px; color: var(--accent); font-size: 13px; }
+
+    .scope { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .scope-card { padding: 13px 15px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .scope-card h2 { margin: 0 0 8px; font-size: 13px; }
+    .scope-card ul { columns: 2; gap: 24px; margin: 0; padding-left: 18px; color: var(--muted); font-size: 11px; line-height: 1.75; }
+    .scope-card.excluded { border-style: dashed; }
+
+    @media (max-width: 1320px) {
+      .workspace { grid-template-columns: 270px minmax(560px, 1fr) 320px; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="title"><h1>Sound Edit</h1><small>volca fm2 voice program</small></div>
+      <div class="field program"><label for="program">Program No.</label><input id="program" value="24"></div>
+      <div class="field voice-name"><label for="voice-name">Voice name · 10 characters</label><input id="voice-name" value="BRASS  1"></div>
+      <button class="button secondary">現在の音色を取得</button>
+      <div class="spacer"></div>
+      <button class="button secondary">初期化</button>
+      <button class="button">送信</button>
+    </header>
+
+    <div class="workspace">
+      <aside class="panel">
+        <div class="panel-head"><h2>Algorithm</h2><span class="eyebrow">Voice structure</span></div>
+        <div class="panel-body">
+          <div class="field"><label for="algorithm">Algorithm</label><select id="algorithm"><option>5 / 32</option></select></div>
+          <div class="algorithm-view" aria-label="Algorithm 5 routing preview">
+            <svg class="algo-svg" viewBox="0 0 240 150" role="img">
+              <path class="algo-line" d="M55 38V74M55 100v26M120 38V74M120 100v26M55 126H120"></path>
+              <rect class="algo-op" x="40" y="16" width="30" height="24" rx="5"></rect><text class="algo-text" x="55" y="28">6</text>
+              <rect class="algo-op" x="40" y="74" width="30" height="26" rx="5"></rect><text class="algo-text" x="55" y="87">5</text>
+              <rect class="algo-op carrier" x="40" y="124" width="30" height="24" rx="5"></rect><text class="algo-text" x="55" y="136">1</text>
+              <rect class="algo-op" x="105" y="16" width="30" height="24" rx="5"></rect><text class="algo-text" x="120" y="28">4</text>
+              <rect class="algo-op" x="105" y="74" width="30" height="26" rx="5"></rect><text class="algo-text" x="120" y="87">3</text>
+              <rect class="algo-op carrier" x="105" y="124" width="30" height="24" rx="5"></rect><text class="algo-text" x="120" y="136">2</text>
+            </svg>
+          </div>
+          <div class="algorithm-controls">
+            <div class="control"><label>Feedback</label><div class="value-box"><span>Amount</span><output>3</output></div></div>
+            <label class="switch"><input type="checkbox" checked> OSC Key Sync</label>
+          </div>
+
+          <div class="section-title" style="margin-top:16px"><h3>Operators</h3><span>select to edit</span></div>
+          <div class="op-list" id="operator-list">
+            <button class="op-card carrier" data-op="1" aria-pressed="true"><span class="op-number">1</span><span class="op-meta"><b>Carrier</b><small>Ratio 1.00 · L99</small></span><i class="led on"></i></button>
+            <button class="op-card carrier" data-op="2" aria-pressed="false"><span class="op-number">2</span><span class="op-meta"><b>Carrier</b><small>Ratio 2.00 · L82</small></span><i class="led on"></i></button>
+            <button class="op-card" data-op="3" aria-pressed="false"><span class="op-number">3</span><span class="op-meta"><b>Modulator</b><small>Ratio 2.00 · L74</small></span><i class="led on"></i></button>
+            <button class="op-card" data-op="4" aria-pressed="false"><span class="op-number">4</span><span class="op-meta"><b>Modulator</b><small>Ratio 0.50 · L67</small></span><i class="led on"></i></button>
+            <button class="op-card" data-op="5" aria-pressed="false"><span class="op-number">5</span><span class="op-meta"><b>Modulator</b><small>Ratio 2.00 · L71</small></span><i class="led on"></i></button>
+            <button class="op-card" data-op="6" aria-pressed="false"><span class="op-number">6</span><span class="op-meta"><b>Modulator</b><small>Ratio 0.50 · L62</small></span><i class="led on"></i></button>
+          </div>
+        </div>
+      </aside>
+
+      <section class="panel operator-detail">
+        <div class="panel-head">
+          <div class="operator-title"><h2 id="operator-title">Operator 1</h2><span class="role" id="operator-role">Carrier</span></div>
+          <label class="switch"><input type="checkbox" checked> Operator On</label>
+        </div>
+
+        <div class="section">
+          <div class="section-title"><h3>Frequency &amp; Output</h3><span>音程とFM変調量の中心</span></div>
+          <div class="control-grid">
+            <div class="control"><label>Mode</label><div class="mode-pair"><button class="active">Ratio</button><button>Fixed</button></div></div>
+            <div class="control"><label>Coarse · 0–31</label><div class="value-box"><span>Coarse</span><output>1</output></div></div>
+            <div class="control"><label>Fine · 0–99</label><div class="value-box"><span>Fine</span><output>0</output></div></div>
+            <div class="control"><label>Detune · −7–+7</label><div class="value-box"><span>Detune</span><output>0</output></div></div>
+            <div class="control"><label>Output Level · 0–99</label><div class="value-box"><span>Level</span><output>99</output></div></div>
+            <div class="control"><label>Amp Mod Sens · 0–3</label><div class="value-box"><span>AMS</span><output>0</output></div></div>
+            <div class="control"><label>Key Velocity · 0–7</label><div class="value-box"><span>KVS</span><output>2</output></div></div>
+            <div class="control"><label>Current frequency</label><div class="value-box"><span>Ratio</span><output>1.00</output></div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title"><h3>Amplitude Envelope</h3><span>Rates 1–4 / Levels 1–4</span></div>
+          <div class="eg-layout">
+            <div class="eg-chart">
+              <svg viewBox="0 0 300 112" aria-label="Operator envelope preview">
+                <path class="eg-grid" d="M0 20H300M0 56H300M0 92H300M75 0V112M150 0V112M225 0V112"></path>
+                <path class="eg-line" d="M8 102 L48 15 L138 30 L224 70 L292 100"></path>
+                <circle class="eg-point" cx="48" cy="15" r="4"></circle><circle class="eg-point" cx="138" cy="30" r="4"></circle><circle class="eg-point" cx="224" cy="70" r="4"></circle><circle class="eg-point" cx="292" cy="100" r="4"></circle>
+              </svg>
+              <div class="eg-caption"><span>Key on</span><span>Key off</span></div>
+            </div>
+            <div class="eg-values">
+              <div class="control"><label>Rate 1</label><div class="value-box"><output>95</output></div></div><div class="control"><label>Rate 2</label><div class="value-box"><output>62</output></div></div><div class="control"><label>Rate 3</label><div class="value-box"><output>48</output></div></div><div class="control"><label>Rate 4</label><div class="value-box"><output>72</output></div></div>
+              <div class="control"><label>Level 1</label><div class="value-box"><output>99</output></div></div><div class="control"><label>Level 2</label><div class="value-box"><output>84</output></div></div><div class="control"><label>Level 3</label><div class="value-box"><output>52</output></div></div><div class="control"><label>Level 4</label><div class="value-box"><output>0</output></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <details open>
+            <summary>Keyboard Scaling</summary>
+            <div class="details-body control-grid">
+              <div class="control"><label>Break Point · A−1–C8</label><div class="value-box"><span>Note</span><output>C3</output></div></div>
+              <div class="control"><label>Left Depth · 0–99</label><div class="value-box"><span>Depth</span><output>0</output></div></div>
+              <div class="control"><label>Right Depth · 0–99</label><div class="value-box"><span>Depth</span><output>25</output></div></div>
+              <div class="control"><label>Rate Scaling · 0–7</label><div class="value-box"><span>Rate</span><output>2</output></div></div>
+              <div class="control"><label>Left Curve</label><select><option>− Linear</option><option>− Exponential</option><option>+ Exponential</option><option>+ Linear</option></select></div>
+              <div class="control"><label>Right Curve</label><select><option>+ Linear</option><option>+ Exponential</option><option>− Exponential</option><option>− Linear</option></select></div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <div class="panel-head"><h2>Global</h2><span class="eyebrow">all operators</span></div>
+        <div class="panel-body global-stack">
+          <section class="global-card">
+            <h3>LFO</h3>
+            <div class="control-grid">
+              <div class="control"><label>Waveform</label><select><option>Sine</option><option>Triangle</option><option>Saw Down</option><option>Saw Up</option><option>Square</option><option>Sample &amp; Hold</option></select></div>
+              <div class="control"><label>Speed · 0–99</label><div class="value-box"><span>Speed</span><output>35</output></div></div>
+              <div class="control"><label>Delay · 0–99</label><div class="value-box"><span>Delay</span><output>0</output></div></div>
+              <div class="control"><label>Pitch Mod Depth</label><div class="value-box"><span>PMD</span><output>18</output></div></div>
+              <div class="control"><label>Amp Mod Depth</label><div class="value-box"><span>AMD</span><output>0</output></div></div>
+              <div class="control"><label>Pitch Mod Sens · 0–7</label><div class="value-box"><span>PMS</span><output>3</output></div></div>
+            </div>
+            <label class="switch" style="margin-top:10px"><input type="checkbox"> LFO Key Sync</label>
+          </section>
+
+          <section class="global-card">
+            <h3>Pitch Envelope</h3>
+            <div class="eg-chart" style="min-height:110px">
+              <svg viewBox="0 0 300 82" aria-label="Pitch envelope preview" style="height:76px"><path class="eg-grid" d="M0 41H300M75 0V82M150 0V82M225 0V82"></path><path class="eg-line" d="M5 41L52 23L130 48L220 41L295 41"></path></svg>
+            </div>
+            <div class="eg-values" style="margin-top:8px">
+              <div class="control"><label>R1</label><div class="value-box"><output>70</output></div></div><div class="control"><label>R2</label><div class="value-box"><output>55</output></div></div><div class="control"><label>R3</label><div class="value-box"><output>64</output></div></div><div class="control"><label>R4</label><div class="value-box"><output>50</output></div></div>
+              <div class="control"><label>L1</label><div class="value-box"><output>62</output></div></div><div class="control"><label>L2</label><div class="value-box"><output>48</output></div></div><div class="control"><label>L3</label><div class="value-box"><output>50</output></div></div><div class="control"><label>L4</label><div class="value-box"><output>50</output></div></div>
+            </div>
+          </section>
+
+          <section class="global-card">
+            <h3>Transpose</h3>
+            <div class="control-grid">
+              <div class="control"><label>Voice Transpose · −24–+24</label><div class="value-box"><span>Semitone</span><output>0</output></div></div>
+              <div class="control"><label>volca Octave · −2–+2</label><div class="value-box"><span>Octave</span><output>0</output></div></div>
+            </div>
+          </section>
+
+          <section class="global-card">
+            <h3>volca fm2 Macros</h3>
+            <div class="macro-grid">
+              <div class="macro"><span>Modulator Attack · −63–+63</span><b>+8</b></div>
+              <div class="macro"><span>Modulator Decay · −63–+63</span><b>−4</b></div>
+              <div class="macro carrier"><span>Carrier Attack · −63–+63</span><b>0</b></div>
+              <div class="macro carrier"><span>Carrier Decay · −63–+63</span><b>+12</b></div>
+            </div>
+          </section>
+        </div>
+      </aside>
+    </div>
+
+    <section class="scope" aria-label="Parameter scope notes">
+      <div class="scope-card">
+        <h2>このSound Editに含める</h2>
+        <ul><li>6 Operator On/Off</li><li>Operator Frequency / Output</li><li>Operator EG</li><li>Keyboard Scaling</li><li>Algorithm / Feedback</li><li>Pitch EG</li><li>LFO</li><li>Transpose / Voice name</li><li>volca fm2 Attack/Decay macros</li><li>volca fm2 Octave</li></ul>
+      </div>
+      <div class="scope-card excluded">
+        <h2>ここには置かない</h2>
+        <ul><li>Cutoff / Resonance（DEXED側）</li><li>Master Level（DEXED側）</li><li>Middle C tuning（DEXED側）</li><li>Mono（DEXED側）</li><li>Cart / Load / Save（ファイル操作）</li><li>Chorus / Reverb（Sequence / Performance側）</li><li>Arpeggiator（Sequence / Performance側）</li><li>Velocity / Gate（Sequence側）</li></ul>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const cards = [...document.querySelectorAll('.op-card')];
+    const title = document.querySelector('#operator-title');
+    const role = document.querySelector('#operator-role');
+    cards.forEach(card => card.addEventListener('click', () => {
+      cards.forEach(item => item.setAttribute('aria-pressed', String(item === card)));
+      title.textContent = `Operator ${card.dataset.op}`;
+      role.textContent = card.classList.contains('carrier') ? 'Carrier' : 'Modulator';
+    }));
+  </script>
+</body>
+</html>

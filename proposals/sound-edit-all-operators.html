@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sound Edit — All Operators</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg:#211a1b; --panel:#382b2d; --panel2:#302426; --ink:#251c1e;
+      --line:rgba(206,179,147,.18); --line2:rgba(206,179,147,.38);
+      --accent:#ceb393; --text:#f1e9e1; --muted:#ad9e96;
+      --carrier:#d5b994; --mod:#86aaa7;
+      font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+    *{box-sizing:border-box} body{min-width:1260px;margin:0;background:var(--bg);color:var(--text)}
+    button,input,select{font:inherit}.app{padding:18px}.topbar{display:flex;align-items:center;gap:12px;min-height:64px;padding:11px 15px;border:1px solid var(--line);border-radius:13px;background:var(--panel)}
+    h1{margin:0;font-size:19px;letter-spacing:-.02em}.sub{margin-right:10px;color:var(--muted);font-size:10px}.field{display:grid;gap:4px}.field label,.label{color:var(--muted);font-size:9px;font-weight:760;letter-spacing:.07em;text-transform:uppercase}
+    input,select{height:36px;padding:0 9px;border:1px solid var(--line);border-radius:7px;outline:0;background:var(--ink);color:var(--text)}input:focus,select:focus,button:focus-visible{border-color:var(--accent);outline:2px solid rgba(206,179,147,.2);outline-offset:1px}.program{width:78px}.name{width:190px}.spacer{flex:1}.btn{height:38px;padding:0 14px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--text);font-size:12px;font-weight:720;cursor:pointer}.btn.primary{border-color:transparent;background:var(--accent);color:#33282a}
+    .section-head{display:flex;align-items:end;justify-content:space-between;margin:16px 2px 8px}.section-head h2{margin:0;font-size:14px}.section-head p{margin:0;color:var(--muted);font-size:10px}
+    .operators{display:grid;grid-template-columns:repeat(3,minmax(390px,1fr));gap:9px}.op{border:1px solid var(--line);border-radius:11px;background:var(--panel);overflow:hidden}.op.carrier{border-color:rgba(213,185,148,.36)}
+    .op-head{display:flex;align-items:center;gap:8px;min-height:42px;padding:7px 10px;border-bottom:1px solid var(--line);background:var(--panel2)}.op-no{width:27px;height:27px;display:grid;place-items:center;border-radius:6px;background:var(--mod);color:#172322;font-size:12px;font-weight:850}.carrier .op-no{background:var(--carrier);color:#33282a}.op-head h3{margin:0;font-size:12px}.role{padding:2px 6px;border-radius:99px;background:rgba(134,170,167,.13);color:#b8d2cf;font-size:9px}.carrier .role{background:rgba(213,185,148,.12);color:#e4cdb0}.switch{margin-left:auto;display:flex;align-items:center;gap:5px;color:var(--muted);font-size:9px}.switch input{width:29px;height:16px;accent-color:var(--accent)}
+    .op-body{padding:9px}.frequency{display:grid;grid-template-columns:1.15fr repeat(4,1fr);gap:5px}.control{display:grid;gap:3px}.control label{overflow:hidden;color:var(--muted);font-size:8px;text-overflow:ellipsis;white-space:nowrap}.value{height:31px;display:flex;align-items:center;justify-content:space-between;padding:0 7px;border:1px solid var(--line);border-radius:6px;background:var(--ink);font-size:9px}.value b{color:var(--accent);font-size:11px;font-variant-numeric:tabular-nums}.seg{height:31px;display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:3px;border:1px solid var(--line);border-radius:6px;background:var(--ink)}.seg button{padding:0;border:0;border-radius:4px;background:transparent;color:var(--muted);font-size:8px}.seg .on{background:var(--accent);color:#33282a;font-weight:760}
+    .eg{display:grid;grid-template-columns:1.1fr 1.35fr;gap:7px;margin-top:7px;padding-top:7px;border-top:1px solid var(--line)}.graph{height:94px;padding:6px;border:1px solid var(--line);border-radius:7px;background:var(--ink)}.graph svg{width:100%;height:100%}.grid{stroke:rgba(206,179,147,.09);stroke-width:1}.env{fill:none;stroke:var(--accent);stroke-width:2.2}.dot{fill:var(--panel);stroke:var(--accent);stroke-width:1.5}.eg-values{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}.eg-values .value{height:28px;padding-inline:5px}.eg-values .control label{text-align:center}
+    .compact{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:7px;padding-top:7px;border-top:1px solid var(--line)}.scaling{display:grid;grid-template-columns:1fr .8fr 1fr .8fr;gap:5px;margin-top:6px}.scaling select{height:31px;padding:0 4px;font-size:9px}
+    .global{display:grid;grid-template-columns:1.1fr 1fr 1.2fr 1fr;gap:9px}.panel{padding:11px;border:1px solid var(--line);border-radius:11px;background:var(--panel)}.panel h3{margin:0 0 9px;font-size:11px}.global-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}.algo-wrap{display:grid;grid-template-columns:115px 1fr;gap:9px}.algo{height:116px;border:1px solid var(--line);border-radius:7px;background:var(--ink)}.algo svg{width:100%;height:100%}.route{fill:none;stroke:var(--accent);stroke-width:2}.node{fill:var(--panel2);stroke:var(--line2)}.node.c{fill:rgba(213,185,148,.15);stroke:var(--carrier)}.node-text{fill:var(--text);font-size:9px;font-weight:800;text-anchor:middle;dominant-baseline:central}
+    .pitch-graph{height:66px;margin-bottom:7px;border:1px solid var(--line);border-radius:7px;background:var(--ink)}.pitch-graph svg{width:100%;height:100%}.macro-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.macro{min-height:46px;padding:7px;border-left:2px solid var(--mod);border-radius:6px;background:var(--ink)}.macro.c{border-left-color:var(--carrier)}.macro span,.macro b{display:block}.macro span{color:var(--muted);font-size:8px}.macro b{margin-top:4px;color:var(--accent);font-size:11px}.note{margin:10px 2px 0;color:var(--muted);font-size:9px;line-height:1.6}
+    @media(max-width:1450px){.operators{grid-template-columns:repeat(2,minmax(440px,1fr))}.global{grid-template-columns:1fr 1fr}}
+    @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+  </style>
+</head>
+<body>
+<main class="app">
+  <header class="topbar">
+    <div><h1>Sound Edit</h1><div class="sub">6 operators overview</div></div>
+    <div class="field program"><label>Program No.</label><input value="24"></div>
+    <div class="field name"><label>Voice name · 10 characters</label><input value="BRASS  1"></div>
+    <button class="btn">現在の音色を取得</button><div class="spacer"></div><button class="btn">初期化</button><button class="btn primary">送信</button>
+  </header>
+
+  <div class="section-head"><h2>Operators</h2><p>6基を同時表示。Carrierはベージュ、Modulatorはブルーグレー。</p></div>
+  <section class="operators" id="operators"></section>
+
+  <div class="section-head"><h2>Global</h2><p>音色全体に適用されるパラメーター</p></div>
+  <section class="global">
+    <article class="panel">
+      <h3>Algorithm &amp; Feedback</h3>
+      <div class="algo-wrap">
+        <div class="algo"><svg viewBox="0 0 115 116"><path class="route" d="M27 27V55M27 76V99M74 27V55M74 76V99M27 99H74"></path><rect class="node" x="17" y="10" width="20" height="18" rx="4"/><text class="node-text" x="27" y="19">6</text><rect class="node" x="17" y="55" width="20" height="21" rx="4"/><text class="node-text" x="27" y="66">5</text><rect class="node c" x="17" y="96" width="20" height="18" rx="4"/><text class="node-text" x="27" y="105">1</text><rect class="node" x="64" y="10" width="20" height="18" rx="4"/><text class="node-text" x="74" y="19">4</text><rect class="node" x="64" y="55" width="20" height="21" rx="4"/><text class="node-text" x="74" y="66">3</text><rect class="node c" x="64" y="96" width="20" height="18" rx="4"/><text class="node-text" x="74" y="105">2</text></svg></div>
+        <div class="global-grid"><div class="control"><label>Algorithm</label><div class="value"><span>Number</span><b>5 / 32</b></div></div><div class="control"><label>Feedback</label><div class="value"><span>Amount</span><b>3</b></div></div><label class="switch" style="margin:0"><input type="checkbox" checked> OSC Key Sync</label></div>
+      </div>
+    </article>
+    <article class="panel">
+      <h3>Pitch Envelope</h3>
+      <div class="pitch-graph"><svg viewBox="0 0 240 64"><path class="grid" d="M0 32H240M60 0V64M120 0V64M180 0V64"></path><path class="env" d="M4 32L44 15L106 39L178 32L236 32"></path></svg></div>
+      <div class="eg-values"><div class="control"><label>R1</label><div class="value"><b>70</b></div></div><div class="control"><label>R2</label><div class="value"><b>55</b></div></div><div class="control"><label>R3</label><div class="value"><b>64</b></div></div><div class="control"><label>R4</label><div class="value"><b>50</b></div></div><div class="control"><label>L1</label><div class="value"><b>62</b></div></div><div class="control"><label>L2</label><div class="value"><b>48</b></div></div><div class="control"><label>L3</label><div class="value"><b>50</b></div></div><div class="control"><label>L4</label><div class="value"><b>50</b></div></div></div>
+    </article>
+    <article class="panel">
+      <h3>LFO</h3>
+      <div class="global-grid"><div class="control"><label>Waveform</label><select><option>Sine</option><option>Triangle</option><option>Saw Down</option><option>Saw Up</option><option>Square</option><option>Sample &amp; Hold</option></select></div><div class="control"><label>Speed</label><div class="value"><span>0–99</span><b>35</b></div></div><div class="control"><label>Delay</label><div class="value"><span>0–99</span><b>0</b></div></div><div class="control"><label>Pitch Mod Depth</label><div class="value"><span>PMD</span><b>18</b></div></div><div class="control"><label>Amp Mod Depth</label><div class="value"><span>AMD</span><b>0</b></div></div><div class="control"><label>Pitch Mod Sens</label><div class="value"><span>0–7</span><b>3</b></div></div><label class="switch" style="margin:0"><input type="checkbox"> LFO Key Sync</label></div>
+    </article>
+    <article class="panel">
+      <h3>volca fm2</h3>
+      <div class="macro-grid"><div class="macro"><span>Modulator Attack · −63–+63</span><b>+8</b></div><div class="macro"><span>Modulator Decay · −63–+63</span><b>−4</b></div><div class="macro c"><span>Carrier Attack · −63–+63</span><b>0</b></div><div class="macro c"><span>Carrier Decay · −63–+63</span><b>+12</b></div></div>
+      <div class="global-grid" style="margin-top:7px"><div class="control"><label>Voice Transpose</label><div class="value"><span>−24–+24</span><b>0</b></div></div><div class="control"><label>volca Octave</label><div class="value"><span>−2–+2</span><b>0</b></div></div></div>
+    </article>
+  </section>
+  <p class="note">Cutoff、Resonance、Master Level、Middle C、MonoはDEXED固有のため除外。Chorus／Reverb、Arpeggiator、Velocity／GateはProgram DataではないためSequence／Performance側へ分離。</p>
+</main>
+
+<template id="operator-template">
+  <article class="op">
+    <header class="op-head"><span class="op-no"></span><h3></h3><span class="role"></span><label class="switch"><input type="checkbox" checked> On</label></header>
+    <div class="op-body">
+      <div class="frequency"><div class="control"><label>Oscillator Mode</label><div class="seg"><button class="on">Ratio</button><button>Fixed</button></div></div><div class="control"><label>Coarse · 0–31</label><div class="value"><span>Coarse</span><b class="coarse"></b></div></div><div class="control"><label>Fine · 0–99</label><div class="value"><span>Fine</span><b>0</b></div></div><div class="control"><label>Detune · −7–+7</label><div class="value"><span>Detune</span><b>0</b></div></div><div class="control"><label>Output · 0–99</label><div class="value"><span>Level</span><b class="output"></b></div></div></div>
+      <div class="eg"><div class="graph"><svg viewBox="0 0 210 82"><path class="grid" d="M0 18H210M0 41H210M0 64H210M52 0V82M104 0V82M156 0V82"></path><path class="env" d="M4 75L34 10L94 21L158 52L206 74"></path><circle class="dot" cx="34" cy="10" r="3"/><circle class="dot" cx="94" cy="21" r="3"/><circle class="dot" cx="158" cy="52" r="3"/><circle class="dot" cx="206" cy="74" r="3"/></svg></div><div class="eg-values"><div class="control"><label>R1</label><div class="value"><b>95</b></div></div><div class="control"><label>R2</label><div class="value"><b>62</b></div></div><div class="control"><label>R3</label><div class="value"><b>48</b></div></div><div class="control"><label>R4</label><div class="value"><b>72</b></div></div><div class="control"><label>L1</label><div class="value"><b>99</b></div></div><div class="control"><label>L2</label><div class="value"><b>84</b></div></div><div class="control"><label>L3</label><div class="value"><b>52</b></div></div><div class="control"><label>L4</label><div class="value"><b>0</b></div></div></div></div>
+      <div class="compact"><div class="control"><label>Amp Mod Sens</label><div class="value"><span>AMS</span><b>0</b></div></div><div class="control"><label>Key Velocity</label><div class="value"><span>KVS</span><b>2</b></div></div><div class="control"><label>Rate Scaling</label><div class="value"><span>Rate</span><b>2</b></div></div><div class="control"><label>Break Point</label><div class="value"><span>Note</span><b>C3</b></div></div></div>
+      <div class="scaling"><div class="control"><label>Left Depth</label><div class="value"><span>Depth</span><b>0</b></div></div><div class="control"><label>Left Curve</label><select><option>−LIN</option><option>−EXP</option><option>+EXP</option><option>+LIN</option></select></div><div class="control"><label>Right Depth</label><div class="value"><span>Depth</span><b>25</b></div></div><div class="control"><label>Right Curve</label><select><option>+LIN</option><option>+EXP</option><option>−EXP</option><option>−LIN</option></select></div></div>
+    </div>
+  </article>
+</template>
+<script>
+  const data=[{n:1,r:'Carrier',c:1,o:99},{n:2,r:'Carrier',c:2,o:82},{n:3,r:'Modulator',c:2,o:74},{n:4,r:'Modulator',c:.5,o:67},{n:5,r:'Modulator',c:2,o:71},{n:6,r:'Modulator',c:.5,o:62}];
+  const root=document.querySelector('#operators'),tpl=document.querySelector('#operator-template');
+  data.forEach(op=>{const node=tpl.content.firstElementChild.cloneNode(true);if(op.r==='Carrier')node.classList.add('carrier');node.querySelector('.op-no').textContent=op.n;node.querySelector('h3').textContent=`Operator ${op.n}`;node.querySelector('.role').textContent=op.r;node.querySelector('.coarse').textContent=op.c;node.querySelector('.output').textContent=op.o;root.append(node)});
+</script>
+</body>
+</html>

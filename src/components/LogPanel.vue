@@ -51,7 +51,7 @@ const texts = computed(() => TEXTS[userLanguage]);
   padding: 5px 15px;
   cursor: pointer;
   color: var(--volca-muted, #CEB393);
-  font-size: 13px;
+  font-size: var(--volca-type-body);
   user-select: none;
 }
 
@@ -68,7 +68,7 @@ const texts = computed(() => TEXTS[userLanguage]);
   background: rgba(18, 13, 14, 0.88);
   color: #9fd18c;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--volca-type-body);
   line-height: 1.5;
   padding: 10px 14px;
   border: none;

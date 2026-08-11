@@ -223,8 +223,7 @@
         <v-select :items="motionSelectItems" item-title="label" item-value="value" v-model="selectedMotionIndex"
           aria-label="Motion parameter" density="compact" hide-details class="motion-control__select" />
         <span class="motion-control__state-label">On/Off</span>
-        <v-switch v-model="seqStore.motionEnabled[selectedMotionIndex]" hide-details density="compact"
-          :aria-label="texts.motionEnable" />
+        <AppToggle v-model="seqStore.motionEnabled[selectedMotionIndex]" :aria-label="texts.motionEnable" />
       </div>
     </v-card>
   </v-container>
@@ -233,6 +232,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useSequencerStore } from '@/stores/sequencerStore';
+import AppToggle from '@/components/AppToggle.vue';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
 import { MOTION_PARAM_LABELS } from '@/types/sequence';
 import { countBarsInSmf, extractStepNotes, parseSmf } from '@/utils/smfImport';
@@ -826,7 +826,7 @@ const endDrag = () => {
 
 .program-control__label {
   color: #d8ccc4;
-  font-size: 14px;
+  font-size: var(--volca-type-body);
   white-space: nowrap;
 }
 
@@ -841,7 +841,7 @@ const endDrag = () => {
   gap: 16px;
   margin-bottom: 12px;
   color: #d8ccc4;
-  font-size: 13px;
+  font-size: var(--volca-type-body);
 }
 
 .program-fetch-status__count {
@@ -872,7 +872,7 @@ const endDrag = () => {
 
 .capture-resolution__label {
   color: #d8ccc4;
-  font-size: 14px;
+  font-size: var(--volca-type-body);
 }
 
 .capture-resolution :deep(.v-btn) {
@@ -882,7 +882,7 @@ const endDrag = () => {
 .capture-progress {
   margin: 10px 0 0;
   color: #b9aaa2;
-  font-size: 13px;
+  font-size: var(--volca-type-body);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -919,7 +919,7 @@ const endDrag = () => {
 
 .pitch-gutter {
   flex: 0 0 56px;
-  font-size: 13px;
+  font-size: var(--volca-type-body);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -946,7 +946,7 @@ const endDrag = () => {
 .header-cell {
   position: relative;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--volca-type-body);
   padding: 4px 0;
   background: #4a3a3c;
 }
@@ -982,7 +982,7 @@ const endDrag = () => {
   z-index: 2;
   overflow: hidden;
   color: #382b2d;
-  font-size: 10px;
+  font-size: var(--volca-type-label);
   font-weight: 700;
   line-height: 1;
   padding-left: 4px;
@@ -1017,7 +1017,7 @@ const endDrag = () => {
 }
 
 .step-indicator {
-  font-size: 14px;
+  font-size: var(--volca-type-body);
   font-variant-numeric: tabular-nums;
   display: flex;
   align-items: center;
@@ -1033,20 +1033,17 @@ const endDrag = () => {
 
 .motion-control__label {
   color: #d8ccc4;
-  font-size: 14px;
+  font-size: var(--volca-type-body);
   font-weight: 650;
 }
 
 .motion-control__state-label {
   margin-left: 4px;
   color: #b9aaa2;
-  font-size: 13px;
+  font-size: var(--volca-type-body);
   white-space: nowrap;
 }
 
-.motion-control :deep(.v-switch) {
-  flex: 0 0 auto;
-}
 
 .motion-control__select {
   flex: 0 0 280px;
@@ -1099,7 +1096,7 @@ const endDrag = () => {
   left: 3px;
   z-index: 2;
   color: #f1e9e1;
-  font-size: 11px;
+  font-size: var(--volca-type-label);
   font-variant-numeric: tabular-nums;
   line-height: 22px;
   text-align: center;
