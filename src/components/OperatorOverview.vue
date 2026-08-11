@@ -31,7 +31,9 @@
             <button v-if="item.field" type="button" class="drag-value" :aria-label="`${item.label} ${item.value}`"
               @pointerdown="startDrag($event, index, item.field, item.min, item.max, item.rawValue)"
               @pointermove="moveDrag" @pointerup="endDrag" @pointercancel="endDrag"
-              @keydown="adjustWithKeyboard($event, index, item.field, item.min, item.max, item.rawValue)">{{ item.value }}</button>
+              @keydown="adjustWithKeyboard($event, index, item.field, item.min, item.max, item.rawValue)">
+              <span>{{ item.value }}</span><MiniKnob :value="item.rawValue" :min="item.min" :max="item.max" />
+            </button>
             <span v-else>{{ item.value }}</span>
           </dd></div>
         </template>
@@ -42,19 +44,23 @@
           class="drag-value" :aria-label="`Level ${valueIndex + 1} ${value}`"
           @pointerdown="startDrag($event, index, 'egLevels', 0, 99, value, valueIndex)" @pointermove="moveDrag"
           @pointerup="endDrag" @pointercancel="endDrag"
-          @keydown="adjustWithKeyboard($event, index, 'egLevels', 0, 99, value, valueIndex)">{{ value }}</button>
+          @keydown="adjustWithKeyboard($event, index, 'egLevels', 0, 99, value, valueIndex)">
+          <span>{{ value }}</span><MiniKnob :value="value" :min="0" :max="99" />
+        </button>
         <span>Rate</span><button v-for="(value, valueIndex) in operator.egRates" :key="`r${valueIndex}`" type="button"
           class="drag-value" :aria-label="`Rate ${valueIndex + 1} ${value}`"
           @pointerdown="startDrag($event, index, 'egRates', 0, 99, value, valueIndex)" @pointermove="moveDrag"
           @pointerup="endDrag" @pointercancel="endDrag"
-          @keydown="adjustWithKeyboard($event, index, 'egRates', 0, 99, value, valueIndex)">{{ value }}</button>
+          @keydown="adjustWithKeyboard($event, index, 'egRates', 0, 99, value, valueIndex)">
+          <span>{{ value }}</span><MiniKnob :value="value" :min="0" :max="99" />
+        </button>
       </div>
     </article>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { defineComponent, h, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { SoundOperator } from '@/types/soundProgram';
 
@@ -65,6 +71,20 @@ const emit = defineEmits<{
 }>();
 const { t } = useI18n();
 const curveNames = ['−LN', '−EX', '+EX', '+LN'];
+const MiniKnob = defineComponent({
+  props: { value: { type: Number, required: true }, min: { type: Number, required: true }, max: { type: Number, required: true } },
+  setup(props) {
+    return () => {
+      const percent = Math.max(0, Math.min(100, ((props.value - props.min) / Math.max(1, props.max - props.min)) * 100));
+      return h('svg', { class: 'mini-knob', viewBox: '0 0 18 18', 'aria-hidden': 'true' }, [
+        h('path', { d: 'M4.05 13.95A7 7 0 1 1 13.95 13.95', pathLength: 100, fill: 'none',
+          stroke: 'rgba(206,179,147,.2)', 'stroke-width': 2.4, 'stroke-linecap': 'round' }),
+        h('path', { d: 'M4.05 13.95A7 7 0 1 1 13.95 13.95', pathLength: 100, fill: 'none',
+          stroke: '#ceb393', 'stroke-width': 2.4, 'stroke-linecap': 'round', 'stroke-dasharray': `${percent} 100` }),
+      ]);
+    };
+  },
+});
 const dragState = ref<null | { operatorIndex: number; field: keyof SoundOperator; min: number; max: number; startY: number; startValue: number; arrayIndex?: number }>(null);
 
 const setValue = (operatorIndex: number, field: keyof SoundOperator, min: number, max: number, value: number, arrayIndex?: number) => {
@@ -155,9 +175,10 @@ const parameters = (operator: SoundOperator) => [
 .graph-grid { fill: none; stroke: rgba(206,179,147,.09); }.graph-line { fill: none; stroke: #ceb393; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .parameter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 3px 7px 6px; overflow: hidden; border-radius: 5px; background: rgba(206,179,147,.1); }
 .parameter-grid div { min-width: 0; padding: 4px 5px; background: #271d1f; }.parameter-grid dt { overflow: hidden; color: #9f918a; font-size: 10px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }.parameter-grid dd { min-height: 18px; margin: 1px 0 0; color: #e1cab0; font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; }
-.drag-value { min-width: 24px; padding: 1px 4px; border: 0; border-radius: 4px; background: rgba(206,179,147,.08); color: #e1cab0; font: inherit; font-weight: 750; cursor: ns-resize; touch-action: none; }
+.drag-value { min-width: 42px; display: inline-grid; grid-template-columns: minmax(18px, auto) 16px; align-items: center; justify-content: end; gap: 3px; padding: 1px 3px 1px 4px; border: 0; border-radius: 4px; background: rgba(206,179,147,.08); color: #e1cab0; font: inherit; font-weight: 750; cursor: ns-resize; touch-action: none; }
 .drag-value:hover { background: rgba(206,179,147,.18); color: #fff8f1; }.drag-value:focus-visible { outline: 1px solid #e1cab0; outline-offset: 1px; }
+.mini-knob { width: 16px; height: 16px; overflow: visible; }
 .eg-values { display: grid; grid-template-columns: 38px repeat(4, 1fr); gap: 1px; margin: 0 7px 7px; overflow: hidden; border-radius: 5px; background: rgba(206,179,147,.1); }
-.eg-values span, .eg-values > button { padding: 3px 4px; background: #271d1f; font-size: 11px; line-height: 1.25; }.eg-values span { color: #9f918a; }.eg-values > button { width: 100%; border-radius: 0; color: #d8ccc4; text-align: center; font-variant-numeric: tabular-nums; }
+.eg-values span, .eg-values > button { padding: 3px 4px; background: #271d1f; font-size: 11px; line-height: 1.25; }.eg-values span { color: #9f918a; }.eg-values > button { width: 100%; grid-template-columns: minmax(14px, auto) 14px; gap: 2px; border-radius: 0; color: #d8ccc4; text-align: center; font-variant-numeric: tabular-nums; }.eg-values .mini-knob { width: 14px; height: 14px; }
 @media (max-width: 1120px) { .operator-overview { grid-template-columns: 1fr; } }
 </style>
