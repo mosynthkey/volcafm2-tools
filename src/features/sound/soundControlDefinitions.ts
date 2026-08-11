@@ -12,8 +12,8 @@ export const operatorFrequencyControls: NumberControlDefinition<OperatorNumberKe
 ]
 
 export const macroControls: NumberControlDefinition<ProgramNumberKey>[] = [
-  { key: 'modulatorAttack', label: 'sound.modAttack', min: -63, max: 63 }, { key: 'modulatorDecay', label: 'sound.modDecay', min: -63, max: 63 },
-  { key: 'carrierAttack', label: 'sound.carrierAttack', min: -63, max: 63 }, { key: 'carrierDecay', label: 'sound.carrierDecay', min: -63, max: 63 },
+  { key: 'modulatorAttack', label: 'sound.modAttack', min: -63, max: 63 }, { key: 'carrierAttack', label: 'sound.carrierAttack', min: -63, max: 63 },
+  { key: 'modulatorDecay', label: 'sound.modDecay', min: -63, max: 63 }, { key: 'carrierDecay', label: 'sound.carrierDecay', min: -63, max: 63 },
 ]
 
 export const lfoControls: NumberControlDefinition<ProgramNumberKey>[] = [
