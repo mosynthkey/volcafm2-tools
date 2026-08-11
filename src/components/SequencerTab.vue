@@ -556,7 +556,10 @@ const sequenceSnapshot = (): SequenceState => ({
   motionEnabled: [...seqStore.motionEnabled],
   motionValues: seqStore.motionValues.map(values => [...values]),
 });
-const loadSequencePreset = (data: unknown) => seqStore.loadFromDecoded(data as SequenceState);
+const loadSequencePreset = (data: unknown) => {
+  seqStore.loadFromDecoded(data as SequenceState);
+  handleSend();
+};
 
 const showSendErrorDialog = ref(false);
 const showProgramFetchErrorDialog = ref(false);
