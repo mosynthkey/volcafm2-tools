@@ -132,9 +132,9 @@
               <NumberControl v-model="selected.leftDepth" :label="t('sound.leftDepth')" :min="0" :max="99" />
               <NumberControl v-model="selected.breakPoint" :label="t('sound.breakPoint')" :min="0" :max="99" />
               <NumberControl v-model="selected.rightDepth" :label="t('sound.rightDepth')" :min="0" :max="99" />
-              <CurveSelector v-model="selected.leftCurve" :label="t('sound.leftCurve')" direction="left" />
+              <CurveSelector v-model="selected.leftCurve" :label="t('sound.leftCurve')" direction="right" />
               <NumberControl v-model="selected.rateScaling" :label="t('sound.rateScaling')" :min="0" :max="7" />
-              <CurveSelector v-model="selected.rightCurve" :label="t('sound.rightCurve')" direction="right" />
+              <CurveSelector v-model="selected.rightCurve" :label="t('sound.rightCurve')" direction="left" />
             </div>
           </section>
         </main>
