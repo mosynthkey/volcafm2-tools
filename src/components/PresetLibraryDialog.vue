@@ -24,15 +24,15 @@
           まだ保存されたデータはありません。
         </div>
         <div v-for="record in records" v-else :key="record.id" class="library-item">
-          <button type="button" class="library-load" @click="loadRecord(record)">
-            <FolderOpen :size="19" />
-            <span><strong>{{ record.name }}</strong><small>{{ formatDate(record.updatedAt) }}</small></span>
-          </button>
+          <div class="library-meta">
+            <strong>{{ record.name }}</strong><small>{{ formatDate(record.updatedAt) }}</small>
+          </div>
+          <v-btn size="small" @click="loadRecord(record)">読み込む</v-btn>
           <template v-if="deleteTarget === record.id">
             <v-btn size="small" variant="text" @click="deleteTarget = null">戻る</v-btn>
             <v-btn size="small" color="error" :loading="busy === record.id" @click="removeRecord(record.id)">削除</v-btn>
           </template>
-          <v-btn v-else icon variant="text" size="small" :aria-label="`${record.name}を削除`"
+          <v-btn v-else class="library-delete-button" icon variant="text" size="small" :aria-label="`${record.name}を削除`"
             @click="deleteTarget = record.id">
             <Trash2 :size="17" />
           </v-btn>
@@ -44,7 +44,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { FolderOpen, Save, Trash2 } from '@lucide/vue';
+import { Save, Trash2 } from '@lucide/vue';
 import DialogCloseButton from '@/components/DialogCloseButton.vue';
 import { deletePreset, listPresets, savePreset, type PresetKind, type PresetRecord } from '@/utils/presetLibrary';
 
@@ -131,10 +131,7 @@ const formatDate = (timestamp: number) => new Intl.DateTimeFormat(navigator.lang
 .library-list { min-height: 150px; max-height: 430px; padding: 4px 8px 8px; overflow-y: auto; }
 .library-empty { display: grid; min-height: 150px; place-items: center; color: #ad9e96; font-size: var(--volca-type-body); }
 .library-item { min-height: 64px; display: flex; align-items: center; gap: 6px; border-top: 1px solid rgba(206,179,147,.16); }
-.library-load { min-width: 0; flex: 1; display: flex; align-items: center; gap: 12px; padding: 10px 8px; border: 0; background: transparent; color: #e1d5cd; cursor: pointer; text-align: left; }
-.library-load:hover { color: #f5ede6; background: rgba(206,179,147,.07); }
-.library-load:focus-visible { outline: 2px solid #ceb393; outline-offset: -2px; border-radius: 8px; }
-.library-load span { min-width: 0; display: grid; gap: 2px; }
-.library-load strong { overflow: hidden; font-size: var(--volca-type-body); text-overflow: ellipsis; white-space: nowrap; }
-.library-load small { color: #ad9e96; font-size: var(--volca-type-label); }
+.library-meta { min-width: 0; flex: 1; display: grid; gap: 2px; padding: 10px 8px; }
+.library-meta strong { overflow: hidden; color: #e1d5cd; font-size: var(--volca-type-body); text-overflow: ellipsis; white-space: nowrap; }
+.library-meta small { color: #ad9e96; font-size: var(--volca-type-label); }
 </style>

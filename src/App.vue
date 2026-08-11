@@ -284,12 +284,14 @@ body { overflow: hidden; }
 .workspace .v-card-title { font-size: var(--volca-type-heading); font-weight: 650; letter-spacing: -.01em; }
 .v-overlay__content > .v-card { padding: 0 !important; overflow: hidden; border: 1px solid var(--volca-line-strong) !important; border-radius: 16px !important; background: #382b2d !important; color: var(--volca-text) !important; box-shadow: 0 24px 70px rgba(10,5,6,.5) !important; }
 .v-overlay__content > .v-card .v-card-title { padding: 20px 20px 10px; font-size: var(--volca-type-heading); font-weight: 680; letter-spacing: -.02em; }
-.dialog-title-row { display: flex; align-items: center; justify-content: space-between; padding-right: 16px; }
+.dialog-title-row { display: flex; align-items: center; justify-content: space-between; }
 .v-overlay__content > .v-card > .v-card-text { padding: 10px 20px 20px; color: #d8ccc4; font-size: var(--volca-type-body); line-height: 1.65; }
 .v-overlay__content > .v-card > .v-card-actions { gap: 8px; padding: 0 20px 18px; }
 .v-overlay__content > .v-card .v-btn { height: 40px; min-height: 40px; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; background: var(--volca-accent) !important; color: #33282a !important; box-shadow: inset 0 1px rgba(255,255,255,.28) !important; font-size: var(--volca-type-body); font-weight: 700; letter-spacing: 0; text-transform: none; }
-.v-overlay__content > .v-card .dialog-close-button { width: 40px; min-width: 40px; border: 0; background: transparent !important; color: var(--volca-muted) !important; box-shadow: none !important; }
+.v-overlay__content > .v-card .dialog-close-button { width: 40px; min-width: 40px; margin: 12px 12px 0 0; border: 0; background: transparent !important; color: var(--volca-muted) !important; box-shadow: none !important; }
 .v-overlay__content > .v-card .dialog-close-button:hover { background: rgba(255,255,255,.07) !important; color: var(--volca-text) !important; }
+.v-overlay__content > .v-card .library-delete-button { width: 40px; min-width: 40px; border: 0; background: transparent !important; color: var(--volca-muted) !important; box-shadow: none !important; }
+.v-overlay__content > .v-card .library-delete-button:hover { background: rgba(255,255,255,.07) !important; color: var(--volca-text) !important; }
 .about-card, .program-load-card, .connection-card { background: #382b2d !important; }
 .connection-card__icon { width: 44px; height: 44px; display: grid; place-items: center; margin: 20px 20px 8px; border: 1px solid var(--volca-line-strong); border-radius: 12px; background: var(--volca-accent-soft); color: var(--volca-accent-bright); }
 .connection-card .v-card-text { line-height: 1.75; }

@@ -250,6 +250,7 @@ const sendProgram = () => midiStore.sendCurrentVoiceDump(encodeSoundProgram(prog
 const soundSnapshot = () => JSON.parse(JSON.stringify(program.value)) as SoundProgram;
 const loadSoundPreset = (data: unknown) => {
   program.value = data as SoundProgram;
+  sendProgram();
 };
 const curveItems = [
   { title: '− Linear', value: 0 }, { title: '− Exponential', value: 1 },
@@ -298,7 +299,7 @@ const NumberControl = KnobControl;
   .send-button.needs-send:not(:disabled) { animation: none; box-shadow: 0 3px 12px rgba(225,202,176,.3); filter: brightness(1.1); }
 }
 .algorithm-picker-card { max-height: min(86vh, 900px); overflow: hidden; }
-.algorithm-picker-header { display: flex; align-items: center; justify-content: space-between; padding-right: 20px; }
+.algorithm-picker-header { display: flex; align-items: center; justify-content: space-between; }
 .algorithm-picker-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 10px; padding: 10px 20px 20px; overflow-y: auto; }
 .algorithm-option { min-width: 0; padding: 10px; border: 1px solid rgba(206,179,147,.18); border-radius: 10px; background: #2b2022; color: #d8ccc4; cursor: pointer; text-align: left; }
 .algorithm-option:hover { border-color: rgba(206,179,147,.48); background: #35282a; }
