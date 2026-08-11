@@ -7,8 +7,8 @@
       @keydown="onKeydown">
       <svg viewBox="0 0 64 64" aria-hidden="true">
         <path class="knob-track" d="M15.03 48.97A24 24 0 1 1 48.97 48.97" pathLength="100" />
-        <path v-if="percent > 0" class="knob-value" d="M15.03 48.97A24 24 0 1 1 48.97 48.97" pathLength="100"
-          :style="{ strokeDasharray: `${percent} 100` }" />
+        <path v-if="valueArc.length > 0" class="knob-value" d="M15.03 48.97A24 24 0 1 1 48.97 48.97" pathLength="100"
+          :style="{ strokeDasharray: `${valueArc.length} 100`, strokeDashoffset: -valueArc.start }" />
       </svg>
       <output>{{ displayValue }}</output>
     </span>
@@ -27,6 +27,16 @@ let dragStartY = 0;
 let dragStartValue = 0;
 const range = computed(() => Math.max(1, props.max - props.min));
 const percent = computed(() => ((props.modelValue - props.min) / range.value) * 100);
+const displayMin = computed(() => props.min + props.displayOffset);
+const displayMax = computed(() => props.max + props.displayOffset);
+const isBipolar = computed(() => displayMin.value < 0 && displayMax.value > 0);
+const zeroPercent = computed(() => ((0 - displayMin.value) / (displayMax.value - displayMin.value)) * 100);
+const valueArc = computed(() => {
+  const value = Math.max(0, Math.min(100, percent.value));
+  if (!isBipolar.value) return { start: 0, length: value };
+  const zero = zeroPercent.value;
+  return { start: Math.min(value, zero), length: Math.abs(value - zero) };
+});
 const displayValue = computed(() => props.modelValue + props.displayOffset);
 const setValue = (value: number) => emit('update:modelValue', Math.max(props.min, Math.min(props.max, Math.round(value))));
 
