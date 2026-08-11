@@ -60,7 +60,8 @@ export const buildAlgorithmGraph = (algorithm: number): { nodes: AlgorithmGraphN
   rows.forEach((ids, depth) => ids.forEach((id, index) => nodes.push({
     id,
     x: 12 + ((index + 1) / (ids.length + 1)) * 216,
-    y: 151 - depth * 37,
+    // 48px leaves at least 14px of visible stem on both sides of a routed arrow.
+    y: 280 - depth * 48,
     carrier: carriers.has(id),
     feedback: feedback.has(id),
   })));

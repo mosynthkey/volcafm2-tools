@@ -103,6 +103,9 @@
       </v-card>
     </v-dialog>
 
+    <PresetLibraryDialog v-model="showLibrary" kind="sequence" title="Sequence Library"
+      :suggested-name="`Sequence ${seqStore.programNo + 1}`" :snapshot="sequenceSnapshot" @load="loadSequencePreset" />
+
     <v-card class="pa-4 sequencer-card">
       <v-row align="center" no-gutters class="sequencer-toolbar">
         <template v-if="stepInputActive">
@@ -163,6 +166,11 @@
               <Upload :size="16" class="ml-1" />
             </v-btn>
           </v-col>
+          <v-col cols="auto" class="ml-2">
+            <v-btn icon variant="text" title="Sequence Library" aria-label="Sequence Library" @click="showLibrary = true">
+              <Library :size="19" />
+            </v-btn>
+          </v-col>
         </template>
       </v-row>
       <v-alert v-if="importResult?.ok" type="success" density="compact" class="mt-3" variant="tonal">
@@ -178,10 +186,10 @@
         <div class="roll-header">
           <div class="pitch-gutter"></div>
           <div v-for="s in 16" :key="s" class="step-cell header-cell"
-            :class="{ beat: (s - 1) % 4 === 0, cursor: stepInputActive && s - 1 === stepCursor, selectable: stepInputActive }"
-            :role="stepInputActive ? 'button' : undefined" :tabindex="stepInputActive ? 0 : undefined"
-            @click="selectStep(s - 1)" @keydown.enter.prevent="selectStep(s - 1)"
-            @keydown.space.prevent="selectStep(s - 1)">
+            :class="{ beat: (s - 1) % 4 === 0, cursor: stepInputActive && s - 1 === stepCursor, selectable: true }"
+            role="button" tabindex="0" :aria-label="`Step ${s}`"
+            @click="onStepHeaderClick(s - 1)" @keydown.enter.prevent="onStepHeaderClick(s - 1)"
+            @keydown.space.prevent="onStepHeaderClick(s - 1)">
             {{ s }}
           </div>
         </div>
@@ -219,11 +227,15 @@
       </div>
 
       <div class="motion-control mt-2">
-        <span class="motion-control__label">{{ texts.motionTarget }}</span>
-        <v-select :items="motionSelectItems" item-title="label" item-value="value" v-model="selectedMotionIndex"
-          aria-label="Motion parameter" density="compact" hide-details class="motion-control__select" />
-        <span class="motion-control__state-label">On/Off</span>
-        <AppToggle v-model="seqStore.motionEnabled[selectedMotionIndex]" :aria-label="texts.motionEnable" />
+        <div class="select-control motion-control__select">
+          <label>{{ texts.motionTarget }}</label>
+          <v-select :items="motionSelectItems" item-title="label" item-value="value" v-model="selectedMotionIndex"
+            aria-label="Motion parameter" density="compact" hide-details />
+        </div>
+        <div class="motion-toggle-control">
+          <span class="motion-control__state-label">On/Off</span>
+          <AppToggle v-model="seqStore.motionEnabled[selectedMotionIndex]" :aria-label="texts.motionEnable" />
+        </div>
       </div>
     </v-card>
   </v-container>
@@ -233,10 +245,11 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useSequencerStore } from '@/stores/sequencerStore';
 import AppToggle from '@/components/AppToggle.vue';
+import PresetLibraryDialog from '@/components/PresetLibraryDialog.vue';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
-import { MOTION_PARAM_LABELS } from '@/types/sequence';
+import { MOTION_PARAM_LABELS, type SequenceState } from '@/types/sequence';
 import { countBarsInSmf, extractStepNotes, parseSmf } from '@/utils/smfImport';
-import { AudioLines, FileUp, Piano, Trash2, Upload, X } from '@lucide/vue';
+import { AudioLines, FileUp, Library, Piano, Trash2, Upload, X } from '@lucide/vue';
 import { MidiSequenceCapture, type SequencePlaybackResolution } from '@/utils/midiSequenceCapture';
 
 const seqStore = useSequencerStore();
@@ -345,6 +358,7 @@ const TEXTS = {
 
 const texts = computed(() => TEXTS[userLanguage]);
 const selectedMotionIndex = ref(0);
+const showLibrary = ref(false);
 const motionSelectItems = computed(() =>
   MOTION_PARAM_LABELS.map((p, i) => ({ label: p.en, value: i }))
 );
@@ -486,7 +500,7 @@ const beginMidiCaptureAfterStop = () => {
         failMidiCapture(texts.value.captureClockStopped);
       }, 3000);
       capturedStepCount.value = midiCapture.stepCount;
-      captureProgress.value = Math.min(100, (midiCapture.clockCount / midiCapture.clocksPerPattern) * 100);
+      captureProgress.value = (capturedStepCount.value / 16) * 100;
     }
     if (result === 'complete') finishMidiCapture();
   });
@@ -533,6 +547,16 @@ const handleSend = () => {
   const bytes = seqStore.buildSysEx();
   midiStore.sendCurrentSequenceDump(bytes);
 };
+
+const sequenceSnapshot = (): SequenceState => ({
+  programNo: seqStore.programNo,
+  velocity: seqStore.velocity,
+  gatePercent: seqStore.gatePercent,
+  notes: JSON.parse(JSON.stringify(seqStore.notes)),
+  motionEnabled: [...seqStore.motionEnabled],
+  motionValues: seqStore.motionValues.map(values => [...values]),
+});
+const loadSequencePreset = (data: unknown) => seqStore.loadFromDecoded(data as SequenceState);
 
 const showSendErrorDialog = ref(false);
 const showProgramFetchErrorDialog = ref(false);
@@ -607,6 +631,23 @@ const confirmImport = async () => {
 // --- ピアノロール: クリック=単発ノート、ドラッグ=タイで繋いだ和音 ---
 const GUTTER_WIDTH = 56;
 const dragState = ref<{ pitch: number; startStep: number; endStep: number } | null>(null);
+const auditionTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+const stopAuditionNote = (pitch: number) => {
+  const timer = auditionTimers.get(pitch);
+  if (timer) clearTimeout(timer);
+  auditionTimers.delete(pitch);
+  midiStore.sendMidiMessage(new Uint8Array([0x80, pitch, 0]));
+};
+
+const auditionPitches = (pitches: number[], duration = 320) => {
+  const velocity = Math.max(1, Math.min(127, Math.round(seqStore.velocity)));
+  for (const pitch of [...new Set(pitches)]) {
+    if (auditionTimers.has(pitch)) stopAuditionNote(pitch);
+    midiStore.sendMidiMessage(new Uint8Array([0x90, pitch, velocity]));
+    auditionTimers.set(pitch, setTimeout(() => stopAuditionNote(pitch), duration));
+  }
+};
 
 const stepFromEvent = (ev: PointerEvent): number => {
   const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
@@ -636,7 +677,7 @@ const onRowPointerUp = (pitch: number, ev: PointerEvent) => {
   const { startStep, endStep } = dragState.value;
   const start = Math.min(startStep, endStep);
   const end = Math.max(startStep, endStep);
-  seqStore.addNote(pitch, start, end - start + 1);
+  if (seqStore.addNote(pitch, start, end - start + 1)) auditionPitches([pitch]);
   dragState.value = null;
 };
 
@@ -699,11 +740,20 @@ const selectStep = (step: number) => {
   stepCursor.value = Math.max(0, Math.min(15, step));
 };
 
+const onStepHeaderClick = (step: number) => {
+  if (stepInputActive.value) selectStep(step);
+  const pitches = seqStore.notes
+    .filter(note => note.startStep <= step && note.startStep + note.length > step)
+    .map(note => note.pitch);
+  auditionPitches(pitches);
+};
+
 onMounted(() => {
   unsubscribeNoteEvent = midiStore.onNoteEvent(handleNoteEvent);
 });
 onUnmounted(() => {
   unsubscribeNoteEvent?.();
+  for (const pitch of [...auditionTimers.keys()]) stopAuditionNote(pitch);
   clearCaptureResources();
 });
 
@@ -1038,17 +1088,22 @@ const endDrag = () => {
 }
 
 .motion-control__state-label {
-  margin-left: 4px;
   color: #b9aaa2;
-  font-size: var(--volca-type-body);
+  font-size: var(--volca-type-label);
   white-space: nowrap;
 }
+
+.motion-toggle-control { display: grid; justify-items: center; align-content: start; gap: 5px; }
 
 
 .motion-control__select {
   flex: 0 0 280px;
   width: 280px;
 }
+
+.select-control { display: grid; align-content: start; gap: 5px; min-width: 0; }
+.select-control > label { color: #d8ccc4; font-size: var(--volca-type-label); line-height: 1.25; }
+.select-control > :deep(.v-input) { margin-block: 12px; }
 
 .motion-bars {
   flex: 1 1 auto;

@@ -27,12 +27,14 @@ export const useMidiStore = defineStore('midi', () => {
     const selectedMidiOut = ref<string | null>(null);
     const programNames = ref<{ name: string }[]>(Array.from({ length: 64 }, () => ({ name: '' })));
     const programData = ref<Uint8Array[]>([]);
+    const lastReceivedProgram = ref<{ programNo: number; name: string } | null>(null);
     const currentProgramFetchState = ref<'idle' | 'loading-programs' | 'requesting' | 'received' | 'error'>('idle');
     const currentProgramFetchProgress = ref(0);
     const sequenceWriteState = ref<'idle' | 'sending' | 'ok' | 'nak' | 'error'>('idle');
     const currentVoiceData = ref<Uint8Array | null>(null);
     const soundEditState = ref<'idle' | 'requesting' | 'received' | 'sending' | 'ok' | 'error'>('idle');
     const logs = ref<string[]>([]);
+    let programLoadPromise: Promise<boolean> | null = null;
 
     const toHex = (bytes: Uint8Array | number[], limit = 24) => {
         const arr = Array.from(bytes).slice(0, limit).map(b => b.toString(16).padStart(2, '0')).join(' ');
@@ -53,6 +55,8 @@ export const useMidiStore = defineStore('midi', () => {
     const noteListeners = new Set<NoteEventCallback>();
     type MidiMessageCallback = (data: Uint8Array, inputName: string) => void;
     const midiMessageListeners = new Set<MidiMessageCallback>();
+    type ProgramChangeCallback = (programNo: number) => void;
+    const programChangeListeners = new Set<ProgramChangeCallback>();
 
     /** MIDIキーボード等からのNote On/Offを購読する。戻り値の関数を呼ぶと解除される。 */
     const onNoteEvent = (cb: NoteEventCallback): (() => void) => {
@@ -65,6 +69,11 @@ export const useMidiStore = defineStore('midi', () => {
         return () => midiMessageListeners.delete(cb);
     };
 
+    const onProgramChange = (cb: ProgramChangeCallback): (() => void) => {
+        programChangeListeners.add(cb);
+        return () => programChangeListeners.delete(cb);
+    };
+
     const handleChannelMessage = (data: Uint8Array) => {
         const type = data[0] & 0xf0;
         if (type === 0x90 || type === 0x80) {
@@ -72,6 +81,11 @@ export const useMidiStore = defineStore('midi', () => {
             const velocity = data[2] ?? 0;
             const on = type === 0x90 && velocity > 0;
             noteListeners.forEach(cb => cb(note, on, velocity));
+        } else if (type === 0xc0) {
+            const programNo = data[1] & 0x7f;
+            log(`RX Program Change: #${programNo}`);
+            useSequencerStore().programNo = Math.min(63, programNo);
+            programChangeListeners.forEach(cb => cb(programNo));
         }
     };
 
@@ -151,6 +165,7 @@ export const useMidiStore = defineStore('midi', () => {
                     selectedMidiOut.value = midiAccess.outputs.get(outputId)?.name ?? null;
                     connectionState.value = MIDIConnectionState.DETECTED;
                     log(`Device Inquiry Reply matched. in="${selectedMidiIn.value}" out="${selectedMidiOut.value}"`);
+                    void ensureAllProgramDumps();
                 }
             } else if (isVolcaFM2Dump(data)) {
                 connectionState.value = MIDIConnectionState.RECEIVING;
@@ -159,11 +174,10 @@ export const useMidiStore = defineStore('midi', () => {
                 const programName = String.fromCharCode(...programDataArray.slice(118, 127));
                 programNames.value[programNo] = { name: programName };
                 programData.value[programNo] = programDataArray;
-                if (currentProgramFetchState.value === 'loading-programs') {
-                    currentProgramFetchProgress.value = programData.value.filter(Boolean).length;
-                }
+                lastReceivedProgram.value = { programNo, name: programName.trim() };
+                currentProgramFetchProgress.value = programData.value.filter(Boolean).length;
                 log(`Program dump received: #${programNo} "${programName}"`);
-                if (programNo === 63) {
+                if (currentProgramFetchProgress.value === 64) {
                     connectionState.value = MIDIConnectionState.RECEIVED;
                 }
             } else if (isVolcaFM2CurrentVoiceDump(data)) {
@@ -301,34 +315,64 @@ export const useMidiStore = defineStore('midi', () => {
         return null;
     };
 
-    const requestProgramDump = async () => {
-        reset();
-        if (!selectedMidiOut.value || !midiAccess.value) return;
+    const waitForProgram = async (programNo: number, timeoutMs: number) => {
+        const startedAt = performance.now();
+        while (!programData.value[programNo]) {
+            if (performance.now() - startedAt >= timeoutMs) return false;
+            await new Promise(resolve => setTimeout(resolve, 5));
+        }
+        return true;
+    };
+
+    const loadAllProgramDumps = async () => {
+        if (!selectedMidiOut.value || !midiAccess.value) return false;
 
         const output = Array.from(midiAccess.value.outputs.values())
             .find((output: MIDIOutput) => output.name === selectedMidiOut.value);
 
         if (!output) {
             connectionState.value = MIDIConnectionState.ERROR;
-            return;
+            return false;
         }
 
-        log('Requesting all 64 program dumps...');
-        let DUMP_REQUEST = [0xF0, 0x42, 0x30, 0x00, 0x01, 0x2F, 0x1E, 0x00, 0xF7];
-        for (let i = 0; i < 64; i++) {
-            DUMP_REQUEST[7] = i;
-            output.send(new Uint8Array(DUMP_REQUEST));
-            await new Promise(resolve => setTimeout(resolve, 200));
+        connectionState.value = MIDIConnectionState.RECEIVING;
+        log('Preloading all 64 program dumps (adaptive response timing)...');
+        const missing: number[] = [];
+        for (let programNo = 0; programNo < 64; programNo++) {
+            if (programData.value[programNo]) continue;
+            let timeoutMs = 120;
+            let received = false;
+            for (let attempt = 1; attempt <= 4; attempt++) {
+                const request = new Uint8Array([0xF0, 0x42, 0x30, 0x00, 0x01, 0x2F, 0x1E, programNo, 0xF7]);
+                output.send(request);
+                received = await waitForProgram(programNo, timeoutMs);
+                if (received) break;
+                log(`Program #${programNo} timed out after ${timeoutMs}ms (attempt ${attempt}/4); backing off.`);
+                timeoutMs *= 2;
+            }
+            if (!received) missing.push(programNo);
         }
+        currentProgramFetchProgress.value = programData.value.filter(Boolean).length;
+        if (missing.length === 0) {
+            connectionState.value = MIDIConnectionState.RECEIVED;
+            log('Program preload complete: 64/64 received.');
+            return true;
+        }
+        connectionState.value = MIDIConnectionState.DETECTED;
+        log(`Program preload incomplete: ${currentProgramFetchProgress.value}/64 received; missing=[${missing.join(',')}].`);
+        return false;
     };
 
-    const waitForProgramDumps = async (timeoutMs = 6000) => {
-        const startedAt = performance.now();
-        while (programData.value.filter(Boolean).length < 64) {
-            if (performance.now() - startedAt >= timeoutMs) return false;
-            await new Promise(resolve => setTimeout(resolve, 100));
+    const ensureAllProgramDumps = () => {
+        if (programData.value.filter(Boolean).length === 64) return Promise.resolve(true);
+        if (!programLoadPromise) {
+            programLoadPromise = loadAllProgramDumps().finally(() => { programLoadPromise = null; });
         }
-        return true;
+        return programLoadPromise;
+    };
+
+    const requestProgramDump = async () => {
+        return ensureAllProgramDumps();
     };
 
     const requestCurrentVoiceProgramNo = async () => {
@@ -336,8 +380,7 @@ export const useMidiStore = defineStore('midi', () => {
         currentProgramFetchProgress.value = programData.value.filter(Boolean).length;
         if (programData.value.filter(Boolean).length < 64) {
             log('Program data is incomplete; receiving all 64 programs before matching the current voice...');
-            await requestProgramDump();
-            if (!await waitForProgramDumps()) {
+            if (!await ensureAllProgramDumps()) {
                 currentProgramFetchState.value = 'error';
                 log('Current voice lookup failed: timed out while receiving the 64 reference programs.');
                 return;
@@ -405,6 +448,7 @@ export const useMidiStore = defineStore('midi', () => {
     const reset = () => {
         programNames.value = Array.from({ length: 64 }, () => ({ name: '' }));
         programData.value = [];
+        lastReceivedProgram.value = null;
     }
 
     const sendCurrentSequenceDump = (bytes: Uint8Array) => {
@@ -485,6 +529,7 @@ export const useMidiStore = defineStore('midi', () => {
         selectedMidiIn,
         selectedMidiOut,
         programNames,
+        lastReceivedProgram,
         initMIDI,
         detectVolcaFM2,
         requestProgramDump,
@@ -504,6 +549,7 @@ export const useMidiStore = defineStore('midi', () => {
         clearLogs,
         onNoteEvent,
         onMidiMessage,
+        onProgramChange,
         sendMidiMessage,
         reset
     };

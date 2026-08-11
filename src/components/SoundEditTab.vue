@@ -25,6 +25,9 @@
       </v-card>
     </v-dialog>
 
+    <PresetLibraryDialog v-model="showLibrary" kind="sound" title="Sound Library"
+      :suggested-name="program.name.trim() || 'Untitled Sound'" :snapshot="soundSnapshot" @load="loadSoundPreset" />
+
     <v-card class="sound-card pa-4">
       <div class="sound-toolbar">
         <div>
@@ -38,9 +41,13 @@
         </v-btn>
         <v-spacer />
         <v-btn variant="text" @click="resetProgram">初期化</v-btn>
-        <v-btn @click="sendProgram" :disabled="!canSend" :loading="midiStore.soundEditState === 'sending'">
+        <v-btn class="send-button" :class="{ 'needs-send': hasUnsavedChanges }" @click="sendProgram"
+          :disabled="!canSend" :loading="midiStore.soundEditState === 'sending'">
           送信
           <Upload :size="16" class="ml-1" />
+        </v-btn>
+        <v-btn icon variant="text" title="Sound Library" aria-label="Sound Library" @click="showLibrary = true">
+          <Library :size="19" />
         </v-btn>
       </div>
 
@@ -62,7 +69,7 @@
               <span>Algorithm</span><strong>{{ program.algorithm + 1 }}</strong>
             </button>
             <NumberControl v-model="program.feedback" label="Feedback" :min="0" :max="7" />
-            <div class="toggle-row"><span>OSC Key Sync</span><AppToggle v-model="program.oscillatorSync" aria-label="OSC Key Sync" /></div>
+            <div class="toggle-row stacked-control"><span>OSC Key Sync</span><AppToggle v-model="program.oscillatorSync" aria-label="OSC Key Sync" /></div>
           </div>
 
           <div class="left-utility-grid">
@@ -78,7 +85,7 @@
             <section class="global-section transpose-section">
               <h4>Transpose</h4>
               <div class="transpose-controls">
-                <NumberControl v-model="program.transpose" label="Semitone (−24…+24)" :min="0" :max="48" :display-offset="-24" />
+                <NumberControl v-model="program.transpose" label="Semitone" :min="0" :max="48" :display-offset="-24" />
                 <NumberControl v-model="program.octave" label="volca Octave" :min="-2" :max="2" />
               </div>
             </section>
@@ -97,13 +104,16 @@
             <div class="control-grid four">
               <div class="mode-control">
                 <label>Mode</label>
-                <v-btn-toggle v-model="selected.oscillatorMode" mandatory divided density="compact">
-                  <v-btn :value="0">Ratio</v-btn><v-btn :value="1">Fixed</v-btn>
-                </v-btn-toggle>
+                <div class="mode-segment" role="group" aria-label="Oscillator mode">
+                  <button type="button" :class="{ active: selected.oscillatorMode === 0 }"
+                    :aria-pressed="selected.oscillatorMode === 0" @click="selected.oscillatorMode = 0">Ratio</button>
+                  <button type="button" :class="{ active: selected.oscillatorMode === 1 }"
+                    :aria-pressed="selected.oscillatorMode === 1" @click="selected.oscillatorMode = 1">Fixed</button>
+                </div>
               </div>
               <NumberControl v-model="selected.coarse" label="Coarse" :min="0" :max="31" />
               <NumberControl v-model="selected.fine" label="Fine" :min="0" :max="99" />
-              <NumberControl v-model="selected.detune" label="Detune (−7…+7)" :min="0" :max="14" :display-offset="-7" />
+              <NumberControl v-model="selected.detune" label="Detune" :min="0" :max="14" :display-offset="-7" />
               <NumberControl v-model="selected.outputLevel" label="Output Level" :min="0" :max="99" />
               <NumberControl v-model="selected.ampModSensitivity" label="Amp Mod Sens" :min="0" :max="3" />
               <NumberControl v-model="selected.keyVelocitySensitivity" label="Key Velocity" :min="0" :max="7" />
@@ -130,13 +140,12 @@
 
           <section class="edit-section keyboard-scaling">
             <div class="section-heading"><h4>Keyboard Scaling</h4><span>Level response across keys</span></div>
-            <div class="control-grid four">
+            <div class="control-grid five">
               <NumberControl v-model="selected.breakPoint" label="Break Point" :min="0" :max="99" />
               <NumberControl v-model="selected.leftDepth" label="Left Depth" :min="0" :max="99" />
               <NumberControl v-model="selected.rightDepth" label="Right Depth" :min="0" :max="99" />
-              <div class="empty-control"></div>
-              <v-select v-model="selected.leftCurve" :items="curveItems" label="Left Curve" density="compact" hide-details />
-              <v-select v-model="selected.rightCurve" :items="curveItems" label="Right Curve" density="compact" hide-details />
+              <div class="select-control"><label>Left Curve</label><v-select v-model="selected.leftCurve" :items="curveItems" aria-label="Left Curve" density="compact" hide-details /></div>
+              <div class="select-control"><label>Right Curve</label><v-select v-model="selected.rightCurve" :items="curveItems" aria-label="Right Curve" density="compact" hide-details /></div>
             </div>
           </section>
         </main>
@@ -144,14 +153,14 @@
         <aside class="sound-panel global-editor">
           <section class="global-section">
             <h4>LFO</h4>
-            <v-select v-model="program.lfoWave" :items="lfoWaveItems" label="Waveform" density="compact" hide-details />
+            <div class="select-control"><label>Waveform</label><v-select v-model="program.lfoWave" :items="lfoWaveItems" aria-label="Waveform" density="compact" hide-details /></div>
             <div class="control-grid three mt-2">
               <NumberControl v-model="program.lfoSpeed" label="Speed" :min="0" :max="99" />
               <NumberControl v-model="program.lfoDelay" label="Delay" :min="0" :max="99" />
               <NumberControl v-model="program.pitchModDepth" label="Pitch Mod Depth" :min="0" :max="99" />
               <NumberControl v-model="program.ampModDepth" label="Amp Mod Depth" :min="0" :max="99" />
               <NumberControl v-model="program.pitchModSensitivity" label="Pitch Mod Sens" :min="0" :max="7" />
-              <div class="toggle-row"><span>LFO Key Sync</span><AppToggle v-model="program.lfoSync" aria-label="LFO Key Sync" /></div>
+              <div class="toggle-row stacked-control"><span>LFO Key Sync</span><AppToggle v-model="program.lfoSync" aria-label="LFO Key Sync" /></div>
             </div>
           </section>
 
@@ -176,13 +185,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { Upload } from '@lucide/vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { Library, Upload } from '@lucide/vue';
 import AlgorithmDiagram from '@/components/AlgorithmDiagram.vue';
 import AppToggle from '@/components/AppToggle.vue';
 import KnobControl from '@/components/KnobControl.vue';
+import PresetLibraryDialog from '@/components/PresetLibraryDialog.vue';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
-import type { SoundOperator } from '@/types/soundProgram';
+import type { SoundOperator, SoundProgram } from '@/types/soundProgram';
 import { createInitialSoundProgram, decodeSoundProgram, encodeSoundProgram } from '@/utils/soundProgramCodec';
 
 const midiStore = useMidiStore();
@@ -190,16 +200,45 @@ const program = ref(createInitialSoundProgram());
 const selectedOperator = ref(0);
 const showError = ref(false);
 const showAlgorithmPicker = ref(false);
+const showLibrary = ref(false);
+const currentVoiceRequestPending = ref(true);
+const loadedProgramSignature = ref<string | null>(null);
+let unsubscribeProgramChange: (() => void) | null = null;
 const selected = computed(() => program.value.operators[selectedOperator.value]);
 const canSend = computed(() => [MIDIConnectionState.DETECTED, MIDIConnectionState.RECEIVING, MIDIConnectionState.RECEIVED]
   .includes(midiStore.connectionState));
+const programSignature = () => Array.from(encodeSoundProgram(program.value)).join(',');
+const hasUnsavedChanges = computed(() => loadedProgramSignature.value !== null
+  && programSignature() !== loadedProgramSignature.value);
 
 watch(() => midiStore.currentVoiceData, data => {
-  if (data) program.value = decodeSoundProgram(data);
+  if (data) {
+    program.value = decodeSoundProgram(data);
+    loadedProgramSignature.value = programSignature();
+  }
 });
 watch(() => midiStore.soundEditState, state => {
   if (state === 'error') showError.value = true;
+  if (state === 'ok') loadedProgramSignature.value = programSignature();
 });
+watch(() => midiStore.connectionState, state => {
+  if (state === MIDIConnectionState.RECEIVED && currentVoiceRequestPending.value) {
+    currentVoiceRequestPending.value = false;
+    midiStore.requestCurrentVoiceDump();
+  }
+}, { immediate: true });
+
+onMounted(() => {
+  unsubscribeProgramChange = midiStore.onProgramChange(() => {
+    if (midiStore.connectionState === MIDIConnectionState.RECEIVED) {
+      currentVoiceRequestPending.value = false;
+      midiStore.requestCurrentVoiceDump();
+    } else {
+      currentVoiceRequestPending.value = true;
+    }
+  });
+});
+onUnmounted(() => unsubscribeProgramChange?.());
 
 const resetProgram = () => { program.value = createInitialSoundProgram(); };
 const selectAlgorithm = (algorithm: number) => {
@@ -207,6 +246,10 @@ const selectAlgorithm = (algorithm: number) => {
   showAlgorithmPicker.value = false;
 };
 const sendProgram = () => midiStore.sendCurrentVoiceDump(encodeSoundProgram(program.value));
+const soundSnapshot = () => JSON.parse(JSON.stringify(program.value)) as SoundProgram;
+const loadSoundPreset = (data: unknown) => {
+  program.value = data as SoundProgram;
+};
 const curveItems = [
   { title: '− Linear', value: 0 }, { title: '− Exponential', value: 1 },
   { title: '+ Exponential', value: 2 }, { title: '+ Linear', value: 3 },
@@ -245,9 +288,17 @@ const NumberControl = KnobControl;
 .sound-toolbar { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; }
 .sound-toolbar h2 { margin: 0; font-size: var(--volca-type-heading); }
 .voice-name { width: 210px; flex: 0 0 210px; }
+.send-button.needs-send:not(:disabled) { animation: send-attention 2.8s cubic-bezier(.45, 0, .55, 1) infinite; }
+@keyframes send-attention {
+  0%, 100% { filter: brightness(1); box-shadow: 0 2px 8px rgba(206,179,147,.08); }
+  50% { filter: brightness(1.14); box-shadow: 0 4px 18px rgba(225,202,176,.42); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .send-button.needs-send:not(:disabled) { animation: none; box-shadow: 0 3px 12px rgba(225,202,176,.3); filter: brightness(1.1); }
+}
 .algorithm-picker-card { max-height: min(86vh, 900px); overflow: hidden; }
-.algorithm-picker-header { display: flex; align-items: center; justify-content: space-between; }
-.algorithm-picker-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 10px; padding: 4px; overflow-y: auto; }
+.algorithm-picker-header { display: flex; align-items: center; justify-content: space-between; padding-right: 20px; }
+.algorithm-picker-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 10px; padding: 10px 20px 20px; overflow-y: auto; }
 .algorithm-option { min-width: 0; padding: 10px; border: 1px solid rgba(206,179,147,.18); border-radius: 10px; background: #2b2022; color: #d8ccc4; cursor: pointer; text-align: left; }
 .algorithm-option:hover { border-color: rgba(206,179,147,.48); background: #35282a; }
 .algorithm-option.selected { border-color: #ceb393; background: rgba(206,179,147,.12); color: #f1e9e1; }
@@ -271,21 +322,28 @@ const NumberControl = KnobControl;
 .algorithm-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .algorithm-legend i { width: 13px; height: 2px; display: inline-block; background: #f1e9e1; }
 .algorithm-legend i.feedback { background: #72d5ca; }.algorithm-legend i.output { background: #e7bd76; }
-.global-mini-grid { display: grid; grid-template-columns: 1fr 1fr minmax(118px, 1.25fr); align-items: center; gap: 10px; padding: 2px 12px 14px; border-bottom: 1px solid rgba(206,179,147,.16); }
+.global-mini-grid { display: grid; grid-template-columns: 1fr 1fr minmax(118px, 1.25fr); align-items: start; gap: 10px; padding: 2px 12px 14px; border-bottom: 1px solid rgba(206,179,147,.16); }
 .operator-heading { position: sticky; top: 0; z-index: 3; background: #302426; }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; color: #ad9e96; font-size: var(--volca-type-label); }
+.toggle-row.stacked-control { flex-direction: column; align-items: center; justify-content: flex-start; gap: 5px; }
+.toggle-row.stacked-control > span { min-height: 15px; line-height: 1.25; text-align: center; }
 .control-grid.three .toggle-row { flex-direction: column; justify-content: flex-start; }
 .edit-section, .global-section { padding: 13px; border-bottom: 1px solid rgba(206,179,147,.15); }
 .section-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }.section-heading h4, .global-section h4 { margin: 0; font-size: var(--volca-type-heading); }.section-heading span { color: #ad9e96; font-size: var(--volca-type-label); }
-.control-grid { display: grid; gap: 8px; }.control-grid.four { grid-template-columns: repeat(4, minmax(92px,1fr)); }.control-grid.three { grid-template-columns: repeat(3, minmax(84px,1fr)); }.control-grid.two { grid-template-columns: 1fr 1fr; }
+.control-grid { display: grid; gap: 8px; }.control-grid.five { grid-template-columns: repeat(3, minmax(72px,.8fr)) repeat(2, minmax(120px,1.3fr)); }.control-grid.four { grid-template-columns: repeat(4, minmax(92px,1fr)); }.control-grid.three { grid-template-columns: repeat(3, minmax(84px,1fr)); align-items: start; }.control-grid.two { grid-template-columns: 1fr 1fr; }
+.select-control { display: grid; align-content: start; gap: 5px; min-width: 0; }
+.select-control > label { color: #ad9e96; font-size: var(--volca-type-label); line-height: 1.25; }
+.select-control > :deep(.v-input) { margin-block: 12px; }
 .mode-control { display: grid; align-content: start; gap: 5px; }
 .mode-control > label { color: #ad9e96; font-size: var(--volca-type-label); }
-.mode-control :deep(.v-btn-toggle) { width: fit-content; padding: 3px; border: 1px solid rgba(206,179,147,.24); border-radius: 9px; background: #251c1e; }
-.mode-control :deep(.v-btn) { min-width: 68px; height: 34px; min-height: 34px; padding-inline: 12px; border: 0 !important; border-radius: 6px !important; background: transparent !important; color: #ad9e96 !important; box-shadow: none !important; }
-.mode-control :deep(.v-btn + .v-btn) { border-left: 1px solid rgba(206,179,147,.38) !important; border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
-.mode-control :deep(.v-btn:first-child) { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
-.mode-control :deep(.v-btn:hover) { background: rgba(206,179,147,.1) !important; color: #f1e9e1 !important; }
-.mode-control :deep(.v-btn.v-btn--active) { background: #ceb393 !important; color: #33282a !important; box-shadow: inset 0 1px rgba(255,255,255,.24) !important; }
+.mode-segment { width: fit-content; height: 40px; display: grid; grid-template-columns: 1fr 1fr; padding: 3px; box-sizing: border-box; border: 1px solid rgba(206,179,147,.3); border-radius: 9px; background: #251c1e; }
+.mode-segment button { width: 72px; height: 32px; padding: 0 12px; border: 0; background: transparent; color: #ad9e96; font: inherit; font-size: var(--volca-type-body); font-weight: 700; cursor: pointer; }
+.mode-segment button + button { border-left: 1px solid rgba(206,179,147,.32); }
+.mode-segment button:first-child { border-radius: 5px 0 0 5px; }
+.mode-segment button:last-child { border-radius: 0 5px 5px 0; }
+.mode-segment button:hover { background: rgba(206,179,147,.1); color: #f1e9e1; }
+.mode-segment button.active { background: #ceb393; color: #33282a; }
+.mode-segment button:focus-visible { position: relative; z-index: 1; outline: 2px solid #e1cab0; outline-offset: -2px; }
 .envelope-layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; }.envelope-graph, .pitch-envelope { width: 100%; border: 1px solid rgba(206,179,147,.15); border-radius: 8px; background: #251c1e; }.envelope-grid { fill: none; stroke: rgba(206,179,147,.1); }.envelope-line { fill: none; stroke: #ceb393; stroke-width: 2.5; }.envelope-graph circle { fill: #302426; stroke: #ceb393; stroke-width: 2; }.envelope-values, .pitch-values { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; align-content: start; }
 .keyboard-scaling { border-bottom: 0; }.global-editor { padding-bottom: 8px; }
 .left-utility-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(110px, 1fr); border-bottom: 1px solid rgba(206,179,147,.15); }

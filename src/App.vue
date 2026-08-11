@@ -7,8 +7,26 @@
           DX7 SysEx conversion and volca fm2 sequence editing in one workspace.<br><br>
           Version 1.0.0<br>
           Copyright (c) 2025, Masaki Ono.
+          <div class="about-log-toggle">
+            <span>Logを表示</span>
+            <AppToggle v-model="showLog" aria-label="Logを表示" />
+          </div>
         </v-card-text>
         <v-card-actions><v-spacer /><v-btn @click="showInfo = false">Close</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog :model-value="showProgramLoadModal" max-width="500" persistent>
+      <v-card class="program-load-card pa-4">
+        <v-card-title>音色データを取得中</v-card-title>
+        <v-card-text>
+          <p class="program-load-copy">volca fm2の音色を読み込んでいます。</p>
+          <v-progress-linear :model-value="programLoadProgress" height="8" rounded />
+          <div class="program-load-status">
+            <span>{{ midiStore.currentProgramFetchProgress }}/64</span>
+            <strong>{{ currentProgramLoadName }}</strong>
+          </div>
+        </v-card-text>
       </v-card>
     </v-dialog>
 
@@ -58,17 +76,17 @@
           </div>
           <div class="sidebar-rule" />
           <div class="sidebar-label">TOOLS</div>
-          <button class="nav-item" :class="{ active: activeTab === 'dx7' }" type="button" @click="activeTab = 'dx7'">
-            <span class="nav-icon"><Download :size="18" /></span>
-            <span><b>DX7 SysEx</b><small>{{ navTexts.dx7 }}</small></span>
+          <button class="nav-item" :class="{ active: activeTab === 'sound-edit' }" type="button" @click="activeTab = 'sound-edit'">
+            <span class="nav-icon"><SlidersHorizontal :size="18" /></span>
+            <span><b>Sound</b><small>{{ navTexts.soundEdit }}</small></span>
           </button>
           <button class="nav-item" :class="{ active: activeTab === 'sequencer' }" type="button" @click="activeTab = 'sequencer'">
             <span class="nav-icon"><Piano :size="18" /></span>
-            <span><b>Sequencer</b><small>{{ navTexts.sequencer }}</small></span>
+            <span><b>Sequence</b><small>{{ navTexts.sequencer }}</small></span>
           </button>
-          <button class="nav-item" :class="{ active: activeTab === 'sound-edit' }" type="button" @click="activeTab = 'sound-edit'">
-            <span class="nav-icon"><SlidersHorizontal :size="18" /></span>
-            <span><b>Sound Edit</b><small>{{ navTexts.soundEdit }}</small></span>
+          <button class="nav-item" :class="{ active: activeTab === 'dx7' }" type="button" @click="activeTab = 'dx7'">
+            <span class="nav-icon"><Download :size="18" /></span>
+            <span><b>DX7</b><small>{{ navTexts.dx7 }}</small></span>
           </button>
           <div class="sidebar-fill" />
           <div class="sidebar-footer">
@@ -91,15 +109,16 @@
           </v-window>
         </main>
       </div>
-      <LogPanel />
+      <LogPanel v-if="showLog" />
     </v-main>
   </v-app>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Download, Info, PanelLeftClose, PanelLeftOpen, Piano, SlidersHorizontal } from '@lucide/vue';
 import Dx7Tab from './components/Dx7Tab.vue';
+import AppToggle from './components/AppToggle.vue';
 import LogPanel from './components/LogPanel.vue';
 import SequencerTab from './components/SequencerTab.vue';
 import SoundEditTab from './components/SoundEditTab.vue';
@@ -107,7 +126,8 @@ import { MIDIConnectionState, useMidiStore } from './stores/midiStore';
 
 const midiStore = useMidiStore();
 const showInfo = ref(false);
-const activeTab = ref('dx7');
+const showLog = ref(false);
+const activeTab = ref('sound-edit');
 const sidebarCollapsed = ref(false);
 const userLanguage = navigator.language.startsWith('ja') ? 'ja' : 'en';
 const sidebarToggleLabel = computed(() => sidebarCollapsed.value
@@ -115,6 +135,12 @@ const sidebarToggleLabel = computed(() => sidebarCollapsed.value
   : (userLanguage === 'ja' ? '左ペインを小さくする' : 'Collapse sidebar'));
 
 onMounted(() => midiStore.initMIDI());
+
+watch([activeTab, () => midiStore.connectionState], ([tab, connectionState]) => {
+  if (tab === 'sequencer' && connectionState === MIDIConnectionState.RECEIVED) {
+    void midiStore.requestCurrentVoiceProgramNo();
+  }
+});
 
 const NAV_TEXTS = {
   ja: { dx7: '音色をDX7 SysExに変換', sequencer: 'シーケンスを編集', soundEdit: '音色を編集' },
@@ -144,6 +170,12 @@ const showConnectionModal = computed(() => !(
   midiStore.connectionState === MIDIConnectionState.RECEIVING ||
   midiStore.connectionState === MIDIConnectionState.RECEIVED
 ));
+const showProgramLoadModal = computed(() => midiStore.connectionState === MIDIConnectionState.RECEIVING
+  && midiStore.currentProgramFetchProgress < 64);
+const programLoadProgress = computed(() => (midiStore.currentProgramFetchProgress / 64) * 100);
+const currentProgramLoadName = computed(() => midiStore.lastReceivedProgram
+  ? `#${String(midiStore.lastReceivedProgram.programNo).padStart(2, '0')}  ${midiStore.lastReceivedProgram.name || '---'}`
+  : '応答を待っています…');
 
 const CONNECTION_LABELS = {
   ja: {
@@ -225,7 +257,7 @@ body { overflow: hidden; }
 .nav-item { width: 100%; display: flex; align-items: center; gap: 11px; min-height: 62px; padding: 9px 11px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--volca-muted); text-align: left; cursor: pointer; transition: background .18s ease, border-color .18s ease, color .18s ease, transform .1s ease; }
 .nav-item:hover { color: var(--volca-text); background: rgba(255,255,255,.045); }
 .nav-item:focus-visible, .about-button:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
-.nav-item.active { color: var(--volca-text); border-color: var(--volca-line); background: linear-gradient(90deg, rgba(206,179,147,.16), rgba(206,179,147,.07)); box-shadow: inset 2px 0 var(--volca-accent); }
+.nav-item.active { color: var(--volca-text); border-color: var(--volca-accent); background: rgba(206,179,147,.11); box-shadow: none; }
 .nav-icon { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 8px; background: rgba(255,255,255,.05); color: var(--volca-accent); }
 .nav-item > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .nav-item b { font-size: var(--volca-type-body); font-weight: 650; }
@@ -237,7 +269,7 @@ body { overflow: hidden; }
 .workspace { min-width: 0; flex: 1; overflow: hidden; }
 .tool-window, .tool-window > .v-window__container, .tool-window .v-window-item { height: 100%; }
 .tool-window .v-window-item { overflow: auto; }
-.workspace .v-container { max-width: 1440px; padding: 22px 26px 30px; }
+.workspace .v-container { width: 100%; max-width: none; padding: 10px 12px 12px; box-sizing: border-box; }
 .workspace .v-card { border: 1px solid var(--volca-line) !important; border-radius: 13px !important; background: var(--volca-panel) !important; box-shadow: 0 14px 35px rgba(9,5,6,.16) !important; backdrop-filter: blur(18px); color: var(--volca-text) !important; }
 .volca-app .v-btn { height: 40px; min-height: 40px; }
 .workspace .v-btn { border: 1px solid rgba(255,255,255,.08); border-radius: 8px; background: var(--volca-accent) !important; color: #33282a !important; box-shadow: inset 0 1px rgba(255,255,255,.28), 0 3px 10px rgba(0,0,0,.16) !important; font-size: var(--volca-type-body); font-weight: 700; letter-spacing: .005em; text-transform: none; }
@@ -247,17 +279,23 @@ body { overflow: hidden; }
 .workspace .v-label { font-size: var(--volca-type-label); }
 .workspace .v-divider { border-color: var(--volca-line); opacity: 1; }
 .workspace .v-card-title { font-size: var(--volca-type-heading); font-weight: 650; letter-spacing: -.01em; }
-.about-card { border: 1px solid var(--volca-line-strong) !important; border-radius: 14px !important; background: #382b2d !important; color: var(--volca-text) !important; }
-.connection-card { padding: 24px 26px 20px; border: 1px solid var(--volca-line-strong) !important; border-radius: 16px !important; background: linear-gradient(145deg, #403133, #322628) !important; color: var(--volca-text) !important; box-shadow: 0 28px 80px rgba(10,5,6,.48) !important; }
-.connection-card__icon { width: 44px; height: 44px; display: grid; place-items: center; margin: 0 16px 8px; border: 1px solid var(--volca-line-strong); border-radius: 12px; background: var(--volca-accent-soft); color: var(--volca-accent-bright); }
-.connection-card .v-card-title { padding-bottom: 8px; font-size: var(--volca-type-heading); font-weight: 680; letter-spacing: -.02em; }
-.connection-card .v-card-text { color: #d8ccc4; font-size: var(--volca-type-body); line-height: 1.75; }
+.v-overlay__content > .v-card { padding: 0 !important; overflow: hidden; border: 1px solid var(--volca-line-strong) !important; border-radius: 16px !important; background: #382b2d !important; color: var(--volca-text) !important; box-shadow: 0 24px 70px rgba(10,5,6,.5) !important; }
+.v-overlay__content > .v-card .v-card-title { padding: 20px 20px 10px; font-size: var(--volca-type-heading); font-weight: 680; letter-spacing: -.02em; }
+.v-overlay__content > .v-card > .v-card-text { padding: 10px 20px 20px; color: #d8ccc4; font-size: var(--volca-type-body); line-height: 1.65; }
+.v-overlay__content > .v-card > .v-card-actions { gap: 8px; padding: 0 20px 18px; }
+.v-overlay__content > .v-card .v-btn { height: 40px; min-height: 40px; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; background: var(--volca-accent) !important; color: #33282a !important; box-shadow: inset 0 1px rgba(255,255,255,.28) !important; font-size: var(--volca-type-body); font-weight: 700; letter-spacing: 0; text-transform: none; }
+.about-card, .program-load-card, .connection-card { background: #382b2d !important; }
+.connection-card__icon { width: 44px; height: 44px; display: grid; place-items: center; margin: 20px 20px 8px; border: 1px solid var(--volca-line-strong); border-radius: 12px; background: var(--volca-accent-soft); color: var(--volca-accent-bright); }
+.connection-card .v-card-text { line-height: 1.75; }
 .connection-steps { display: grid; gap: 8px; margin: 0; padding-left: 1.4rem; }
 .connection-steps li { padding-left: 4px; }
 .connection-card .v-card-actions { padding-top: 12px; }
-.connection-card .v-btn { border-radius: 9px; background: var(--volca-accent) !important; color: #33282a !important; font-size: var(--volca-type-body); font-weight: 700; letter-spacing: 0; text-transform: none; }
+.program-load-copy { margin: 0 0 16px; color: #d8ccc4; }
+.program-load-status { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; color: var(--volca-muted); font-variant-numeric: tabular-nums; }
+.program-load-status strong { overflow: hidden; color: var(--volca-text); text-overflow: ellipsis; white-space: nowrap; }
+.about-log-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--volca-line); }
 @keyframes status-pulse { 50% { opacity: .45; transform: scale(.82); } }
-@media (max-width: 900px) { .sidebar { width: 76px; flex-basis: 76px; } .sidebar-brand { justify-content: center; padding-inline: 0; } .sidebar-toggle, .brand-copy, .sidebar-label, .nav-item > span:last-child, .midi-state > span:last-child, .about-button span { display: none; } .nav-item, .about-button, .midi-state { justify-content: center; padding: 8px; } .workspace .v-container { padding: 16px; } }
+@media (max-width: 900px) { .sidebar { width: 76px; flex-basis: 76px; } .sidebar-brand { justify-content: center; padding-inline: 0; } .sidebar-toggle, .brand-copy, .sidebar-label, .nav-item > span:last-child, .midi-state > span:last-child, .about-button span { display: none; } .nav-item, .about-button, .midi-state { justify-content: center; padding: 8px; } .workspace .v-container { padding: 8px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition-duration: .01ms !important; } }
 @media (prefers-reduced-transparency: reduce) { .sidebar, .workspace .v-card { backdrop-filter: none; background: var(--volca-panel-solid) !important; } }
 </style>

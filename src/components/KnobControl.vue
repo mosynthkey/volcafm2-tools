@@ -6,14 +6,12 @@
       @pointermove="moveDrag" @pointerup="endDrag" @pointercancel="endDrag" @wheel.prevent="onWheel"
       @keydown="onKeydown">
       <svg viewBox="0 0 64 64" aria-hidden="true">
-        <path class="knob-track" d="M15.7 50.3A24 24 0 1 1 48.3 50.3" pathLength="100" />
-        <path class="knob-value" d="M15.7 50.3A24 24 0 1 1 48.3 50.3" pathLength="100"
+        <path class="knob-track" d="M15.03 48.97A24 24 0 1 1 48.97 48.97" pathLength="100" />
+        <path v-if="percent > 0" class="knob-value" d="M15.03 48.97A24 24 0 1 1 48.97 48.97" pathLength="100"
           :style="{ strokeDasharray: `${percent} 100` }" />
-        <circle cx="32" cy="32" r="18" />
-        <line x1="32" y1="32" x2="32" y2="18" :transform="`rotate(${angle} 32 32)`" />
       </svg>
+      <output>{{ displayValue }}</output>
     </span>
-    <output>{{ displayValue }}</output>
   </label>
 </template>
 
@@ -29,7 +27,6 @@ let dragStartY = 0;
 let dragStartValue = 0;
 const range = computed(() => Math.max(1, props.max - props.min));
 const percent = computed(() => ((props.modelValue - props.min) / range.value) * 100);
-const angle = computed(() => -135 + percent.value * 2.7);
 const displayValue = computed(() => props.modelValue + props.displayOffset);
 const setValue = (value: number) => emit('update:modelValue', Math.max(props.min, Math.min(props.max, Math.round(value))));
 
@@ -59,15 +56,15 @@ const onKeydown = (event: KeyboardEvent) => {
 </script>
 
 <style scoped>
-.knob-control { display: grid; min-width: 58px; justify-items: center; gap: 4px; color: #ad9e96; font-size: var(--volca-type-label); line-height: 1.25; text-align: center; }
-.knob-label { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.knob { width: 58px; height: 58px; display: block; cursor: ns-resize; touch-action: none; }
+.knob-control { display: grid; min-width: 64px; justify-items: center; gap: 4px; color: #ad9e96; font-size: var(--volca-type-label); line-height: 1.25; text-align: center; }
+.knob-label { width: 100%; min-height: 15px; overflow: hidden; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.knob { position: relative; width: 64px; height: 64px; display: block; cursor: ns-resize; touch-action: none; }
 .knob svg { width: 100%; height: 100%; overflow: visible; }
-.knob-track, .knob-value { fill: none; stroke-width: 3; stroke-linecap: round; }
-.knob-track { stroke: rgba(206,179,147,.16); }.knob-value { stroke: #ceb393; }
-.knob circle { fill: #302426; stroke: rgba(206,179,147,.25); stroke-width: 1.5; }
-.knob line { stroke: #f1e9e1; stroke-width: 2.5; stroke-linecap: round; }
+.knob-track, .knob-value { fill: none; stroke-width: 5; stroke-linecap: round; }
+.knob-track { stroke: rgba(206,179,147,.18); }
+.knob-value { stroke: #ceb393; }
+.knob:hover .knob-track { stroke: rgba(206,179,147,.3); }
 .knob:focus-visible { outline: 2px solid #ceb393; outline-offset: 2px; border-radius: 50%; }
-output { min-width: 32px; padding: 2px 5px; border-radius: 4px; background: #251c1e; color: #ceb393; font-size: var(--volca-type-body); font-variant-numeric: tabular-nums; }
-.compact { min-width: 48px; }.compact .knob { width: 46px; height: 46px; }.compact output { font-size: var(--volca-type-label); }
+output { position: absolute; top: 50%; left: 50%; z-index: 2; min-width: 24px; transform: translate(-50%, -50%); color: #e1cab0; font-size: var(--volca-type-body); font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; pointer-events: none; }
+.compact output { min-width: 20px; font-size: var(--volca-type-label); }
 </style>
