@@ -4,8 +4,8 @@ import vuetify from 'vite-plugin-vuetify'
 import { fileURLToPath, URL } from 'node:url'
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  base: process.env.NODE_ENV === 'production' ? '/volcafm2-dx7/' : '/',
+export default defineConfig(({ mode }) => ({
+  base: mode === 'desktop' ? './' : process.env.NODE_ENV === 'production' ? '/volcafm2-dx7/' : '/',
   plugins: [
     vue(),
     vuetify({ autoImport: true }),
@@ -22,4 +22,4 @@ export default defineConfig({
       }
     }
   }
-}) 
+}))

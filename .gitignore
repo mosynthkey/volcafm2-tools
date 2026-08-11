@@ -13,5 +13,6 @@ packages/template-compiler/build.js
 packages/template-compiler/browser.js
 .vscode
 dist
+dist-desktop
 temp
 types/v3-generated.d.ts
