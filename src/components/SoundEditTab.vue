@@ -83,11 +83,16 @@
         <main class="sound-panel operator-editor">
           <div class="panel-title operator-heading">
             <h3>{{ t('sound.operator', { count: selectedOperator + 1 }) }}</h3>
-            <AppToggle v-model="selected.enabled" :aria-label="t('sound.operator', { count: selectedOperator + 1 })" />
           </div>
 
           <section class="edit-section">
-            <div class="section-heading"><h4>{{ t('sound.frequencyOutput') }}</h4><span>{{ frequencyLabel(selected) }}</span></div>
+            <div class="section-heading frequency-heading">
+              <h4>{{ t('sound.frequencyOutput') }}</h4>
+              <div class="frequency-heading-controls">
+                <span>{{ frequencyLabel(selected) }}</span>
+                <AppToggle v-model="selected.enabled" :aria-label="t('sound.operator', { count: selectedOperator + 1 })" />
+              </div>
+            </div>
             <div class="control-grid four">
               <div class="mode-control">
                 <label>{{ t('sound.mode') }}</label>
@@ -314,6 +319,8 @@ const NumberControl = KnobControl;
 .control-grid.three .toggle-row { flex-direction: column; justify-content: flex-start; }
 .edit-section, .global-section { padding: 13px; border-bottom: 1px solid rgba(206,179,147,.15); }
 .section-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }.section-heading h4, .global-section h4 { margin: 0; font-size: var(--volca-type-heading); }.section-heading span { color: #ad9e96; font-size: var(--volca-type-label); }
+.frequency-heading { align-items: center; }
+.frequency-heading-controls { display: flex; align-items: center; gap: 12px; }
 .control-grid { display: grid; gap: 8px; }.control-grid.scaling-grid { grid-template-columns: repeat(3, minmax(120px,1fr)); }.control-grid.four { grid-template-columns: repeat(4, minmax(92px,1fr)); }.control-grid.three { grid-template-columns: repeat(3, minmax(84px,1fr)); align-items: start; }.control-grid.two { grid-template-columns: 1fr 1fr; }
 .select-control { display: grid; align-content: start; gap: 5px; min-width: 0; }
 .select-control > label { color: #ad9e96; font-size: var(--volca-type-label); line-height: 1.25; }
