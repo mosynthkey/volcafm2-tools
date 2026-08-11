@@ -33,7 +33,7 @@ const messages = {
       sendFailedTitle: '送信できませんでした', sendNak: '送信しましたがvolca fm2がエラーを返しました（NAK）。', sendError: '送信できませんでした。接続を確認してください。',
       stepInput: 'ステップ入力', stepInputExit: 'ステップ入力を終了', stepIndicator: 'ステップ {count}/16', stepPrev: '前のステップへ', stepNext: '次のステップへ（無音のまま進む）', stepReset: '先頭に戻す',
       motionParam: 'パラメーター', motionTarget: 'モーションの対象', motionEnable: 'このパラメーターのモーションを有効化', library: 'Sequence Library',
-      motionParams: { transpose: 'トランスポーズ', velocity: 'ベロシティ', algorithm: 'アルゴリズム', modulatorAttack: 'モジュレーター アタック', modulatorDecay: 'モジュレーター ディケイ', carrierAttack: 'キャリア アタック', carrierDecay: 'キャリア ディケイ', lfoRate: 'LFO レート', lfoPitchDepth: 'LFO ピッチデプス', arpType: 'アルペジオ タイプ', arpDivision: 'アルペジオ ディビジョン', chorusDepth: 'コーラス デプス', reverbDepth: 'リバーブ デプス' },
+      motionParams: { transpose: 'Transpose', velocity: 'Velocity', algorithm: 'Algorithm', modulatorAttack: 'Modulator Attack', modulatorDecay: 'Modulator Decay', carrierAttack: 'Carrier Attack', carrierDecay: 'Carrier Decay', lfoRate: 'LFO Rate', lfoPitchDepth: 'LFO Pitch Depth', arpType: 'Arp Type', arpDivision: 'Arp Division', chorusDepth: 'Chorus Depth', reverbDepth: 'Reverb Depth' },
     },
     sound: {
       title: 'Sound Edit', connectionError: 'volca fm2とのMIDI IN/OUT接続を確認してください。', selectAlgorithm: 'Algorithmを選択', library: 'Sound Library', untitled: 'Untitled Sound',
