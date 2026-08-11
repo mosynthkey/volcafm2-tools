@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { createInitialSoundProgram, decodeSoundProgram, encodeSoundProgram } from '../src/utils/soundProgramCodec';
+import { createInitialSoundProgram, decodeSoundProgram, encodeSoundProgram, normalizeSoundProgramName } from '../src/utils/soundProgramCodec';
 
 const program = createInitialSoundProgram();
 program.name = 'TEST VOICE';
@@ -20,6 +20,7 @@ program.operators[5].rightCurve = 2;
 
 const bytes = encodeSoundProgram(program);
 assert.equal(bytes.length, 140);
+assert.deepEqual(Array.from(bytes.slice(118, 128)), Array.from('TEST VOICE', character => character.charCodeAt(0)));
 const decoded = decodeSoundProgram(bytes);
 
 assert.equal(decoded.name, program.name);
@@ -37,5 +38,12 @@ assert.equal(decoded.operators[0].fine, 99);
 assert.equal(decoded.operators[0].detune, 14);
 assert.equal(decoded.operators[5].leftCurve, 3);
 assert.equal(decoded.operators[5].rightCurve, 2);
+
+program.name = 'NEW NAME!';
+const renamedBytes = encodeSoundProgram(program);
+assert.equal(String.fromCharCode(...renamedBytes.slice(118, 128)), 'NEW NAME! ');
+assert.equal(decodeSoundProgram(renamedBytes).name, 'NEW NAME!');
+assert.equal(normalizeSoundProgramName('LONG VOICE NAME'), 'LONG VOICE');
+assert.equal(normalizeSoundProgramName('FM音色'), 'FM');
 
 console.log('Sound program codec verification passed (140-byte Current Program Data).');

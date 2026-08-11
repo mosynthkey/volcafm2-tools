@@ -1,11 +1,21 @@
 import type { SoundOperator, SoundProgram } from '@/types/soundProgram';
 
 export const SOUND_PROGRAM_SIZE = 140;
+export const SOUND_PROGRAM_NAME_LENGTH = 10;
 
 const clamp = (value: number, min: number, max: number) =>
     Math.max(min, Math.min(max, Math.round(Number.isFinite(value) ? value : min)));
 
 const operatorBase = (operatorIndex: number) => (5 - operatorIndex) * 17;
+
+export const normalizeSoundProgramName = (value: string): string => Array.from(value)
+    .map(character => {
+        const code = character.charCodeAt(0);
+        return code >= 0x20 && code <= 0x7e ? character : ' ';
+    })
+    .join('')
+    .slice(0, SOUND_PROGRAM_NAME_LENGTH)
+    .trimEnd();
 
 const decodeOperator = (data: Uint8Array, operatorIndex: number): SoundOperator => {
     const base = operatorBase(operatorIndex);
@@ -89,8 +99,8 @@ export const encodeSoundProgram = (program: SoundProgram): Uint8Array => {
     data[115] = clamp(program.ampModDepth, 0, 99);
     data[116] = (program.lfoSync ? 1 : 0) | (clamp(program.lfoWave, 0, 5) << 1) | (clamp(program.pitchModSensitivity, 0, 7) << 4);
     data[117] = clamp(program.transpose, 0, 48);
-    const name = program.name.slice(0, 10).padEnd(10, ' ');
-    for (let index = 0; index < 10; index++) data[118 + index] = name.charCodeAt(index) & 0x7f;
+    const name = normalizeSoundProgramName(program.name).padEnd(SOUND_PROGRAM_NAME_LENGTH, ' ');
+    for (let index = 0; index < SOUND_PROGRAM_NAME_LENGTH; index++) data[118 + index] = name.charCodeAt(index);
     data[128] = clamp(program.modulatorAttack + 64, 1, 127);
     data[129] = clamp(program.modulatorDecay + 64, 1, 127);
     data[130] = clamp(program.carrierAttack + 64, 1, 127);

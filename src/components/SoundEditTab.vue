@@ -191,7 +191,7 @@ import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue';
 import AppDialog from '@/components/dialogs/AppDialog.vue';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
 import type { SoundOperator, SoundProgram } from '@/types/soundProgram';
-import { createInitialSoundProgram, decodeSoundProgram, encodeSoundProgram } from '@/utils/soundProgramCodec';
+import { createInitialSoundProgram, decodeSoundProgram, encodeSoundProgram, normalizeSoundProgramName } from '@/utils/soundProgramCodec';
 import { dx7EnvelopeGeometry, dx7EnvelopePoints } from '@/utils/dx7Envelope';
 import { formatOperatorFrequency } from '@/utils/operatorFrequency';
 import { useI18n } from 'vue-i18n';
@@ -263,7 +263,11 @@ const updateOverviewOperator = (payload: { operatorIndex: number; field: keyof S
     (operator[payload.field] as number) = payload.value;
   }
 };
-const sendProgram = () => midiStore.sendCurrentVoiceDump(encodeSoundProgram(program.value));
+const sendProgram = () => {
+  // Commit the current Voice Name input to the KORG current-voice payload before sending.
+  program.value.name = normalizeSoundProgramName(program.value.name);
+  midiStore.sendCurrentVoiceDump(encodeSoundProgram(program.value));
+};
 const soundSnapshot = () => JSON.parse(JSON.stringify(program.value)) as SoundProgram;
 const loadSoundPreset = (data: unknown) => {
   program.value = data as SoundProgram;
