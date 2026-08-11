@@ -113,10 +113,10 @@
                 <circle v-for="(point, index) in envelopeCircles(selected.egRates, selected.egLevels)" :key="index" :cx="point.x" :cy="point.y" r="5" />
               </svg>
               <div class="envelope-values">
-                <NumberControl v-for="index in 4" :key="`r${index}`" v-model="selected.egRates[index - 1]"
-                  :label="t('sound.rate', { count: index })" :min="0" :max="99" compact />
                 <NumberControl v-for="index in 4" :key="`l${index}`" v-model="selected.egLevels[index - 1]"
                   :label="t('sound.level', { count: index })" :min="0" :max="99" compact />
+                <NumberControl v-for="index in 4" :key="`r${index}`" v-model="selected.egRates[index - 1]"
+                  :label="t('sound.rate', { count: index })" :min="0" :max="99" compact />
               </div>
             </div>
           </section>
@@ -152,10 +152,10 @@
               <polyline class="envelope-line" :points="pitchEnvelopePoints" />
             </svg>
             <div class="pitch-values">
-              <NumberControl v-for="index in 4" :key="`pr${index}`" v-model="program.pitchEgRates[index - 1]"
-                :label="`R${index}`" :min="0" :max="99" compact />
               <NumberControl v-for="index in 4" :key="`pl${index}`" v-model="program.pitchEgLevels[index - 1]"
                 :label="`L${index}`" :min="0" :max="99" compact />
+              <NumberControl v-for="index in 4" :key="`pr${index}`" v-model="program.pitchEgRates[index - 1]"
+                :label="`R${index}`" :min="0" :max="99" compact />
             </div>
           </section>
 
