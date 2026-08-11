@@ -27,26 +27,71 @@
 
       <dl class="parameter-grid">
         <template v-for="item in parameters(operator)" :key="item.label">
-          <div><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></div>
+          <div><dt>{{ item.label }}</dt><dd>
+            <button v-if="item.field" type="button" class="drag-value" :aria-label="`${item.label} ${item.value}`"
+              @pointerdown="startDrag($event, index, item.field, item.min, item.max, item.rawValue)"
+              @pointermove="moveDrag" @pointerup="endDrag" @pointercancel="endDrag"
+              @keydown="adjustWithKeyboard($event, index, item.field, item.min, item.max, item.rawValue)">{{ item.value }}</button>
+            <span v-else>{{ item.value }}</span>
+          </dd></div>
         </template>
       </dl>
 
       <div class="eg-values">
-        <span>Level</span><b v-for="(value, valueIndex) in operator.egLevels" :key="`l${valueIndex}`">{{ value }}</b>
-        <span>Rate</span><b v-for="(value, valueIndex) in operator.egRates" :key="`r${valueIndex}`">{{ value }}</b>
+        <span>Level</span><button v-for="(value, valueIndex) in operator.egLevels" :key="`l${valueIndex}`" type="button"
+          class="drag-value" :aria-label="`Level ${valueIndex + 1} ${value}`"
+          @pointerdown="startDrag($event, index, 'egLevels', 0, 99, value, valueIndex)" @pointermove="moveDrag"
+          @pointerup="endDrag" @pointercancel="endDrag"
+          @keydown="adjustWithKeyboard($event, index, 'egLevels', 0, 99, value, valueIndex)">{{ value }}</button>
+        <span>Rate</span><button v-for="(value, valueIndex) in operator.egRates" :key="`r${valueIndex}`" type="button"
+          class="drag-value" :aria-label="`Rate ${valueIndex + 1} ${value}`"
+          @pointerdown="startDrag($event, index, 'egRates', 0, 99, value, valueIndex)" @pointermove="moveDrag"
+          @pointerup="endDrag" @pointercancel="endDrag"
+          @keydown="adjustWithKeyboard($event, index, 'egRates', 0, 99, value, valueIndex)">{{ value }}</button>
       </div>
     </article>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { SoundOperator } from '@/types/soundProgram';
 
 defineProps<{ operators: SoundOperator[] }>();
-defineEmits<{ select: [operatorIndex: number] }>();
+const emit = defineEmits<{
+  select: [operatorIndex: number];
+  update: [payload: { operatorIndex: number; field: keyof SoundOperator; value: number; arrayIndex?: number }];
+}>();
 const { t } = useI18n();
 const curveNames = ['−LN', '−EX', '+EX', '+LN'];
+const dragState = ref<null | { operatorIndex: number; field: keyof SoundOperator; min: number; max: number; startY: number; startValue: number; arrayIndex?: number }>(null);
+
+const setValue = (operatorIndex: number, field: keyof SoundOperator, min: number, max: number, value: number, arrayIndex?: number) => {
+  emit('update', { operatorIndex, field, value: Math.max(min, Math.min(max, Math.round(value))), arrayIndex });
+};
+const startDrag = (event: PointerEvent, operatorIndex: number, field: keyof SoundOperator, min: number, max: number, value: number, arrayIndex?: number) => {
+  dragState.value = { operatorIndex, field, min, max, startY: event.clientY, startValue: value, arrayIndex };
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+};
+const moveDrag = (event: PointerEvent) => {
+  const state = dragState.value;
+  if (!state) return;
+  const sensitivity = event.shiftKey ? 240 : 120;
+  setValue(state.operatorIndex, state.field, state.min, state.max,
+    state.startValue + ((state.startY - event.clientY) / sensitivity) * (state.max - state.min), state.arrayIndex);
+};
+const endDrag = (event: PointerEvent) => {
+  dragState.value = null;
+  const target = event.currentTarget as HTMLElement;
+  if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
+};
+const adjustWithKeyboard = (event: KeyboardEvent, operatorIndex: number, field: keyof SoundOperator, min: number, max: number, value: number, arrayIndex?: number) => {
+  const delta = event.key === 'ArrowUp' || event.key === 'ArrowRight' ? 1 : event.key === 'ArrowDown' || event.key === 'ArrowLeft' ? -1 : 0;
+  if (!delta) return;
+  event.preventDefault();
+  setValue(operatorIndex, field, min, max, value + delta, arrayIndex);
+};
 
 const frequencyLabel = (operator: SoundOperator) => operator.oscillatorMode === 0
   ? `Ratio ${Math.max(.5, operator.coarse) + operator.fine / 100}`
@@ -80,11 +125,16 @@ const scalingPath = (operator: SoundOperator) => {
   return `M4 ${leftY}${curveSegment(4, leftY, breakX, centerY, operator.leftCurve)}${curveSegment(breakX, centerY, 176, rightY, operator.rightCurve)}`;
 };
 const parameters = (operator: SoundOperator) => [
-  { label: 'Coarse', value: operator.coarse }, { label: 'Fine', value: operator.fine },
-  { label: 'Detune', value: operator.detune - 7 }, { label: 'Output', value: operator.outputLevel },
-  { label: 'Amp Mod', value: operator.ampModSensitivity }, { label: 'Key Vel', value: operator.keyVelocitySensitivity },
-  { label: 'Rate Scale', value: operator.rateScaling }, { label: 'Break', value: operator.breakPoint },
-  { label: 'L Depth', value: operator.leftDepth }, { label: 'R Depth', value: operator.rightDepth },
+  { label: 'Coarse', value: operator.coarse, rawValue: operator.coarse, field: 'coarse' as const, min: 0, max: 31 },
+  { label: 'Fine', value: operator.fine, rawValue: operator.fine, field: 'fine' as const, min: 0, max: 99 },
+  { label: 'Detune', value: operator.detune - 7, rawValue: operator.detune, field: 'detune' as const, min: 0, max: 14 },
+  { label: 'Output', value: operator.outputLevel, rawValue: operator.outputLevel, field: 'outputLevel' as const, min: 0, max: 99 },
+  { label: 'Amp Mod', value: operator.ampModSensitivity, rawValue: operator.ampModSensitivity, field: 'ampModSensitivity' as const, min: 0, max: 3 },
+  { label: 'Key Vel', value: operator.keyVelocitySensitivity, rawValue: operator.keyVelocitySensitivity, field: 'keyVelocitySensitivity' as const, min: 0, max: 7 },
+  { label: 'Rate Scale', value: operator.rateScaling, rawValue: operator.rateScaling, field: 'rateScaling' as const, min: 0, max: 7 },
+  { label: 'Break', value: operator.breakPoint, rawValue: operator.breakPoint, field: 'breakPoint' as const, min: 0, max: 99 },
+  { label: 'L Depth', value: operator.leftDepth, rawValue: operator.leftDepth, field: 'leftDepth' as const, min: 0, max: 99 },
+  { label: 'R Depth', value: operator.rightDepth, rawValue: operator.rightDepth, field: 'rightDepth' as const, min: 0, max: 99 },
   { label: 'L Curve', value: curveNames[operator.leftCurve] }, { label: 'R Curve', value: curveNames[operator.rightCurve] },
 ];
 </script>
@@ -104,8 +154,10 @@ const parameters = (operator: SoundOperator) => [
 .mini-graphs svg { width: 100%; height: 54px; display: block; border-radius: 5px; background: #21191a; }
 .graph-grid { fill: none; stroke: rgba(206,179,147,.09); }.graph-line { fill: none; stroke: #ceb393; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .parameter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 3px 7px 6px; overflow: hidden; border-radius: 5px; background: rgba(206,179,147,.1); }
-.parameter-grid div { min-width: 0; padding: 4px 5px; background: #271d1f; }.parameter-grid dt { overflow: hidden; color: #9f918a; font-size: 10px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }.parameter-grid dd { margin: 1px 0 0; color: #e1cab0; font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.parameter-grid div { min-width: 0; padding: 4px 5px; background: #271d1f; }.parameter-grid dt { overflow: hidden; color: #9f918a; font-size: 10px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }.parameter-grid dd { min-height: 18px; margin: 1px 0 0; color: #e1cab0; font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.drag-value { min-width: 24px; padding: 1px 4px; border: 0; border-radius: 4px; background: rgba(206,179,147,.08); color: #e1cab0; font: inherit; font-weight: 750; cursor: ns-resize; touch-action: none; }
+.drag-value:hover { background: rgba(206,179,147,.18); color: #fff8f1; }.drag-value:focus-visible { outline: 1px solid #e1cab0; outline-offset: 1px; }
 .eg-values { display: grid; grid-template-columns: 38px repeat(4, 1fr); gap: 1px; margin: 0 7px 7px; overflow: hidden; border-radius: 5px; background: rgba(206,179,147,.1); }
-.eg-values span, .eg-values b { padding: 3px 4px; background: #271d1f; font-size: 11px; line-height: 1.25; }.eg-values span { color: #9f918a; }.eg-values b { color: #d8ccc4; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.eg-values span, .eg-values > button { padding: 3px 4px; background: #271d1f; font-size: 11px; line-height: 1.25; }.eg-values span { color: #9f918a; }.eg-values > button { width: 100%; border-radius: 0; color: #d8ccc4; text-align: center; font-variant-numeric: tabular-nums; }
 @media (max-width: 1120px) { .operator-overview { grid-template-columns: 1fr; } }
 </style>

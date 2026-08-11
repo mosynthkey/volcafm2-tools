@@ -87,7 +87,8 @@
             </button>
           </div>
 
-          <OperatorOverview v-if="selectedOperator < 0" :operators="program.operators" @select="selectedOperator = $event" />
+          <OperatorOverview v-if="selectedOperator < 0" :operators="program.operators" @select="selectedOperator = $event"
+            @update="updateOverviewOperator" />
 
           <template v-else>
           <section class="edit-section">
@@ -251,6 +252,14 @@ const selectAlgorithm = (algorithm: number) => {
 };
 const selectOperator = (operatorIndex: number) => {
   selectedOperator.value = selectedOperator.value === operatorIndex ? -1 : operatorIndex;
+};
+const updateOverviewOperator = (payload: { operatorIndex: number; field: keyof SoundOperator; value: number; arrayIndex?: number }) => {
+  const operator = program.value.operators[payload.operatorIndex];
+  if (payload.arrayIndex !== undefined) {
+    (operator[payload.field] as number[])[payload.arrayIndex] = payload.value;
+  } else {
+    (operator[payload.field] as number) = payload.value;
+  }
 };
 const sendProgram = () => midiStore.sendCurrentVoiceDump(encodeSoundProgram(program.value));
 const soundSnapshot = () => JSON.parse(JSON.stringify(program.value)) as SoundProgram;
