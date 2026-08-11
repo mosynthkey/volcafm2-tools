@@ -129,6 +129,13 @@
               <X :size="18" />
             </v-btn>
           </v-col>
+          <v-col cols="auto" class="ml-3 step-input-status">{{ texts.stepIndicator(stepCursor + 1) }}</v-col>
+          <v-col cols="auto" class="ml-3">
+            <v-btn :disabled="!canInsertTie" @click="insertTie">Tie</v-btn>
+          </v-col>
+          <v-col cols="auto" class="ml-2">
+            <v-btn @click="insertRest">Rest</v-btn>
+          </v-col>
         </template>
         <template v-else>
           <v-col cols="auto" class="mr-4 program-control">
@@ -397,6 +404,7 @@ const canSend = computed(() =>
   midiStore.connectionState === MIDIConnectionState.DETECTED ||
   midiStore.connectionState === MIDIConnectionState.RECEIVED
 );
+const canInsertTie = computed(() => stepCursor.value > 0 && seqStore.stepNoteCount(stepCursor.value - 1) > 0);
 const isFetchingCurrentProgram = computed(() =>
   midiStore.currentProgramFetchState === 'loading-programs' ||
   midiStore.currentProgramFetchState === 'requesting'
@@ -774,6 +782,17 @@ const stepNext = () => {
   }
   stepCursor.value++;
 };
+const insertRest = () => {
+  heldNotes.value.clear();
+  chordBuffer.value.clear();
+  seqStore.insertRest(stepCursor.value);
+  stepNext();
+};
+const insertTie = () => {
+  heldNotes.value.clear();
+  chordBuffer.value.clear();
+  if (seqStore.insertTie(stepCursor.value)) stepNext();
+};
 const stepPrev = () => {
   stepCursor.value = Math.max(0, stepCursor.value - 1);
 };
@@ -906,6 +925,7 @@ const endDrag = () => {
 .sequencer-toolbar > .v-col {
   flex-shrink: 0;
 }
+.step-input-status { color: #e1cab0; font-size: var(--volca-type-body); font-weight: 750; font-variant-numeric: tabular-nums; }
 
 .sequencer-card > .v-alert,
 .sequencer-card > .v-divider {

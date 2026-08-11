@@ -18,6 +18,7 @@ import {
 } from '../src/utils/sequenceCodec';
 import { MOTION_PARAM_COUNT, NUM_OF_STEPS, type SequenceNote, type SequenceState } from '../src/types/sequence';
 import { reorderSequenceSteps } from '../src/utils/sequenceRandomizer';
+import { clearSequenceStep, tieSequenceStep } from '../src/utils/sequenceStepEditing';
 
 let failCount = 0;
 
@@ -140,6 +141,23 @@ check(
 );
 check('program/velocity/gate stay unchanged', reordered.programNo === sampleState.programNo
     && reordered.velocity === sampleState.velocity && reordered.gatePercent === sampleState.gatePercent);
+
+// ---------------------------------------------------------------------------
+// 6) Step InputのRest/Tie
+// ---------------------------------------------------------------------------
+console.log('[6] Step input Rest / Tie');
+const editingNotes: SequenceNote[] = [
+    { pitch: 60, startStep: 0, length: 4 },
+    { pitch: 64, startStep: 1, length: 1 },
+];
+const rested = clearSequenceStep(editingNotes, 2);
+check('Rest clears only the target step', JSON.stringify(activePitches({ ...sampleState, notes: rested }, 2)) === '[]');
+check('Rest preserves the step before and after', activePitches({ ...sampleState, notes: rested }, 1).includes(60)
+    && activePitches({ ...sampleState, notes: rested }, 3).includes(60));
+const tied = tieSequenceStep(editingNotes, 2);
+check('Tie copies all notes from the previous step', !!tied
+    && JSON.stringify(activePitches({ ...sampleState, notes: tied }, 2)) === JSON.stringify(activePitches({ ...sampleState, notes: editingNotes }, 1)));
+check('Tie is unavailable on step 1', tieSequenceStep(editingNotes, 0) === null);
 
 // ---------------------------------------------------------------------------
 console.log('');

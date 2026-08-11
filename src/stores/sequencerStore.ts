@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { createEmptySequenceState, MOTION_PARAM_COUNT, NUM_OF_STEPS, NUM_OF_VOICES_PER_STEP, type SequenceNote, type SequenceState } from '../types/sequence';
 import { encodeCurrentSequenceDump } from '../utils/sequenceCodec';
 import { createRandomStepOrder, reorderSequenceSteps } from '../utils/sequenceRandomizer';
+import { clearSequenceStep, tieSequenceStep } from '../utils/sequenceStepEditing';
 
 export const useSequencerStore = defineStore('sequencer', () => {
     const initial = createEmptySequenceState();
@@ -60,6 +61,17 @@ export const useSequencerStore = defineStore('sequencer', () => {
         motionValues.value = Array.from({ length: MOTION_PARAM_COUNT }, () => Array.from({ length: NUM_OF_STEPS }, () => 64));
     };
 
+    const insertRest = (step: number) => {
+        notes.value = clearSequenceStep(notes.value, step);
+    };
+
+    const insertTie = (step: number): boolean => {
+        const tied = tieSequenceStep(notes.value, step);
+        if (!tied) return false;
+        notes.value = tied;
+        return true;
+    };
+
     const loadFromDecoded = (state: SequenceState) => {
         programNo.value = state.programNo;
         velocity.value = state.velocity;
@@ -103,6 +115,8 @@ export const useSequencerStore = defineStore('sequencer', () => {
         removeNote,
         setMotionValue,
         clearAll,
+        insertRest,
+        insertTie,
         loadFromDecoded,
         randomizeSteps,
         buildSysEx,
