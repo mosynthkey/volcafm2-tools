@@ -36,11 +36,8 @@
         @capture="openCaptureDialog" @randomize="showRandomizeDialog = true" @send="handleSend"
         @library="showLibrary = true" @import-file="handleImportFile" />
 
-      <v-alert v-if="importResult?.ok" type="success" density="compact" class="mt-3" variant="tonal">
-        {{ texts.importOk(importResult.count, importResult.totalBars) }}
-      </v-alert>
-      <v-alert v-else-if="importResult && !importResult.ok" type="error" density="compact" class="mt-3" variant="tonal">
-        {{ texts.importError }}: {{ importResult.message }}
+      <v-alert v-if="importError" type="error" density="compact" class="mt-3" variant="tonal">
+        {{ texts.importError }}: {{ importError }}
       </v-alert>
       <v-divider class="my-4" />
       <PianoRollEditor v-model:motion-index="selectedMotionIndex" :step-input-active="stepInputActive"
@@ -59,7 +56,7 @@ import AppProgressDialog from '@/components/dialogs/AppProgressDialog.vue';
 import AppDialog from '@/components/dialogs/AppDialog.vue';
 import { useMidiStore } from '@/stores/midiStore';
 import type { SequenceState } from '@/types/sequence';
-import { countBarsInSmf, extractStepNotes, parseSmf } from '@/utils/smfImport';
+import { extractStepNotes, parseSmf } from '@/utils/smfImport';
 import { Dices } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import { useStepInput } from '@/features/sequence/composables/useStepInput';
@@ -86,7 +83,7 @@ const texts = computed(() => ({
   captureStep1: t('sequence.captureStep1'), captureStep2: t('sequence.captureStep2'), captureStep3: t('sequence.captureStep3'), captureStart: t('sequence.captureStart'), captureCancel: t('sequence.captureCancel'), captureRunning: t('sequence.captureRunning'),
   captureProgress: (n: number) => t('sequence.captureProgress', { count: n }), captureDone: (n: number) => t('sequence.captureDone', { count: n }),
   importSmf: t('sequence.importSmf'), importSettings: t('sequence.importSettings'), importBar: t('sequence.importBar'), cancel: t('common.cancel'), import: t('sequence.import'),
-  importOk: (n: number, total: number) => t('sequence.importOk', { count: n, total }), importError: t('sequence.importError'), send: t('common.send'),
+  importError: t('sequence.importError'), send: t('common.send'),
   sendFailedTitle: t('sequence.sendFailedTitle'), sendNak: t('sequence.sendNak'), sendError: t('sequence.sendError'), stepInputOn: t('sequence.stepInput'), stepInputOff: t('sequence.stepInput'),
   stepInputExit: t('sequence.stepInputExit'), stepIndicator: (n: number) => t('sequence.stepIndicator', { count: n }), motionTarget: t('sequence.motionTarget'), motionEnable: t('sequence.motionEnable'),
 }));
@@ -151,9 +148,10 @@ watch(() => midiStore.currentProgramFetchState, (state) => {
 const smfBarOffset = ref(1);
 const pendingSmfFile = ref<File | null>(null);
 const showImportDialog = ref(false);
-const importResult = ref<{ ok: true; count: number; totalBars: number } | { ok: false; message: string } | null>(null);
+const importError = ref<string | null>(null);
 
 const handleImportFile = (file: File) => {
+  importError.value = null;
   pendingSmfFile.value = file;
   showImportDialog.value = true;
 };
@@ -170,17 +168,15 @@ const confirmImport = async () => {
   try {
     const buffer = await file.arrayBuffer();
     const parsed = parseSmf(buffer);
-    const totalBars = countBarsInSmf(parsed, 4);
     const { notes, velocity } = extractStepNotes(parsed, 4, Math.max(0, smfBarOffset.value - 1));
     seqStore.notes = [];
     seqStore.velocity = velocity;
-    let added = 0;
     for (const n of notes) {
-      if (seqStore.addNote(n.pitch, n.startStep, n.length)) added++;
+      seqStore.addNote(n.pitch, n.startStep, n.length);
     }
-    importResult.value = { ok: true, count: added, totalBars };
+    importError.value = null;
   } catch (e) {
-    importResult.value = { ok: false, message: String(e instanceof Error ? e.message : e) };
+    importError.value = String(e instanceof Error ? e.message : e);
   } finally {
     pendingSmfFile.value = null;
   }
