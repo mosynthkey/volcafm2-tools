@@ -192,6 +192,7 @@ import AppDialog from '@/components/dialogs/AppDialog.vue';
 import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
 import type { SoundOperator, SoundProgram } from '@/types/soundProgram';
 import { createInitialSoundProgram, decodeSoundProgram, encodeSoundProgram } from '@/utils/soundProgramCodec';
+import { formatOperatorFrequency } from '@/utils/operatorFrequency';
 import { useI18n } from 'vue-i18n';
 import { lfoControls, macroControls, operatorFrequencyControls, type OperatorNumberKey, type ProgramNumberKey } from '@/features/sound/soundControlDefinitions';
 
@@ -270,9 +271,7 @@ const loadSoundPreset = (data: unknown) => {
 const lfoWaveItems = ['Triangle', 'Saw Down', 'Saw Up', 'Square', 'Sine', 'Sample & Hold']
   .map((title, value) => ({ title, value }));
 
-const frequencyLabel = (operator: SoundOperator) => operator.oscillatorMode === 0
-  ? `Ratio ${Math.max(.5, operator.coarse) + operator.fine / 100}`
-  : `Fixed C${operator.coarse} F${operator.fine}`;
+const frequencyLabel = formatOperatorFrequency;
 const levelPercent = (level: number) => Math.pow(Math.max(0, level - 31) / 68, 1.12);
 const segmentDuration = (rate: number, from: number, to: number) => {
   const rising = to > from;

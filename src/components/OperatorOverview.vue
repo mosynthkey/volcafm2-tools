@@ -63,6 +63,7 @@
 import { defineComponent, h, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { SoundOperator } from '@/types/soundProgram';
+import { formatOperatorFrequency } from '@/utils/operatorFrequency';
 
 defineProps<{ operators: SoundOperator[] }>();
 const emit = defineEmits<{
@@ -127,9 +128,7 @@ const adjustWithKeyboard = (event: KeyboardEvent, operatorIndex: number, field: 
   setValue(operatorIndex, field, min, max, value + delta, arrayIndex);
 };
 
-const frequencyLabel = (operator: SoundOperator) => operator.oscillatorMode === 0
-  ? `Ratio ${Math.max(.5, operator.coarse) + operator.fine / 100}`
-  : `Fixed C${operator.coarse} F${operator.fine}`;
+const frequencyLabel = formatOperatorFrequency;
 const levelPercent = (level: number) => Math.pow(Math.max(0, level - 31) / 68, 1.12);
 const segmentDuration = (rate: number, from: number, to: number) => {
   const rising = to > from;
