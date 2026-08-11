@@ -252,6 +252,36 @@
   resolved "https://registry.npmjs.org/@humanwhocodes/retry/-/retry-0.4.1.tgz"
   integrity sha512-c7hNEllBlenFTHBky65mhq8WD2kbN9Q6gk0bTk8lSBvc554jpXSkST1iePudpt7+A/AQvuHs9EMqjHDXMY1lrA==
 
+"@intlify/core-base@11.4.8":
+  version "11.4.8"
+  resolved "https://registry.npmjs.org/@intlify/core-base/-/core-base-11.4.8.tgz"
+  integrity sha512-A+Q7SKm5oEcy1E/cghqd7n/St4XjTqLhiiyDuieNcMrJcrHlkY5n0jp7Q9dD3txvVHzvsmBVV5M9wD5/s1zfzw==
+  dependencies:
+    "@intlify/devtools-types" "11.4.8"
+    "@intlify/message-compiler" "11.4.8"
+    "@intlify/shared" "11.4.8"
+
+"@intlify/devtools-types@11.4.8":
+  version "11.4.8"
+  resolved "https://registry.npmjs.org/@intlify/devtools-types/-/devtools-types-11.4.8.tgz"
+  integrity sha512-MGpID+rlfzGUbNcnC20bm5NMSBHPrvx0atLTfv9dftn3kjXw1hGKDcIcwrO99tSrZEc2i+hczRL7ks8qXsHPkQ==
+  dependencies:
+    "@intlify/core-base" "11.4.8"
+    "@intlify/shared" "11.4.8"
+
+"@intlify/message-compiler@11.4.8":
+  version "11.4.8"
+  resolved "https://registry.npmjs.org/@intlify/message-compiler/-/message-compiler-11.4.8.tgz"
+  integrity sha512-vbzk17dYwduYiv52EK61+FDCyhfVg1uPUtPmiD/d45W99uJIcXywrweOBcHv7n9/iEqmXiMGT52bgJbZDQqK3w==
+  dependencies:
+    "@intlify/shared" "11.4.8"
+    source-map-js "^1.0.2"
+
+"@intlify/shared@11.4.8":
+  version "11.4.8"
+  resolved "https://registry.npmjs.org/@intlify/shared/-/shared-11.4.8.tgz"
+  integrity sha512-XbRgrv+XEuvDr7UCY55oibVrh+o4u+A0VB6nSL0F5Z8LcZxE/8j573LYG6bCrOigIcHdGpSNI7Rh5UpC5/B/eg==
+
 "@isaacs/fs-minipass@^4.0.0":
   version "4.0.1"
   resolved "https://registry.npmjs.org/@isaacs/fs-minipass/-/fs-minipass-4.0.1.tgz"
@@ -629,6 +659,11 @@
   dependencies:
     de-indent "^1.0.2"
     he "^1.2.0"
+
+"@vue/devtools-api@^6.5.0":
+  version "6.6.4"
+  resolved "https://registry.npmjs.org/@vue/devtools-api/-/devtools-api-6.6.4.tgz"
+  integrity sha512-sGhTPMuXqZ1rVOk32RylztWkfXTRhuS7vgAKv0zjqk8gbsHkJ7xfFf+jbySxt7tWObEJwyKaHMikV/WGDiQm8g==
 
 "@vue/devtools-api@^7.7.2":
   version "7.7.2"
@@ -3027,7 +3062,7 @@ simple-update-notifier@2.0.0:
   dependencies:
     semver "^7.5.3"
 
-source-map-js@^1.2.0, source-map-js@^1.2.1, "source-map-js@>=0.6.2 <2.0.0":
+source-map-js@^1.0.2, source-map-js@^1.2.0, source-map-js@^1.2.1, "source-map-js@>=0.6.2 <2.0.0":
   version "1.2.1"
   resolved "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.1.tgz"
   integrity sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==
@@ -3396,6 +3431,16 @@ vue-eslint-parser@^9.4.3:
     esquery "^1.4.0"
     lodash "^4.17.21"
     semver "^7.3.6"
+
+vue-i18n@^11.4.8:
+  version "11.4.8"
+  resolved "https://registry.npmjs.org/vue-i18n/-/vue-i18n-11.4.8.tgz"
+  integrity sha512-0ULeHP6Z9CGvAm67S77ZEp41cfGXIREGL8qfhos2BMgcQQewtQcDKuojt6jjasAD/S8GwfTp2ySPmDSpwvrCMQ==
+  dependencies:
+    "@intlify/core-base" "11.4.8"
+    "@intlify/devtools-types" "11.4.8"
+    "@intlify/shared" "11.4.8"
+    "@vue/devtools-api" "^6.5.0"
 
 vue-tsc@^2.1.10:
   version "2.2.2"

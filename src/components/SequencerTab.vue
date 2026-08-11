@@ -274,7 +274,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { useSequencerStore } from '@/stores/sequencerStore';
 import AppToggle from '@/components/AppToggle.vue';
 import PresetLibraryDialog from '@/components/PresetLibraryDialog.vue';
@@ -283,9 +283,13 @@ import { MOTION_PARAM_LABELS, type SequenceState } from '@/types/sequence';
 import { countBarsInSmf, extractStepNotes, parseSmf } from '@/utils/smfImport';
 import { AudioLines, Check, Dices, FileUp, Library, Piano, Trash2, Upload, X } from '@lucide/vue';
 import { MidiSequenceCapture, type SequencePlaybackResolution } from '@/utils/midiSequenceCapture';
+import { useI18n } from 'vue-i18n';
+import { useNoteAudition } from '@/features/sequence/composables/useNoteAudition';
+import { useStepInput } from '@/features/sequence/composables/useStepInput';
 
 const seqStore = useSequencerStore();
 const midiStore = useMidiStore();
+const { t } = useI18n();
 
 const userLanguage = navigator.language.startsWith('ja') ? 'ja' : 'en';
 
@@ -398,7 +402,23 @@ const TEXTS = {
   },
 };
 
-const texts = computed(() => TEXTS[userLanguage]);
+// The compatibility adapter keeps the template readable while all copy comes
+// from vue-i18n. It can be replaced with direct `t()` calls component by component.
+const texts = computed(() => ({
+  program: t('sequence.program'), programNameUnknown: t('sequence.programNameUnknown'), getCurrentProgram: t('sequence.getCurrentProgram'),
+  programFetchFailedTitle: t('sequence.programFetchFailedTitle'), programFetchFailed: t('sequence.programFetchFailed'), programFetchTitle: t('sequence.programFetchTitle'),
+  receivingProgramsForMatch: t('sequence.receivingProgramsForMatch'), matchingCurrentProgram: t('sequence.matchingCurrentProgram'), velocity: t('sequence.velocity'), gate: t('sequence.gate'),
+  clear: t('sequence.clear'), randomize: t('sequence.randomize'), randomizeTitle: t('sequence.randomizeTitle'), randomizeDescription: t('sequence.randomizeDescription'), randomizeRun: t('sequence.randomizeRun'),
+  captureButton: t('sequence.captureButton'), captureTitle: t('sequence.captureTitle'), captureDescription: t('sequence.captureDescription'), captureResolution: t('sequence.captureResolution'),
+  captureStep1: t('sequence.captureStep1'), captureStep2: t('sequence.captureStep2'), captureStep3: t('sequence.captureStep3'), captureStart: t('sequence.captureStart'), captureCancel: t('sequence.captureCancel'),
+  captureRunning: t('sequence.captureRunning'), captureProgress: (n: number) => t('sequence.captureProgress', { count: n }), captureDone: (n: number) => t('sequence.captureDone', { count: n }),
+  captureNoClock: t('sequence.captureNoClock'), captureClockStopped: t('sequence.captureClockStopped'), captureStartFailed: t('sequence.captureStartFailed'),
+  importSmf: t('sequence.importSmf'), importSettings: t('sequence.importSettings'), importBar: t('sequence.importBar'), cancel: t('common.cancel'), import: t('sequence.import'),
+  importOk: (n: number, totalBars: number) => t('sequence.importOk', { count: n, total: totalBars }), importError: t('sequence.importError'), send: t('common.send'),
+  sendFailedTitle: t('sequence.sendFailedTitle'), sendNak: t('sequence.sendNak'), sendError: t('sequence.sendError'), stepInputOn: t('sequence.stepInput'), stepInputOff: t('sequence.stepInput'),
+  stepInputExit: t('sequence.stepInputExit'), stepIndicator: (n: number) => t('sequence.stepIndicator', { count: n }), stepPrev: t('sequence.stepPrev'), stepNext: t('sequence.stepNext'), stepReset: t('sequence.stepReset'),
+  motionParam: t('sequence.motionParam'), motionTarget: t('sequence.motionTarget'), motionEnable: t('sequence.motionEnable'),
+}));
 const selectedMotionIndex = ref(0);
 const showLibrary = ref(false);
 const showRandomizeDialog = ref(false);
@@ -415,7 +435,6 @@ const currentProgramName = computed(() => {
   if (!Number.isInteger(programNo) || programNo < 0 || programNo > 63) return '';
   return midiStore.programNames[programNo]?.name.trim() ?? '';
 });
-const canInsertTie = computed(() => stepCursor.value > 0 && seqStore.stepNoteCount(stepCursor.value - 1) > 0);
 const isFetchingCurrentProgram = computed(() =>
   midiStore.currentProgramFetchState === 'loading-programs' ||
   midiStore.currentProgramFetchState === 'requesting'
@@ -597,6 +616,12 @@ const handleSend = () => {
   midiStore.sendCurrentSequenceDump(bytes);
 };
 
+const { audition: auditionPitches } = useNoteAudition(midiStore, seqStore);
+const {
+  active: stepInputActive, cursor: stepCursor, chordBuffer, canInsertTie,
+  toggle: toggleStepInput, next: stepNext, insertRest, insertTie, select: selectStep,
+} = useStepInput(midiStore, seqStore, handleSend);
+
 const confirmRandomize = () => {
   seqStore.randomizeSteps();
   showRandomizeDialog.value = false;
@@ -688,23 +713,6 @@ const confirmImport = async () => {
 // --- ピアノロール: クリック=単発ノート、ドラッグ=タイで繋いだ和音 ---
 const GUTTER_WIDTH = 56;
 const dragState = ref<{ pitch: number; startStep: number; endStep: number } | null>(null);
-const auditionTimers = new Map<number, ReturnType<typeof setTimeout>>();
-
-const stopAuditionNote = (pitch: number) => {
-  const timer = auditionTimers.get(pitch);
-  if (timer) clearTimeout(timer);
-  auditionTimers.delete(pitch);
-  midiStore.sendMidiMessage(new Uint8Array([0x80, pitch, 0]));
-};
-
-const auditionPitches = (pitches: number[], duration = 320) => {
-  const velocity = Math.max(1, Math.min(127, Math.round(seqStore.velocity)));
-  for (const pitch of [...new Set(pitches)]) {
-    if (auditionTimers.has(pitch)) stopAuditionNote(pitch);
-    midiStore.sendMidiMessage(new Uint8Array([0x90, pitch, velocity]));
-    auditionTimers.set(pitch, setTimeout(() => stopAuditionNote(pitch), duration));
-  }
-};
 
 const stepFromEvent = (ev: PointerEvent): number => {
   const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
@@ -738,82 +746,6 @@ const onRowPointerUp = (pitch: number, ev: PointerEvent) => {
   dragState.value = null;
 };
 
-// --- MIDIキーボードでのステップ入力 ---
-const stepInputActive = ref(false);
-const stepCursor = ref(0);
-const heldNotes = ref<Set<number>>(new Set());
-const chordBuffer = ref<Set<number>>(new Set());
-let unsubscribeNoteEvent: (() => void) | null = null;
-
-const finishStepInput = () => {
-  stepInputActive.value = false;
-  heldNotes.value.clear();
-  chordBuffer.value.clear();
-  handleSend();
-};
-
-const commitChord = () => {
-  const step = stepCursor.value;
-  for (const pitch of chordBuffer.value) {
-    seqStore.addNote(pitch, step, 1);
-  }
-  chordBuffer.value.clear();
-  if (step === 15) {
-    finishStepInput();
-    return;
-  }
-  stepCursor.value++;
-};
-
-const handleNoteEvent = (note: number, on: boolean) => {
-  if (!stepInputActive.value) return;
-  if (on) {
-    heldNotes.value.add(note);
-    chordBuffer.value.add(note);
-  } else {
-    heldNotes.value.delete(note);
-    if (heldNotes.value.size === 0 && chordBuffer.value.size > 0) {
-      commitChord();
-    }
-  }
-};
-
-const toggleStepInput = () => {
-  const starting = !stepInputActive.value;
-  stepInputActive.value = starting;
-  if (starting) stepCursor.value = 0;
-  heldNotes.value.clear();
-  chordBuffer.value.clear();
-};
-
-const stepNext = () => {
-  if (stepCursor.value === 15) {
-    finishStepInput();
-    return;
-  }
-  stepCursor.value++;
-};
-const insertRest = () => {
-  heldNotes.value.clear();
-  chordBuffer.value.clear();
-  seqStore.insertRest(stepCursor.value);
-  stepNext();
-};
-const insertTie = () => {
-  heldNotes.value.clear();
-  chordBuffer.value.clear();
-  if (seqStore.insertTie(stepCursor.value)) stepNext();
-};
-const stepPrev = () => {
-  stepCursor.value = Math.max(0, stepCursor.value - 1);
-};
-const selectStep = (step: number) => {
-  if (!stepInputActive.value) return;
-  heldNotes.value.clear();
-  chordBuffer.value.clear();
-  stepCursor.value = Math.max(0, Math.min(15, step));
-};
-
 const onStepHeaderClick = (step: number) => {
   if (stepInputActive.value) selectStep(step);
   const pitches = seqStore.notes
@@ -822,12 +754,7 @@ const onStepHeaderClick = (step: number) => {
   auditionPitches(pitches);
 };
 
-onMounted(() => {
-  unsubscribeNoteEvent = midiStore.onNoteEvent(handleNoteEvent);
-});
 onUnmounted(() => {
-  unsubscribeNoteEvent?.();
-  for (const pitch of [...auditionTimers.keys()]) stopAuditionNote(pitch);
   clearCaptureResources();
 });
 

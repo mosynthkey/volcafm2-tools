@@ -4,15 +4,15 @@
       <v-card class="about-card">
         <div class="dialog-title-row">
           <v-card-title>volca fm2 tool</v-card-title>
-          <DialogCloseButton label="Close" @click="showInfo = false" />
+          <DialogCloseButton :label="t('common.close')" @click="showInfo = false" />
         </div>
         <v-card-text>
-          DX7 SysEx conversion and volca fm2 sequence editing in one workspace.<br><br>
+          {{ t('app.description') }}<br><br>
           Version 1.0.0<br>
           Copyright (c) 2025, Masaki Ono.
           <div class="about-log-toggle">
-            <span>Logを表示</span>
-            <AppToggle v-model="showLog" aria-label="Logを表示" />
+            <span>{{ t('app.showLog') }}</span>
+            <AppToggle v-model="showLog" :aria-label="t('app.showLog')" />
           </div>
         </v-card-text>
       </v-card>
@@ -20,9 +20,9 @@
 
     <v-dialog :model-value="showProgramLoadModal" max-width="500" persistent>
       <v-card class="program-load-card pa-4">
-        <v-card-title>音色データを取得中</v-card-title>
+        <v-card-title>{{ t('app.loadingPrograms.title') }}</v-card-title>
         <v-card-text>
-          <p class="program-load-copy">volca fm2の音色を読み込んでいます。</p>
+          <p class="program-load-copy">{{ t('app.loadingPrograms.description') }}</p>
           <v-progress-linear :model-value="programLoadProgress" height="8" rounded />
           <div class="program-load-status">
             <span>{{ midiStore.currentProgramFetchProgress }}/64</span>
@@ -77,18 +77,18 @@
             </button>
           </div>
           <div class="sidebar-rule" />
-          <div class="sidebar-label">TOOLS</div>
+          <div class="sidebar-label">{{ t('app.tools') }}</div>
           <button class="nav-item" :class="{ active: activeTab === 'sound-edit' }" type="button" @click="activeTab = 'sound-edit'">
             <span class="nav-icon"><SlidersHorizontal :size="18" /></span>
-            <span><b>Sound</b><small>{{ navTexts.soundEdit }}</small></span>
+            <span><b>Sound</b><small>{{ t('app.nav.sound') }}</small></span>
           </button>
           <button class="nav-item" :class="{ active: activeTab === 'sequencer' }" type="button" @click="activeTab = 'sequencer'">
             <span class="nav-icon"><Piano :size="18" /></span>
-            <span><b>Sequence</b><small>{{ navTexts.sequencer }}</small></span>
+            <span><b>Sequence</b><small>{{ t('app.nav.sequence') }}</small></span>
           </button>
           <button class="nav-item" :class="{ active: activeTab === 'dx7' }" type="button" @click="activeTab = 'dx7'">
             <span class="nav-icon"><Download :size="18" /></span>
-            <span><b>DX7</b><small>{{ navTexts.dx7 }}</small></span>
+            <span><b>DX7</b><small>{{ t('app.nav.dx7') }}</small></span>
           </button>
           <div class="sidebar-fill" />
           <div class="sidebar-footer">
@@ -98,7 +98,7 @@
             </div>
             <button class="about-button" type="button" @click="showInfo = true">
               <Info :size="17" />
-              <span>About</span>
+              <span>{{ t('app.about') }}</span>
             </button>
           </div>
         </aside>
@@ -117,7 +117,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { Download, Info, PanelLeftClose, PanelLeftOpen, Piano, SlidersHorizontal } from '@lucide/vue';
 import Dx7Tab from './components/Dx7Tab.vue';
 import AppToggle from './components/AppToggle.vue';
@@ -126,48 +127,39 @@ import LogPanel from './components/LogPanel.vue';
 import SequencerTab from './components/SequencerTab.vue';
 import SoundEditTab from './components/SoundEditTab.vue';
 import { MIDIConnectionState, useMidiStore } from './stores/midiStore';
+import { useSequencerStore } from './stores/sequencerStore';
 
 const midiStore = useMidiStore();
+const sequencerStore = useSequencerStore();
+const { t } = useI18n();
 const showInfo = ref(false);
 const showLog = ref(false);
 const activeTab = ref('sound-edit');
 const sidebarCollapsed = ref(false);
-const userLanguage = navigator.language.startsWith('ja') ? 'ja' : 'en';
 const sidebarToggleLabel = computed(() => sidebarCollapsed.value
-  ? (userLanguage === 'ja' ? '左ペインを広げる' : 'Expand sidebar')
-  : (userLanguage === 'ja' ? '左ペインを小さくする' : 'Collapse sidebar'));
+  ? t('app.expandSidebar')
+  : t('app.collapseSidebar'));
 
-onMounted(() => midiStore.initMIDI());
+let unsubscribeProgramChange: (() => void) | null = null;
+onMounted(() => {
+  unsubscribeProgramChange = midiStore.onProgramChange(programNo => { sequencerStore.programNo = Math.min(63, programNo); });
+  void midiStore.initMIDI();
+});
+onUnmounted(() => unsubscribeProgramChange?.());
 
 watch([activeTab, () => midiStore.connectionState], ([tab, connectionState]) => {
   if (tab === 'sequencer' && connectionState === MIDIConnectionState.RECEIVED) {
     void midiStore.requestCurrentVoiceProgramNo();
   }
 });
+watch(() => midiStore.matchedProgramNo, programNo => {
+  if (programNo !== null) sequencerStore.programNo = programNo;
+});
 
-const NAV_TEXTS = {
-  ja: { dx7: '音色をDX7 SysExに変換', sequencer: 'シーケンスを編集', soundEdit: '音色を編集' },
-  en: { dx7: 'Receive & convert patches', sequencer: 'Edit the 16-step pattern', soundEdit: 'Edit the current voice' },
-};
-const navTexts = computed(() => NAV_TEXTS[userLanguage]);
-
-const CONNECTION_TEXTS = {
-  ja: {
-    title: 'volca fm2が見つかりません。',
-    step1: 'mac/PCと繋がっているMIDIインターフェースにvolca fm2のMIDI IN/OUTを両方接続してください。',
-    step2: 'Chromeブラウザから本アプリにアクセスしてください。',
-    step3: 'MIDI接続の許可ダイアログが表示されますので、許可を選択してください。',
-    retry: 'volca fm2を再検出',
-  },
-  en: {
-    title: 'volca fm2 was not found.',
-    step1: 'Connect both MIDI IN and MIDI OUT on the volca fm2 to the MIDI interface connected to your Mac or PC.',
-    step2: 'Open this app in Google Chrome.',
-    step3: 'When the MIDI permission dialog appears, choose Allow.',
-    retry: 'Detect volca fm2 again',
-  },
-};
-const connectionTexts = computed(() => CONNECTION_TEXTS[userLanguage]);
+const connectionTexts = computed(() => ({
+  title: t('app.connection.title'), step1: t('app.connection.step1'), step2: t('app.connection.step2'),
+  step3: t('app.connection.step3'), retry: t('app.connection.retry'),
+}));
 const showConnectionModal = computed(() => !(
   midiStore.connectionState === MIDIConnectionState.DETECTED ||
   midiStore.connectionState === MIDIConnectionState.RECEIVING ||
@@ -178,21 +170,14 @@ const showProgramLoadModal = computed(() => midiStore.connectionState === MIDICo
 const programLoadProgress = computed(() => (midiStore.currentProgramFetchProgress / 64) * 100);
 const currentProgramLoadName = computed(() => midiStore.lastReceivedProgram
   ? `#${String(midiStore.lastReceivedProgram.programNo).padStart(2, '0')}  ${midiStore.lastReceivedProgram.name || '---'}`
-  : '応答を待っています…');
+  : t('app.loadingPrograms.waiting'));
 
-const CONNECTION_LABELS = {
-  ja: {
-    [MIDIConnectionState.INITIALIZING]: 'MIDI 初期化中', [MIDIConnectionState.SEARCHING]: '検索中',
-    [MIDIConnectionState.NOT_FOUND]: '未接続', [MIDIConnectionState.DETECTED]: '接続済み',
-    [MIDIConnectionState.RECEIVING]: '受信中', [MIDIConnectionState.RECEIVED]: '接続済み', [MIDIConnectionState.ERROR]: '接続エラー',
-  },
-  en: {
-    [MIDIConnectionState.INITIALIZING]: 'Initializing MIDI', [MIDIConnectionState.SEARCHING]: 'Searching',
-    [MIDIConnectionState.NOT_FOUND]: 'Not connected', [MIDIConnectionState.DETECTED]: 'Connected',
-    [MIDIConnectionState.RECEIVING]: 'Receiving', [MIDIConnectionState.RECEIVED]: 'Connected', [MIDIConnectionState.ERROR]: 'Connection error',
-  },
-};
-const connectionLabel = computed(() => CONNECTION_LABELS[userLanguage][midiStore.connectionState]);
+const connectionLabel = computed(() => t({
+  [MIDIConnectionState.INITIALIZING]: 'app.connection.initializing', [MIDIConnectionState.SEARCHING]: 'app.connection.searching',
+  [MIDIConnectionState.NOT_FOUND]: 'app.connection.disconnected', [MIDIConnectionState.DETECTED]: 'app.connection.connected',
+  [MIDIConnectionState.RECEIVING]: 'app.connection.receiving', [MIDIConnectionState.RECEIVED]: 'app.connection.connected',
+  [MIDIConnectionState.ERROR]: 'app.connection.error',
+}[midiStore.connectionState]));
 const connectionTone = computed(() => {
   if (midiStore.connectionState === MIDIConnectionState.DETECTED || midiStore.connectionState === MIDIConnectionState.RECEIVED) return 'connected';
   if (midiStore.connectionState === MIDIConnectionState.SEARCHING || midiStore.connectionState === MIDIConnectionState.RECEIVING) return 'busy';
