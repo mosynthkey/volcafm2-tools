@@ -5,8 +5,9 @@ export type ProgramNumberKey = { [K in keyof SoundProgram]: SoundProgram[K] exte
 export type NumberControlDefinition<K extends string> = { key: K; label: string; min: number; max: number; displayOffset?: number }
 
 export const operatorFrequencyControls: NumberControlDefinition<OperatorNumberKey>[] = [
+  { key: 'detune', label: 'sound.detune', min: 0, max: 14, displayOffset: -7 },
   { key: 'coarse', label: 'sound.coarse', min: 0, max: 31 }, { key: 'fine', label: 'sound.fine', min: 0, max: 99 },
-  { key: 'detune', label: 'sound.detune', min: 0, max: 14, displayOffset: -7 }, { key: 'outputLevel', label: 'sound.outputLevel', min: 0, max: 99 },
+  { key: 'outputLevel', label: 'sound.outputLevel', min: 0, max: 99 },
   { key: 'ampModSensitivity', label: 'sound.ampModSens', min: 0, max: 3 }, { key: 'keyVelocitySensitivity', label: 'sound.keyVelocity', min: 0, max: 7 },
 ]
 

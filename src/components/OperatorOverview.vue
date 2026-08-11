@@ -148,9 +148,9 @@ const scalingPath = (operator: SoundOperator) => {
   return `M4 ${leftY}${curveSegment(4, leftY, breakX, centerY, operator.leftCurve)}${curveSegment(breakX, centerY, 176, rightY, operator.rightCurve)}`;
 };
 const parameters = (operator: SoundOperator) => [
+  { label: 'Detune', value: operator.detune - 7, rawValue: operator.detune, field: 'detune' as const, min: 0, max: 14 },
   { label: 'Coarse', value: operator.coarse, rawValue: operator.coarse, field: 'coarse' as const, min: 0, max: 31 },
   { label: 'Fine', value: operator.fine, rawValue: operator.fine, field: 'fine' as const, min: 0, max: 99 },
-  { label: 'Detune', value: operator.detune - 7, rawValue: operator.detune, field: 'detune' as const, min: 0, max: 14 },
   { label: 'Output', value: operator.outputLevel, rawValue: operator.outputLevel, field: 'outputLevel' as const, min: 0, max: 99 },
   { label: 'Amp Mod', value: operator.ampModSensitivity, rawValue: operator.ampModSensitivity, field: 'ampModSensitivity' as const, min: 0, max: 3 },
   { label: 'Key Vel', value: operator.keyVelocitySensitivity, rawValue: operator.keyVelocitySensitivity, field: 'keyVelocitySensitivity' as const, min: 0, max: 7 },
