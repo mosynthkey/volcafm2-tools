@@ -41,11 +41,8 @@
     <v-main>
       <div class="app-layout">
         <aside class="sidebar" :class="{ 'is-collapsed': sidebarCollapsed }">
-          <div class="sidebar-brand">
-            <img class="brand-mark" src="/app-icon.png" alt="" aria-hidden="true" />
-            <div class="brand-copy">
-              <h1>volca fm2 tool</h1>
-            </div>
+          <div class="sidebar-heading">
+            <div class="sidebar-label">{{ t('app.tools') }}</div>
             <button class="sidebar-toggle" type="button" :aria-label="sidebarToggleLabel"
               :title="sidebarToggleLabel" @click="sidebarCollapsed = !sidebarCollapsed">
               <PanelLeftOpen v-if="sidebarCollapsed" :size="18" />
@@ -53,7 +50,6 @@
             </button>
           </div>
           <div class="sidebar-rule" />
-          <div class="sidebar-label">{{ t('app.tools') }}</div>
           <button class="nav-item" :class="{ active: activeTab === 'sound-edit' }" type="button" @click="activeTab = 'sound-edit'">
             <span class="nav-icon"><SlidersHorizontal :size="18" /></span>
             <span><b>Sound</b><small>{{ t('app.nav.sound') }}</small></span>
@@ -72,10 +68,13 @@
               <span class="status-light" />
               <span>{{ connectionLabel }}</span>
             </div>
-            <button class="about-button" type="button" @click="showInfo = true">
-              <Info :size="17" />
-              <span>{{ t('app.about') }}</span>
-            </button>
+            <div class="sidebar-meta">
+              <img class="brand-mark" src="/app-icon.png" alt="volca fm2 tool" />
+              <button class="about-button" type="button" @click="showInfo = true">
+                <Info :size="17" />
+                <span>{{ t('app.about') }}</span>
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -188,15 +187,13 @@ const connectionTone = computed(() => {
 html, body, #app { margin: 0; min-width: 760px; min-height: 100%; background: var(--volca-bg); }
 body { overflow: hidden; }
 .volca-app { background: radial-gradient(circle at 72% -20%, #594447 0, transparent 38%), var(--volca-bg) !important; color: var(--volca-text); }
-.brand-mark { width: 42px; height: 42px; display: block; flex: 0 0 42px; object-fit: contain; }
-.brand-copy h1 { margin: 0; font-size: var(--volca-type-heading); line-height: 1.15; letter-spacing: -.015em; font-weight: 680; }
-.sidebar-brand { display: flex; align-items: center; gap: 11px; min-height: 48px; padding: 4px 8px 16px; }
-.brand-copy { min-width: 0; flex: 1; }
+.brand-mark { width: 40px; height: 40px; display: block; flex: 0 0 40px; object-fit: contain; }
+.sidebar-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 42px; padding: 0 5px 8px 10px; }
 .sidebar-toggle { width: 34px; height: 34px; display: grid; flex: 0 0 34px; place-items: center; padding: 0; border: 1px solid var(--volca-line); border-radius: 8px; background: transparent; color: var(--volca-muted); cursor: pointer; transition: color .18s ease, background .18s ease, transform .1s ease; }
 .sidebar-toggle:hover { color: var(--volca-text); background: rgba(255,255,255,.055); }
 .sidebar-toggle:active { transform: scale(.96); }
 .sidebar-toggle:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
-.sidebar-rule { height: 1px; margin: 0 5px 18px; background: var(--volca-line); }
+.sidebar-rule { height: 1px; margin: 0 5px 13px; background: var(--volca-line); }
 .midi-state { display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 7px 10px; border: 1px solid var(--volca-line); border-radius: 9px; color: var(--volca-muted); background: rgba(255,255,255,.025); font-size: var(--volca-type-body); font-weight: 600; }
 .status-light, .device-dot { width: 7px; height: 7px; border-radius: 50%; background: #746769; box-shadow: 0 0 0 3px rgba(116,103,105,.12); }
 .midi-state.is-connected .status-light { background: #9fc592; box-shadow: 0 0 0 3px rgba(159,197,146,.12); }
@@ -207,17 +204,16 @@ body { overflow: hidden; }
 .app-layout { display: flex; min-height: 0; flex: 1 1 auto; }
 .sidebar { width: 256px; flex: 0 0 256px; display: flex; flex-direction: column; gap: 5px; padding: 14px 11px 12px; border-right: 1px solid var(--volca-line); background: rgba(42,32,33,.68); backdrop-filter: blur(24px) saturate(135%); transition: width .2s ease, flex-basis .2s ease; }
 .sidebar.is-collapsed { width: 76px; flex-basis: 76px; }
-.sidebar.is-collapsed .sidebar-brand { justify-content: center; padding-inline: 0; }
-.sidebar.is-collapsed .brand-mark,
-.sidebar.is-collapsed .brand-copy,
+.sidebar.is-collapsed .sidebar-heading { justify-content: center; padding-inline: 0; }
 .sidebar.is-collapsed .sidebar-label,
 .sidebar.is-collapsed .nav-item > span:last-child,
 .sidebar.is-collapsed .midi-state > span:last-child,
 .sidebar.is-collapsed .about-button span { display: none; }
+.sidebar.is-collapsed .sidebar-meta { flex-direction: column; }
 .sidebar.is-collapsed .nav-item,
 .sidebar.is-collapsed .about-button,
 .sidebar.is-collapsed .midi-state { justify-content: center; padding: 8px; }
-.sidebar-label { padding: 0 10px 8px; color: #9b8d8d; font-size: var(--volca-type-label); font-weight: 750; letter-spacing: .12em; }
+.sidebar-label { color: #9b8d8d; font-size: var(--volca-type-label); font-weight: 750; letter-spacing: .12em; }
 .nav-item { width: 100%; display: flex; align-items: center; gap: 11px; min-height: 62px; padding: 9px 11px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--volca-muted); text-align: left; cursor: pointer; transition: background .18s ease, border-color .18s ease, color .18s ease, transform .1s ease; }
 .nav-item:hover { color: var(--volca-text); background: rgba(255,255,255,.045); }
 .nav-item:focus-visible, .about-button:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
@@ -228,6 +224,8 @@ body { overflow: hidden; }
 .nav-item small { overflow: hidden; color: #aa9b9b; font-size: var(--volca-type-label); line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-fill { flex: 1; }
 .sidebar-footer { display: grid; gap: 5px; margin: 4px; padding-top: 12px; border-top: 1px solid var(--volca-line); }
+.sidebar-meta { display: flex; align-items: center; gap: 7px; padding: 3px 2px 0; }
+.sidebar-meta .about-button { min-width: 0; flex: 1; }
 .about-button { display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 7px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--volca-muted); font: inherit; font-size: var(--volca-type-body); font-weight: 600; text-align: left; cursor: pointer; transition: background .16s ease, color .16s ease, transform .1s ease; }
 .about-button:hover { color: var(--volca-text); background: rgba(255,255,255,.055); }
 .workspace { min-width: 0; flex: 1; overflow: hidden; }
@@ -264,7 +262,7 @@ body { overflow: hidden; }
 .program-load-status strong { overflow: hidden; color: var(--volca-text); text-overflow: ellipsis; white-space: nowrap; }
 .about-log-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--volca-line); }
 @keyframes status-pulse { 50% { opacity: .45; transform: scale(.82); } }
-@media (max-width: 900px) { .sidebar { width: 76px; flex-basis: 76px; } .sidebar-brand { justify-content: center; padding-inline: 0; } .sidebar-toggle, .brand-copy, .sidebar-label, .nav-item > span:last-child, .midi-state > span:last-child, .about-button span { display: none; } .nav-item, .about-button, .midi-state { justify-content: center; padding: 8px; } .workspace .v-container { padding: 8px; } }
+@media (max-width: 900px) { .sidebar { width: 76px; flex-basis: 76px; } .sidebar-heading { justify-content: center; padding-inline: 0; } .sidebar-label, .nav-item > span:last-child, .midi-state > span:last-child, .about-button span { display: none; } .sidebar-meta { flex-direction: column; } .nav-item, .about-button, .midi-state { justify-content: center; padding: 8px; } .workspace .v-container { padding: 8px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition-duration: .01ms !important; } }
 @media (prefers-reduced-transparency: reduce) { .sidebar, .workspace .v-card { backdrop-filter: none; background: var(--volca-panel-solid) !important; } }
 </style>
