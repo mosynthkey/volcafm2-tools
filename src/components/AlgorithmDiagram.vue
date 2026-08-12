@@ -37,7 +37,7 @@ const outputBusPath = computed(() => {
 });
 const nodeById = (id: number) => graph.value.nodes.find(node => node.id === id)!;
 const nodeHalfWidth = computed(() => props.largeNodes ? 16 : 12);
-const nodeHalfHeight = computed(() => props.largeNodes ? 13 : 10);
+const nodeHalfHeight = nodeHalfWidth;
 const MIN_ROUTE_STEM = 14;
 const edgePath = (fromId: number, toId: number) => {
   const from = nodeById(fromId), to = nodeById(toId);
