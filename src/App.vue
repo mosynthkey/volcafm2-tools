@@ -21,7 +21,7 @@
 
     <AppDialog :model-value="showConnectionModal" :title="connectionTexts.title" max-width="560" persistent :closable="false">
         <div class="connection-card__icon" aria-hidden="true">
-          <Piano :size="22" />
+          <img src="/app-icon.png" alt="" />
         </div>
           <ol class="connection-steps">
             <li>{{ connectionTexts.step1 }}</li>
@@ -218,7 +218,7 @@ body { overflow: hidden; }
 .nav-item:hover { color: var(--volca-text); background: rgba(255,255,255,.045); }
 .nav-item:focus-visible, .about-button:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
 .nav-item.active { color: var(--volca-text); border-color: var(--volca-accent); background: rgba(206,179,147,.11); box-shadow: none; }
-.nav-icon { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 8px; background: rgba(255,255,255,.05); color: var(--volca-accent); }
+.nav-icon { width: 31px; height: 31px; display: grid; place-items: center; color: var(--volca-accent); }
 .nav-item > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .nav-item b { font-size: var(--volca-type-body); font-weight: 650; }
 .nav-item small { overflow: hidden; color: #aa9b9b; font-size: var(--volca-type-label); line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
@@ -252,7 +252,8 @@ body { overflow: hidden; }
 .v-overlay__content > .v-card .library-delete-button { width: 40px; min-width: 40px; border: 0; background: transparent !important; color: var(--volca-muted) !important; box-shadow: none !important; }
 .v-overlay__content > .v-card .library-delete-button:hover { background: rgba(255,255,255,.07) !important; color: var(--volca-text) !important; }
 .about-card, .program-load-card, .connection-card { background: #382b2d !important; }
-.connection-card__icon { width: 44px; height: 44px; display: grid; place-items: center; margin: 20px 20px 8px; border: 1px solid var(--volca-line-strong); border-radius: 12px; background: var(--volca-accent-soft); color: var(--volca-accent-bright); }
+.connection-card__icon { width: 56px; height: 56px; margin: 20px 20px 8px; }
+.connection-card__icon img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .connection-card .v-card-text { line-height: 1.75; }
 .connection-steps { display: grid; gap: 8px; margin: 0; padding-left: 1.4rem; }
 .connection-steps li { padding-left: 4px; }
