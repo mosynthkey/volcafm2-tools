@@ -19,6 +19,7 @@ import {
 import { MOTION_PARAM_COUNT, NUM_OF_STEPS, type SequenceNote, type SequenceState } from '../src/types/sequence';
 import { reorderSequenceSteps } from '../src/utils/sequenceRandomizer';
 import { clearSequenceStep, tieSequenceStep } from '../src/utils/sequenceStepEditing';
+import { createMotionPattern } from '../src/utils/motionPatterns';
 
 let failCount = 0;
 
@@ -141,6 +142,15 @@ check(
 );
 check('program/velocity/gate stay unchanged', reordered.programNo === sampleState.programNo
     && reordered.velocity === sampleState.velocity && reordered.gatePercent === sampleState.gatePercent);
+
+console.log('[5b] Automatic motion patterns');
+const sine = createMotionPattern('sine', { min: 24, max: 104, cycles: 1 });
+check('sine uses requested min/max', Math.min(...sine) === 24 && Math.max(...sine) === 104);
+check('sine starts at min and reaches max at half cycle', sine[0] === 24 && sine[8] === 104);
+const sineTwoCycles = createMotionPattern('sine', { min: 20, max: 100, cycles: 2 });
+check('sine cycle count changes the phase', sineTwoCycles[4] === 100 && sineTwoCycles[8] === 20 && sineTwoCycles[12] === 100);
+const reversedRange = createMotionPattern('linearUp', { min: 110, max: 30 });
+check('reversed min/max are normalized', reversedRange[0] === 30 && reversedRange[15] === 110);
 
 // ---------------------------------------------------------------------------
 // 6) Step InputのRest/Tie
