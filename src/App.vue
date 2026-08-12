@@ -42,7 +42,7 @@
       <div class="app-layout">
         <aside class="sidebar" :class="{ 'is-collapsed': sidebarCollapsed }">
           <div class="sidebar-brand">
-            <div class="brand-mark" aria-hidden="true"><span>FM</span><b>2</b></div>
+            <img class="brand-mark" src="/app-icon.png" alt="" aria-hidden="true" />
             <div class="brand-copy">
               <h1>volca fm2 tool</h1>
             </div>
@@ -188,8 +188,7 @@ const connectionTone = computed(() => {
 html, body, #app { margin: 0; min-width: 760px; min-height: 100%; background: var(--volca-bg); }
 body { overflow: hidden; }
 .volca-app { background: radial-gradient(circle at 72% -20%, #594447 0, transparent 38%), var(--volca-bg) !important; color: var(--volca-text); }
-.brand-mark { width: 38px; height: 38px; display: grid; place-items: center; position: relative; border: 1px solid var(--volca-line-strong); border-radius: 10px; background: linear-gradient(145deg, #e0c5a5, #a8896c); color: #332729; box-shadow: inset 0 1px rgba(255,255,255,.35), 0 5px 18px rgba(0,0,0,.22); font-size: var(--volca-type-label); font-weight: 900; letter-spacing: -.05em; }
-.brand-mark b { position: absolute; right: 3px; bottom: 0; font-size: var(--volca-type-label); }
+.brand-mark { width: 42px; height: 42px; display: block; flex: 0 0 42px; object-fit: contain; }
 .brand-copy h1 { margin: 0; font-size: var(--volca-type-heading); line-height: 1.15; letter-spacing: -.015em; font-weight: 680; }
 .sidebar-brand { display: flex; align-items: center; gap: 11px; min-height: 48px; padding: 4px 8px 16px; }
 .brand-copy { min-width: 0; flex: 1; }
