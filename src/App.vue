@@ -1,9 +1,14 @@
 <template>
   <v-app class="volca-app">
     <AppDialog v-model="showInfo" title="volca fm2 tools" max-width="440">
-          {{ t('app.description') }}<br><br>
-          Version 1.0.0<br>
-          Copyright (c) 2025, Masaki Ono.
+          <div class="about-identity">
+            <img src="/app-icon.png" alt="" />
+            <h2>volca fm2 tools</h2>
+            <p>{{ t('app.description') }}</p>
+            <span>{{ t('app.version', { version: '1.0.0' }) }}</span>
+            <span>{{ t('app.license') }}</span>
+            <small>{{ t('app.copyright') }}</small>
+          </div>
           <div class="about-log-toggle">
             <span>{{ t('app.showLog') }}</span>
             <AppToggle v-model="showLog" :aria-label="t('app.showLog')" />
@@ -68,13 +73,10 @@
               <span class="status-light" />
               <span>{{ connectionLabel }}</span>
             </div>
-            <div class="sidebar-meta">
-              <img class="brand-mark" src="/app-icon.png" alt="volca fm2 tools" />
-              <button class="about-button" type="button" @click="showInfo = true">
-                <Info :size="17" />
-                <span>{{ t('app.about') }}</span>
-              </button>
-            </div>
+            <button class="about-button" type="button" @click="showInfo = true">
+              <img class="brand-mark" src="/app-icon.png" alt="" />
+              <span>{{ t('app.about') }}</span>
+            </button>
           </div>
         </aside>
 
@@ -94,7 +96,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Download, Info, PanelLeftClose, PanelLeftOpen, Piano, SlidersHorizontal } from '@lucide/vue';
+import { Download, PanelLeftClose, PanelLeftOpen, Piano, SlidersHorizontal } from '@lucide/vue';
 import Dx7Tab from './components/Dx7Tab.vue';
 import AppToggle from './components/AppToggle.vue';
 import AppDialog from './components/dialogs/AppDialog.vue';
@@ -209,7 +211,6 @@ body { overflow: hidden; }
 .sidebar.is-collapsed .nav-item > span:last-child,
 .sidebar.is-collapsed .midi-state > span:last-child,
 .sidebar.is-collapsed .about-button span { display: none; }
-.sidebar.is-collapsed .sidebar-meta { flex-direction: column; }
 .sidebar.is-collapsed .nav-item,
 .sidebar.is-collapsed .about-button,
 .sidebar.is-collapsed .midi-state { justify-content: center; padding: 8px; }
@@ -224,9 +225,7 @@ body { overflow: hidden; }
 .nav-item small { overflow: hidden; color: #aa9b9b; font-size: var(--volca-type-label); line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-fill { flex: 1; }
 .sidebar-footer { display: grid; gap: 5px; margin: 4px; padding-top: 12px; border-top: 1px solid var(--volca-line); }
-.sidebar-meta { display: flex; align-items: center; gap: 7px; padding: 3px 2px 0; }
-.sidebar-meta .about-button { min-width: 0; flex: 1; }
-.about-button { display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 7px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--volca-muted); font: inherit; font-size: var(--volca-type-body); font-weight: 600; text-align: left; cursor: pointer; transition: background .16s ease, color .16s ease, transform .1s ease; }
+.about-button { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 4px 8px 4px 4px; border: 0; border-radius: 9px; background: transparent; color: var(--volca-muted); font: inherit; font-size: var(--volca-type-body); font-weight: 650; text-align: left; cursor: pointer; transition: background .16s ease, color .16s ease, transform .1s ease; }
 .about-button:hover { color: var(--volca-text); background: rgba(255,255,255,.055); }
 .workspace { min-width: 0; flex: 1; overflow: hidden; }
 .tool-window, .tool-window > .v-window__container, .tool-window .v-window-item { height: 100%; }
@@ -262,8 +261,14 @@ body { overflow: hidden; }
 .program-load-status { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; color: var(--volca-muted); font-variant-numeric: tabular-nums; }
 .program-load-status strong { overflow: hidden; color: var(--volca-text); text-overflow: ellipsis; white-space: nowrap; }
 .about-log-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--volca-line); }
+.about-identity { display: grid; justify-items: center; text-align: center; }
+.about-identity img { width: 72px; height: 72px; display: block; margin-bottom: 12px; object-fit: contain; }
+.about-identity h2 { margin: 0; color: var(--volca-text); font-size: var(--volca-type-heading); font-weight: 700; letter-spacing: -.02em; }
+.about-identity p { max-width: 34ch; margin: 10px 0 12px; color: #d8ccc4; line-height: 1.55; }
+.about-identity span { color: var(--volca-muted); font-size: var(--volca-type-label); line-height: 1.6; }
+.about-identity small { margin-top: 6px; color: var(--volca-muted); font-size: var(--volca-type-label); }
 @keyframes status-pulse { 50% { opacity: .45; transform: scale(.82); } }
-@media (max-width: 900px) { .sidebar { width: 76px; flex-basis: 76px; } .sidebar-heading { justify-content: center; padding-inline: 0; } .sidebar-label, .nav-item > span:last-child, .midi-state > span:last-child, .about-button span { display: none; } .sidebar-meta { flex-direction: column; } .nav-item, .about-button, .midi-state { justify-content: center; padding: 8px; } .workspace .v-container { padding: 8px; } }
+@media (max-width: 900px) { .sidebar { width: 76px; flex-basis: 76px; } .sidebar-heading { justify-content: center; padding-inline: 0; } .sidebar-label, .nav-item > span:last-child, .midi-state > span:last-child, .about-button span { display: none; } .nav-item, .about-button, .midi-state { justify-content: center; padding: 8px; } .workspace .v-container { padding: 8px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition-duration: .01ms !important; } }
 @media (prefers-reduced-transparency: reduce) { .sidebar, .workspace .v-card { backdrop-filter: none; background: var(--volca-panel-solid) !important; } }
 </style>

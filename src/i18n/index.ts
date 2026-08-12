@@ -5,7 +5,7 @@ const messages = {
     common: { ok: 'OK', cancel: 'キャンセル', close: '閉じる', save: '保存', load: '読み込む', delete: '削除', back: '戻る', loading: '読み込み中…', send: '送信' },
     app: {
       description: 'DX7 SysEx変換とvolca fm2のシーケンス編集をひとつの画面で行います。',
-      showLog: 'ログを表示', log: 'ログ', tools: 'ツール', about: 'volca fm2 tools',
+      showLog: 'ログを表示', log: 'ログ', tools: 'ツール', about: 'volca fm2 tools', version: 'バージョン {version}', license: 'MIT ライセンス', copyright: 'Copyright (C) 2025 Masaki Ono',
       expandSidebar: '左ペインを広げる', collapseSidebar: '左ペインを小さくする',
       nav: { sound: '音色を編集', sequence: 'シーケンスを編集', dx7: '音色をDX7 SysExに変換' },
       loadingPrograms: { title: '音色データを取得中', description: 'volca fm2の音色を読み込んでいます。', waiting: '応答を待っています…' },
@@ -51,7 +51,7 @@ const messages = {
   en: {
     common: { ok: 'OK', cancel: 'Cancel', close: 'Close', save: 'Save', load: 'Load', delete: 'Delete', back: 'Back', loading: 'Loading…', send: 'Send' },
     app: {
-      description: 'DX7 SysEx conversion and volca fm2 sequence editing in one workspace.', showLog: 'Show log', log: 'Log', tools: 'Tools', about: 'volca fm2 tools', expandSidebar: 'Expand sidebar', collapseSidebar: 'Collapse sidebar',
+      description: 'DX7 SysEx conversion and volca fm2 sequence editing in one workspace.', showLog: 'Show log', log: 'Log', tools: 'Tools', about: 'volca fm2 tools', version: 'Version {version}', license: 'MIT License', copyright: 'Copyright (C) 2025 Masaki Ono', expandSidebar: 'Expand sidebar', collapseSidebar: 'Collapse sidebar',
       nav: { sound: 'Edit the current voice', sequence: 'Edit the sequence', dx7: 'Convert voices to DX7 SysEx' },
       loadingPrograms: { title: 'Loading voice data', description: 'Receiving voices from the volca fm2.', waiting: 'Waiting for a response…' },
       connection: { title: 'volca fm2 was not found.', step1: 'Connect both MIDI IN and MIDI OUT on the volca fm2 to the MIDI interface connected to your computer.', step2: 'Open this app in Chrome or the desktop application.', step3: 'If the MIDI permission dialog appears, choose Allow.', retry: 'Detect volca fm2 again', initializing: 'Initializing MIDI', searching: 'Searching', disconnected: 'Not connected', connected: 'Connected', receiving: 'Receiving', error: 'Connection error' },
