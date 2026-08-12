@@ -68,6 +68,7 @@
     ],
     "asar": true,
     "mac": {
+      "icon": "build/icon.png",
       "target": [
         "zip",
         "dmg"
@@ -80,6 +81,7 @@
       "artifactName": "${productName}-macOS.${ext}"
     },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "nsis"
       ],
