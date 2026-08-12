@@ -1,6 +1,6 @@
 <template>
   <v-app class="volca-app">
-    <AppDialog v-model="showInfo" title="volca fm2 tool" max-width="440">
+    <AppDialog v-model="showInfo" title="volca fm2 tools" max-width="440">
           {{ t('app.description') }}<br><br>
           Version 1.0.0<br>
           Copyright (c) 2025, Masaki Ono.
@@ -69,7 +69,7 @@
               <span>{{ connectionLabel }}</span>
             </div>
             <div class="sidebar-meta">
-              <img class="brand-mark" src="/app-icon.png" alt="volca fm2 tool" />
+              <img class="brand-mark" src="/app-icon.png" alt="volca fm2 tools" />
               <button class="about-button" type="button" @click="showInfo = true">
                 <Info :size="17" />
                 <span>{{ t('app.about') }}</span>

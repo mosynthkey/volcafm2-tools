@@ -56,7 +56,7 @@ function setupMenu() {
 
 async function createWindow() {
   const win = new BrowserWindow({
-    title: 'volca fm2 tool',
+    title: 'volca fm2 tools',
     width: 1440,
     height: 960,
     minWidth: 960,
@@ -80,7 +80,7 @@ async function createWindow() {
     console.error('[electron] Failed to load the application', error)
     await dialog.showMessageBox(win, {
       type: 'error',
-      title: 'volca fm2 tool',
+      title: 'volca fm2 tools',
       message: 'アプリケーションを読み込めませんでした。',
       detail: error instanceof Error ? error.message : String(error),
     })
