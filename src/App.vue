@@ -4,7 +4,6 @@
           <div class="about-identity">
             <img src="/app-icon.png" alt="" />
             <h2>volca fm2 tools</h2>
-            <p>{{ t('app.description') }}</p>
             <span>{{ t('app.version', { version: '1.0.0' }) }}</span>
             <span>{{ t('app.license') }}</span>
             <small>{{ t('app.copyright') }}</small>
@@ -264,7 +263,6 @@ body { overflow: hidden; }
 .about-identity { display: grid; justify-items: center; text-align: center; }
 .about-identity img { width: 72px; height: 72px; display: block; margin-bottom: 12px; object-fit: contain; }
 .about-identity h2 { margin: 0; color: var(--volca-text); font-size: var(--volca-type-heading); font-weight: 700; letter-spacing: -.02em; }
-.about-identity p { max-width: 34ch; margin: 10px 0 12px; color: #d8ccc4; line-height: 1.55; }
 .about-identity span { color: var(--volca-muted); font-size: var(--volca-type-label); line-height: 1.6; }
 .about-identity small { margin-top: 6px; color: var(--volca-muted); font-size: var(--volca-type-label); }
 @keyframes status-pulse { 50% { opacity: .45; transform: scale(.82); } }

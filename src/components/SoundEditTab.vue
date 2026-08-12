@@ -21,7 +21,7 @@
         <div>
           <h2>{{ t('sound.title') }}</h2>
         </div>
-        <v-text-field v-model="program.name" :label="t('sound.voiceName')" maxlength="10" counter="10"
+        <v-text-field v-model="program.name" :aria-label="t('sound.voiceName')" maxlength="10" counter="10"
           density="compact" hide-details class="voice-name" />
         <v-btn @click="midiStore.requestCurrentVoiceDump" :disabled="!canSend"
           :loading="midiStore.soundEditState === 'requesting'">
