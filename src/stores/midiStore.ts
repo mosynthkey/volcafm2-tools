@@ -39,6 +39,8 @@ export const useMidiStore = defineStore('midi', () => {
     const soundEditState = ref<'idle' | 'requesting' | 'received' | 'sending' | 'ok' | 'error'>('idle');
     const logs = ref<string[]>([]);
     let programLoadPromise: Promise<boolean> | null = null;
+    let currentVoiceFetchPromise: Promise<boolean> | null = null;
+    let currentVoiceWaiter: ((ok: boolean) => void) | null = null;
 
     const receivedProgramCount = computed(() => programData.value.filter(Boolean).length);
     const isDeviceReady = computed(() => isDeviceReadyState(connectionState.value));
@@ -150,9 +152,13 @@ export const useMidiStore = defineStore('midi', () => {
                 const match = matchCurrentVoice(voiceData, programData.value, programNames.value);
                 matchedProgramNo.value = match.programNo;
                 currentProgramFetchState.value = 'received';
+                currentVoiceWaiter?.(true);
+                currentVoiceWaiter = null;
                 log(`Current voice matched program #${match.programNo} "${match.currentName}" (byte differences=${match.differences}, nameCandidates=${match.nameCandidateCount}).`);
             } catch (error) {
                 currentProgramFetchState.value = 'error';
+                currentVoiceWaiter?.(false);
+                currentVoiceWaiter = null;
                 log(`Current voice matching failed: ${error}`);
             }
         } else if (isStatusReply(data)) {
@@ -231,35 +237,55 @@ export const useMidiStore = defineStore('midi', () => {
         return programLoadPromise;
     };
 
+    const reloadAllProgramDumps = () => {
+        if (programLoadPromise) return programLoadPromise;
+        programNames.value = Array.from({ length: 64 }, () => ({ name: '' }));
+        programData.value = [];
+        lastReceivedProgram.value = null;
+        currentProgramFetchProgress.value = 0;
+        programLoadPromise = loadAllProgramDumps().finally(() => { programLoadPromise = null; });
+        return programLoadPromise;
+    };
+
     const requestProgramDump = async () => ensureAllProgramDumps();
 
-    const requestCurrentVoiceProgramNo = async () => {
-        currentProgramFetchState.value = 'loading-programs';
-        currentProgramFetchProgress.value = receivedProgramCount.value;
-        if (receivedProgramCount.value < 64) {
-            log('Program data is incomplete; receiving all 64 programs before matching the current voice...');
-            if (!await ensureAllProgramDumps()) {
-                currentProgramFetchState.value = 'error';
-                log('Current voice lookup failed: timed out while receiving the 64 reference programs.');
-                return;
-            }
-        }
+    const failCurrentVoiceFetch = (message: string) => {
+        currentProgramFetchState.value = 'error';
+        log(message);
+        currentVoiceWaiter?.(false);
+        currentVoiceWaiter = null;
+    };
 
-        currentProgramFetchState.value = 'requesting';
-        currentProgramFetchProgress.value = 64;
-        log('Requesting CURRENT VOICE DATA DUMP (Func 0x12)...');
-        const request = createCurrentVoiceRequest();
-        if (!sendSysEx(request)) {
-            currentProgramFetchState.value = 'error';
-            return;
-        }
-        armTimeout(
-            () => currentProgramFetchState.value === 'requesting',
-            () => {
-                currentProgramFetchState.value = 'error';
-                log('Current voice request timed out (no Func 0x42 reply within 4s).');
-            },
-        );
+    const requestCurrentVoiceProgramNo = async () => {
+        if (currentVoiceFetchPromise) return currentVoiceFetchPromise;
+        currentVoiceFetchPromise = (async () => {
+            currentProgramFetchState.value = 'loading-programs';
+            currentProgramFetchProgress.value = receivedProgramCount.value;
+            if (receivedProgramCount.value < 64) {
+                log('Program data is incomplete; receiving all 64 programs before matching the current voice...');
+                if (!await ensureAllProgramDumps()) {
+                    failCurrentVoiceFetch('Current voice lookup failed: timed out while receiving the 64 reference programs.');
+                    return false;
+                }
+            }
+
+            currentProgramFetchState.value = 'requesting';
+            currentProgramFetchProgress.value = 64;
+            log('Requesting CURRENT VOICE DATA DUMP (Func 0x12)...');
+            const request = createCurrentVoiceRequest();
+            if (!sendSysEx(request)) {
+                failCurrentVoiceFetch('Failed to send current voice request: no MIDI output selected.');
+                return false;
+            }
+            return await new Promise<boolean>(resolve => {
+                currentVoiceWaiter = resolve;
+                armTimeout(
+                    () => currentProgramFetchState.value === 'requesting',
+                    () => failCurrentVoiceFetch('Current voice request timed out (no Func 0x42 reply within 4s).'),
+                );
+            });
+        })().finally(() => { currentVoiceFetchPromise = null; });
+        return currentVoiceFetchPromise;
     };
 
     const dx7CartridgeBytes = (bank: 0 | 1) =>
@@ -355,6 +381,7 @@ export const useMidiStore = defineStore('midi', () => {
         initMIDI,
         detectVolcaFM2,
         requestProgramDump,
+        reloadAllProgramDumps,
         dx7CartridgeBytes,
         sendSysEx,
         requestCurrentVoiceProgramNo,

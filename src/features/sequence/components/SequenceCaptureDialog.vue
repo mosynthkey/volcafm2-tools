@@ -1,6 +1,6 @@
 <template>
-  <AppDialog v-model="open" :title="t('sequence.captureTitle')" max-width="520"
-    :persistent="phase === 'capturing'" :closable="phase !== 'capturing'">
+  <AppDialog v-model="open" :title="phase === 'fetching-program' ? t('sequence.programFetchTitle') : t('sequence.captureTitle')" max-width="520"
+    :persistent="phase === 'capturing' || phase === 'fetching-program'" :closable="phase !== 'capturing' && phase !== 'fetching-program'">
     <template v-if="phase === 'ready'">
       <p class="capture-copy">{{ t('sequence.captureDescription') }}</p>
       <p class="capture-note">{{ t('sequence.captureNotesOnly') }}</p>
@@ -14,6 +14,13 @@
       </div>
       <ol class="capture-steps"><li>{{ t('sequence.captureStep1') }}</li><li>{{ t('sequence.captureStep2') }}</li><li>{{ t('sequence.captureStep3') }}</li></ol>
     </template>
+    <template v-else-if="phase === 'fetching-program'">
+      <p>{{ programFetchStatusText }}</p>
+      <v-progress-linear
+        :model-value="midi.currentProgramFetchState === 'loading-programs' ? (midi.currentProgramFetchProgress / 64) * 100 : 0"
+        :indeterminate="midi.currentProgramFetchState === 'requesting'" height="8" rounded />
+      <p v-if="midi.currentProgramFetchState === 'loading-programs'" class="capture-progress">{{ midi.currentProgramFetchProgress }}/64</p>
+    </template>
     <template v-else-if="phase === 'capturing'">
       <p>{{ t('sequence.captureRunning') }}</p><v-progress-linear :model-value="progress" height="8" rounded />
       <p class="capture-progress">{{ t('sequence.captureProgress', { count: stepCount }) }}</p>
@@ -22,21 +29,28 @@
     <p v-else>{{ errorMessage }}</p>
     <template #actions>
       <template v-if="phase === 'ready'"><v-btn variant="text" @click="open = false">{{ t('common.cancel') }}</v-btn><v-btn @click="start()">{{ t('sequence.captureStart') }}</v-btn></template>
-      <v-btn v-else-if="phase === 'capturing'" variant="text" @click="cancel()">{{ t('sequence.captureCancel') }}</v-btn>
+      <v-btn v-else-if="phase === 'capturing' || phase === 'fetching-program'" variant="text" @click="cancel()">{{ t('sequence.captureCancel') }}</v-btn>
       <v-btn v-else @click="open = false">{{ t('common.ok') }}</v-btn>
     </template>
   </AppDialog>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Check } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
 import AppDialog from '@/components/dialogs/AppDialog.vue'
+import { useMidiStore } from '@/stores/midiStore'
 import { useSequenceCapture } from '@/features/sequence/composables/useSequenceCapture'
 import type { SequencePlaybackResolution } from '@/utils/midiSequenceCapture'
 
 const { open, phase, progress, stepCount, noteCount, errorMessage, resolution, start, cancel } = useSequenceCapture()
-const { t } = useI18n(); const resolutions: SequencePlaybackResolution[] = [1, 2, 4]
+const { t } = useI18n(); const midi = useMidiStore(); const resolutions: SequencePlaybackResolution[] = [1, 2, 4]
+const programFetchStatusText = computed(() =>
+  midi.currentProgramFetchState === 'loading-programs'
+    ? t('sequence.receivingProgramsForMatch')
+    : t('sequence.matchingCurrentProgram')
+)
 </script>
 
 <style scoped>

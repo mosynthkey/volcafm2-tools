@@ -4,7 +4,7 @@ import { useMidiStore } from '@/stores/midiStore'
 import { useSequencerStore } from '@/stores/sequencerStore'
 import { MidiSequenceCapture, type SequencePlaybackResolution } from '@/utils/midiSequenceCapture'
 
-export type CapturePhase = 'ready' | 'capturing' | 'done' | 'error'
+export type CapturePhase = 'ready' | 'fetching-program' | 'capturing' | 'done' | 'error'
 
 export function useSequenceCapture() {
   const midi = useMidiStore()
@@ -20,6 +20,7 @@ export function useSequenceCapture() {
   let capture: MidiSequenceCapture | null = null; let unsubscribe: (() => void) | null = null
   let clockTimeout: ReturnType<typeof setTimeout> | null = null; let startDelay: ReturnType<typeof setTimeout> | null = null
   let startedAt = 0; let lastClockAt = 0; let ignoredDuplicates = 0
+  let cancelled = false
   const recentMessages = new Map<string, number>(); const duplicateWindow = 5
   const log = (message: string) => midi.addLog(`[CAPTURE] ${message}`)
   const hex = (data: Uint8Array) => [...data].map(byte => byte.toString(16).padStart(2, '0').toUpperCase()).join(' ')
@@ -69,13 +70,26 @@ export function useSequenceCapture() {
     clockTimeout = setTimeout(() => { if (capture?.clockCount === 0) fail(t('sequence.captureNoClock')) }, 3000)
     if (!midi.sendMidiMessage(new Uint8Array([0xfa]))) fail(t('sequence.captureStartFailed'))
   }
-  const start = () => {
+  const startCapture = () => {
     phase.value = 'capturing'; progress.value = 0; stepCount.value = 0; startedAt = performance.now(); capture = null
     log('Sending pre-capture Stop (FC)...')
     if (!midi.sendMidiMessage(new Uint8Array([0xfc]))) return fail(t('sequence.captureStartFailed'))
     startDelay = setTimeout(beginAfterStop, 100)
   }
-  const cancel = () => { clearResources(); midi.sendMidiMessage(new Uint8Array([0xfc])); phase.value = 'ready'; open.value = false }
+  const start = async () => {
+    cancelled = false
+    phase.value = 'fetching-program'
+    log('Fetching current program number before capture...')
+    const matched = await midi.requestCurrentVoiceProgramNo()
+    if (cancelled || !open.value) return
+    if (!matched) {
+      errorMessage.value = t('sequence.programFetchFailed')
+      phase.value = 'error'
+      return
+    }
+    startCapture()
+  }
+  const cancel = () => { cancelled = true; clearResources(); midi.sendMidiMessage(new Uint8Array([0xfc])); phase.value = 'ready'; open.value = false }
   onUnmounted(clearResources)
   return { open, phase, progress, stepCount, noteCount, errorMessage, resolution, start, cancel }
 }

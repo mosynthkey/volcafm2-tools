@@ -29,13 +29,20 @@
 </template>
 
 <script setup lang="ts">
+import { watch } from 'vue';
 import { useMidiStore } from '@/stores/midiStore';
+import { useUiStore } from '@/stores/uiStore';
 import { downloadBinary } from '@/utils/downloadBinary';
 import { Download } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 
 const midiStore = useMidiStore();
+const ui = useUiStore();
 const { t } = useI18n();
+
+watch([() => ui.activeTab, () => midiStore.isDeviceReady], ([tab, ready]) => {
+  if (tab === 'dx7' && ready) void midiStore.reloadAllProgramDumps();
+}, { immediate: true });
 const downloadCartridge = (index: number) => {
   const bank = index === 0 ? 0 : 1;
   downloadBinary(midiStore.dx7CartridgeBytes(bank), `volca_fm2_dx7_cartridge_${index + 1}.syx`);
