@@ -9,7 +9,7 @@
 
     <OperatorOverview v-if="soundStore.selectedOperator < 0" />
 
-    <template v-else>
+    <div v-else class="operator-detail">
     <section class="edit-section">
       <div class="section-heading frequency-heading">
         <h4>{{ t('sound.frequencyOutput') }}</h4>
@@ -62,7 +62,7 @@
         <CurveSelector v-model="selected.rightCurve" :label="t('sound.rightCurve')" direction="left" />
       </div>
     </section>
-    </template>
+    </div>
   </main>
 </template>
 
@@ -124,4 +124,5 @@ const NumberControl = KnobControl;
 .envelope-graph circle { fill: #302426; stroke: #ceb393; stroke-width: 2; }
 .envelope-values { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; align-content: start; }
 .keyboard-scaling { border-bottom: 0; }
+.operator-detail { zoom: 0.8; }
 </style>
