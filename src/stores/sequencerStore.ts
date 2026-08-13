@@ -11,6 +11,7 @@ import { createRandomStepOrder, reorderSequenceSteps } from '../utils/sequenceRa
 import { clearSequenceStep, tieSequenceStep } from '../utils/sequenceStepEditing';
 import { extractStepNotes, parseSmf } from '../utils/smfImport';
 import { getPref, setPref } from '../utils/appPrefs';
+import { displayToMidi } from '../utils/motionValue';
 
 const SKIP_RANDOMIZE_PREF = 'skipRandomizeDialog';
 const SEND_MAX_ATTEMPTS = 5;
@@ -123,6 +124,11 @@ export const useSequencerStore = defineStore('sequencer', () => {
             ? createMotionPoints(clamped)
             : current.map((existing, index) => index === point ? clamped : existing);
         func.value.motionOn = true;
+    };
+
+    const clearMotionParam = (paramIndex: number) => {
+        const midi = displayToMidi(paramIndex, 0, func.value.transposeNote);
+        motionValues.value[paramIndex] = Array.from({ length: NUM_OF_STEPS }, () => createMotionPoints(midi));
     };
 
     const toggleMotionStep = (paramIndex: number, step: number) => {
@@ -417,6 +423,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
         addNote,
         removeNote,
         setMotionValue,
+        clearMotionParam,
         toggleMotionStep,
         toggleStepOn,
         toggleActiveStep,
