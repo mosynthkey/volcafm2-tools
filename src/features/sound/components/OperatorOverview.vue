@@ -159,7 +159,7 @@ const parameters = (operator: SoundOperator) => [
 </script>
 
 <style scoped>
-.operator-overview { display: grid; grid-template-columns: repeat(2, minmax(216px, 1fr)); gap: 8px; padding: 8px; zoom: 0.8; }
+.operator-overview { display: grid; grid-template-columns: repeat(2, minmax(216px, 1fr)); gap: 8px; padding: 8px; }
 .operator-summary { min-width: 0; overflow: hidden; border: 1px solid rgba(206,179,147,.18); border-radius: 9px; background: #2b2022; }
 .operator-summary.off { opacity: .58; }
 .operator-summary-heading { width: 100%; height: 38px; display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 7px; padding: 4px 8px; border: 0; border-bottom: 1px solid rgba(206,179,147,.14); background: transparent; color: #d8ccc4; cursor: pointer; text-align: left; }

@@ -7,9 +7,10 @@
       </button>
     </div>
 
+    <div class="operator-body">
     <OperatorOverview v-if="soundStore.selectedOperator < 0" />
 
-    <div v-else class="operator-detail">
+    <template v-else>
     <section class="edit-section">
       <div class="section-heading frequency-heading">
         <h4>{{ t('sound.frequencyOutput') }}</h4>
@@ -62,6 +63,7 @@
         <CurveSelector v-model="selected.rightCurve" :label="t('sound.rightCurve')" direction="left" />
       </div>
     </section>
+    </template>
     </div>
   </main>
 </template>
@@ -92,10 +94,12 @@ const NumberControl = KnobControl;
 </script>
 
 <style scoped>
-.panel-title { display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 10px 12px; border-bottom: 1px solid rgba(206,179,147,.16); }
-.panel-title h3 { margin: 2px 0 0; font-size: var(--volca-type-heading); }
-.operator-heading { position: sticky; top: 0; z-index: 3; background: #302426; }
-.show-all-operators { padding: 5px 8px; border: 1px solid rgba(206,179,147,.28); border-radius: 7px; background: transparent; color: #c7b9b0; font: inherit; font-size: var(--volca-type-label); cursor: pointer; }
+.operator-editor { display: flex; flex-direction: column; overflow: hidden; }
+.panel-title { display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; flex: 0 0 42px; height: 42px; padding: 0 12px; border-bottom: 1px solid rgba(206,179,147,.16); }
+.panel-title h3 { margin: 0; font-size: var(--volca-type-heading); line-height: 1; }
+.operator-heading { z-index: 3; background: #302426; }
+.operator-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.show-all-operators { box-sizing: border-box; height: 28px; padding: 0 8px; border: 1px solid rgba(206,179,147,.28); border-radius: 7px; background: transparent; color: #c7b9b0; font: inherit; font-size: var(--volca-type-label); line-height: 1; cursor: pointer; }
 .show-all-operators:hover { border-color: rgba(206,179,147,.58); background: rgba(206,179,147,.08); color: #f1e9e1; }
 .show-all-operators:focus-visible { outline: 2px solid #e1cab0; outline-offset: 2px; }
 .edit-section { padding: 13px; border-bottom: 1px solid rgba(206,179,147,.15); }
@@ -124,5 +128,4 @@ const NumberControl = KnobControl;
 .envelope-graph circle { fill: #302426; stroke: #ceb393; stroke-width: 2; }
 .envelope-values { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; align-content: start; }
 .keyboard-scaling { border-bottom: 0; }
-.operator-detail { zoom: 0.8; }
 </style>

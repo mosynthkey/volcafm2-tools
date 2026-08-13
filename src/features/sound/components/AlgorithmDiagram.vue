@@ -9,10 +9,10 @@
       </template>
     </g>
     <g v-for="operator in layout" :key="operator[0]" class="operator-node"
-      :class="{ carrier: isCarrier(operator), off: !enabled[operator[0] - 1], selected: pickable && sound.selectedOperator === operator[0] - 1 }"
-      role="button" tabindex="0" @click.stop="pickable && sound.toggleOperator(operator[0] - 1)"
-      @keydown.enter.stop.prevent="pickable && sound.toggleOperator(operator[0] - 1)">
-      <rect class="operator-block" :x="origin(operator).x + 1" :y="origin(operator).y - 1" width="14" height="14" rx="3" />
+      :class="{ carrier: isCarrier(operator), off: !enabled[operator[0] - 1], selected: pickable && sound.selectedOperator === operator[0] - 1 }">
+      <rect class="operator-block" :x="origin(operator).x + 1" :y="origin(operator).y - 1" width="14" height="14" rx="3"
+        role="button" tabindex="0" @click.stop="pickable && sound.toggleOperator(operator[0] - 1)"
+        @keydown.enter.stop.prevent="pickable && sound.toggleOperator(operator[0] - 1)" />
       <text :x="origin(operator).x + 8" :y="origin(operator).y + 6">{{ operator[0] }}</text>
     </g>
   </svg>
@@ -65,7 +65,7 @@ const feedbackPath = (operator: DexedAlgorithmOperator) => {
 </script>
 
 <style scoped>
-.algorithm-diagram { width: 100%; height: 320px; border: 1px solid rgba(241,233,225,.18); border-radius: 8px; background: #1c1516; }
+.algorithm-diagram { width: 100%; height: 256px; border: 1px solid rgba(241,233,225,.18); border-radius: 8px; background: #1c1516; }
 .algorithm-diagram.pickable { cursor: pointer; }
 .algorithm-diagram.pickable:hover { border-color: rgba(206,179,147,.48); }
 .algorithm-diagram.pickable:focus-visible { outline: 2px solid #ceb393; outline-offset: 2px; }
@@ -74,11 +74,11 @@ const feedbackPath = (operator: DexedAlgorithmOperator) => {
 .feedback-line { stroke: #72d5ca; }
 .output-line { stroke: #e7bd76; }
 .operator-node { cursor: pointer; }
-.operator-block { fill: #514044; stroke: #f1e9e1; stroke-width: 1.25; }
+.operator-block { fill: #514044; stroke: #f1e9e1; stroke-width: 1.25; outline: none; }
 .operator-node.carrier .operator-block { fill: #725f45; stroke: #e7bd76; }
 .operator-node text { fill: #f8eee4; font-size: 9px; font-weight: 800; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
-.operator-node.selected .operator-block,.operator-node:focus-visible .operator-block { fill: #d8bea0; stroke: #f8eee4; stroke-width: 2; }
-.operator-node.selected text,.operator-node:focus-visible text { fill: #2b2022; }
+.operator-node.selected .operator-block,.operator-block:focus-visible { fill: #d8bea0; stroke: #f8eee4; }
+.operator-node.selected text,.operator-block:focus-visible ~ text { fill: #2b2022; }
 .operator-node.off { opacity: .28; }
-.operator-node:focus-visible { outline: none; }
+.operator-block:focus,.operator-block:focus-visible { outline: none; }
 </style>

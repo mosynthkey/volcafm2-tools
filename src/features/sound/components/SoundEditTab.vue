@@ -40,6 +40,7 @@ import SoundGlobalEditor from '@/features/sound/components/SoundGlobalEditor.vue
 import SoundOperatorEditor from '@/features/sound/components/SoundOperatorEditor.vue';
 import SoundToolbar from '@/features/sound/components/SoundToolbar.vue';
 import { useSoundSync } from '@/features/sound/composables/useSoundSync';
+import { useSoundUndo } from '@/features/sound/composables/useSoundUndo';
 import { useSoundStore } from '@/stores/soundStore';
 import type { SoundProgram } from '@/types/soundProgram';
 import { useI18n } from 'vue-i18n';
@@ -48,6 +49,7 @@ const soundStore = useSoundStore();
 const { program } = storeToRefs(soundStore);
 const { t } = useI18n();
 const { sendProgram } = useSoundSync();
+useSoundUndo();
 const loadSoundPreset = (data: unknown) => {
   soundStore.loadPreset(data as SoundProgram);
   sendProgram();
@@ -66,5 +68,6 @@ const loadSoundPreset = (data: unknown) => {
 .algorithm-option :deep(.algorithm-diagram) { height: 142px; pointer-events: none; }
 .sound-workspace { display: grid; flex: 1 1 auto; min-height: 0; grid-template-columns: 380px minmax(520px, 1fr) 330px; gap: 10px; overflow: auto; }
 .sound-workspace :deep(.sound-panel) { min-height: 0; border: 1px solid rgba(206,179,147,.18); border-radius: 11px; background: rgba(48,36,38,.72); overflow: auto; }
+.sound-workspace :deep(.sound-panel.operator-editor) { overflow: hidden; }
 @media (max-width: 1300px) { .sound-workspace { grid-template-columns: 320px minmax(500px,1fr) 300px; } }
 </style>
