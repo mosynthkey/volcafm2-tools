@@ -8,7 +8,11 @@
       </template>
     </AppDialog>
 
-    <AppErrorDialog v-model="showSendErrorDialog" :title="t('sequence.sendFailedTitle')" :message="sendErrorMessage" />
+    <AppErrorDialog v-model="seqStore.showSendErrorDialog" :title="t('sequence.sendFailedTitle')" :message="sendErrorMessage" />
+    <v-snackbar v-model="seqStore.showSendRetrySnackbar" :timeout="-1" location="bottom" color="#463638"
+      class="send-retry-snackbar">
+      {{ t('sequence.sendRetrying') }}
+    </v-snackbar>
 
     <AppDialog v-model="seqStore.showRandomizeDialog" :title="t('sequence.randomizeTitle')">
       <p class="randomize-copy">{{ t('sequence.randomizeDescription') }}</p>
@@ -82,15 +86,11 @@ const programFetchStatusText = computed(() =>
 );
 
 const sequenceSnapshot = () => JSON.parse(JSON.stringify(seqStore.toState()));
-const showSendErrorDialog = ref(false);
 const showProgramFetchErrorDialog = ref(false);
 const sendErrorMessage = computed(() =>
-  midiStore.sequenceWriteState === 'nak' ? t('sequence.sendNak') : t('sequence.sendError')
+  seqStore.lastSendFailure === 'nak' ? t('sequence.sendNak') : t('sequence.sendError')
 );
 
-watch(() => midiStore.sequenceWriteState, state => {
-  if (state === 'nak' || state === 'error') showSendErrorDialog.value = true;
-});
 watch(() => midiStore.currentProgramFetchState, state => {
   if (state === 'error') showProgramFetchErrorDialog.value = true;
 });
@@ -131,5 +131,12 @@ watch(() => midiStore.currentProgramFetchState, state => {
   margin-top: 2px;
   flex: 0 0 auto;
   accent-color: var(--volca-accent);
+}
+
+:deep(.send-retry-snackbar .v-snackbar__wrapper) {
+  min-width: 280px;
+  border: 1px solid rgba(206, 179, 147, 0.28);
+  color: var(--volca-text);
+  font-weight: 650;
 }
 </style>
