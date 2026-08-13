@@ -17,8 +17,8 @@ import {
     unpack7to8,
 } from '../src/utils/sequenceCodec';
 import { MOTION_PARAM_COUNT, NUM_OF_STEPS, createEmptySequenceState, createMotionPoints, createSequenceNote, type SequenceNote, type SequenceState } from '../src/types/sequence';
-import { reorderSequenceSteps } from '../src/utils/sequenceRandomizer';
-import { clearSequenceStep, tieSequenceStep } from '../src/utils/sequenceStepEditing';
+import { createShiftedStepOrder, reorderSequenceSteps } from '../src/utils/sequenceRandomizer';
+import { clearSequenceStep, copySequenceStep, tieSequenceStep } from '../src/utils/sequenceStepEditing';
 import { createMotionPattern } from '../src/utils/motionPatterns';
 
 let failCount = 0;
@@ -183,6 +183,12 @@ check('step flags follow the permutation',
 );
 check('program/velocity/gate stay unchanged', reordered.programNo === sampleState.programNo
     && reordered.velocity === sampleState.velocity && reordered.gatePercent === sampleState.gatePercent);
+const shiftedLeft = reorderSequenceSteps(sampleState, createShiftedStepOrder(-1));
+check('left shift moves step 1 to step 16', JSON.stringify(activePitches(shiftedLeft, 15)) === JSON.stringify(activePitches(sampleState, 0)));
+check('left shift moves step 2 to step 1', JSON.stringify(activePitches(shiftedLeft, 0)) === JSON.stringify(activePitches(sampleState, 1)));
+const shiftedRight = reorderSequenceSteps(sampleState, createShiftedStepOrder(1));
+check('right shift moves step 16 to step 1', JSON.stringify(activePitches(shiftedRight, 0)) === JSON.stringify(activePitches(sampleState, 15)));
+check('right shift moves step 1 to step 2', JSON.stringify(activePitches(shiftedRight, 1)) === JSON.stringify(activePitches(sampleState, 0)));
 
 console.log('[5b] Automatic motion patterns');
 const sine = createMotionPattern('sine', { min: 24, max: 104, cycles: 1 });
@@ -211,6 +217,33 @@ const tied = tieSequenceStep(editingNotes, 2);
 check('Tie copies all notes from the previous step', !!tied
     && JSON.stringify(activePitches({ ...sampleState, notes: tied }, 2)) === JSON.stringify(activePitches({ ...sampleState, notes: editingNotes }, 1)));
 check('Tie is unavailable on step 1', tieSequenceStep(editingNotes, 0) === null);
+
+const copySource = {
+    ...sampleState,
+    notes: [
+        createSequenceNote(60, 0, 2, 111, 70),
+        createSequenceNote(67, 4, 1, 80, 40),
+    ],
+    stepOn: sampleState.stepOn.map((_, step) => step !== 4),
+    activeStep: sampleState.activeStep.map((_, step) => step !== 7),
+    transposeFuncOn: sampleState.transposeFuncOn.map((_, step) => step === 4),
+    motionStepEnabled: sampleState.motionStepEnabled.map(flags => flags.map((_, step) => step !== 4)),
+    motionValues: sampleState.motionValues.map((values, parameter) => values.map((points, step) =>
+        step === 4 ? createMotionPoints(20 + parameter) : points)),
+};
+const copied = copySequenceStep(copySource, 4, 7);
+check('Copy replaces destination notes', JSON.stringify(activePitches(copied, 7)) === JSON.stringify(activePitches(copySource, 4)));
+check('Copy leaves the source step unchanged', JSON.stringify(activePitches(copied, 4)) === JSON.stringify(activePitches(copySource, 4)));
+check('Copy keeps other steps', JSON.stringify(activePitches(copied, 0)) === JSON.stringify(activePitches(copySource, 0)));
+check('Copy uses source note attributes', copied.notes.some(note => note.pitch === 67 && note.startStep === 7 && note.velocity === 80 && note.gatePercent === 40));
+check('Copy duplicates motion values', copied.motionValues.every((values, parameter) =>
+    values[7].every((value, point) => value === copySource.motionValues[parameter][4][point])));
+check('Copy duplicates step flags', copied.stepOn[7] === copySource.stepOn[4]
+    && copied.transposeFuncOn[7] === copySource.transposeFuncOn[4]
+    && copied.motionStepEnabled[0][7] === copySource.motionStepEnabled[0][4]);
+check('Copy keeps at least one active step', copied.activeStep.some(Boolean));
+const sameStep = copySequenceStep(copySource, 4, 4);
+check('Copy onto the same step is a no-op', sameStep === copySource);
 
 // ---------------------------------------------------------------------------
 console.log('');

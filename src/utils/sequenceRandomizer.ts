@@ -11,6 +11,11 @@ export const createRandomStepOrder = (random: () => number = Math.random): numbe
     return order;
 };
 
+export const createShiftedStepOrder = (delta: number): number[] => {
+    const shift = ((Math.round(delta) % NUM_OF_STEPS) + NUM_OF_STEPS) % NUM_OF_STEPS;
+    return Array.from({ length: NUM_OF_STEPS }, (_, step) => (step - shift + NUM_OF_STEPS) % NUM_OF_STEPS);
+};
+
 const isActiveAt = (note: SequenceNote, step: number) =>
     note.startStep <= step && note.startStep + note.length > step;
 

@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
 import { useMidiStore } from '@/stores/midiStore';
 import {
@@ -7,8 +7,8 @@ import {
     normalizeSequenceState, type SequenceNote, type SequenceState,
 } from '../types/sequence';
 import { encodeCurrentSequenceDump } from '../utils/sequenceCodec';
-import { createRandomStepOrder, reorderSequenceSteps } from '../utils/sequenceRandomizer';
-import { clearSequenceStep, tieSequenceStep } from '../utils/sequenceStepEditing';
+import { createRandomStepOrder, createShiftedStepOrder, reorderSequenceSteps } from '../utils/sequenceRandomizer';
+import { clearSequenceStep, copySequenceStep, tieSequenceStep } from '../utils/sequenceStepEditing';
 import { extractStepNotes, parseSmf } from '../utils/smfImport';
 import { getPref, setPref } from '../utils/appPrefs';
 import { displayToMidi } from '../utils/motionValue';
@@ -16,6 +16,10 @@ import { displayToMidi } from '../utils/motionValue';
 const SKIP_RANDOMIZE_PREF = 'skipRandomizeDialog';
 const SEND_MAX_ATTEMPTS = 5;
 const SEND_RETRY_DELAY_MS = 800;
+const HISTORY_LIMIT = 80;
+const HISTORY_COMMIT_MS = 320;
+
+const cloneSequenceState = (state: SequenceState): SequenceState => JSON.parse(JSON.stringify(state)) as SequenceState;
 
 export const useSequencerStore = defineStore('sequencer', () => {
     const initial = createEmptySequenceState();
@@ -221,6 +225,92 @@ export const useSequencerStore = defineStore('sequencer', () => {
         loadFromDecoded(reorderSequenceSteps(toState(), createRandomStepOrder(random)));
     };
 
+    const shiftSteps = (delta: number) => {
+        if (!delta) return;
+        loadFromDecoded(reorderSequenceSteps(toState(), createShiftedStepOrder(delta)));
+    };
+
+    const copyStep = (from: number, to: number) => {
+        if (from === to) return;
+        loadFromDecoded(copySequenceStep(toState(), from, to));
+    };
+
+    const historyPast: SequenceState[] = [];
+    const historyFuture: SequenceState[] = [];
+    const canUndo = ref(false);
+    const canRedo = ref(false);
+    let historyBaseline = cloneSequenceState(toState());
+    let applyingHistory = false;
+    let historyTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const historySignature = (state: SequenceState) => JSON.stringify(state);
+    const refreshHistoryFlags = () => {
+        canUndo.value = historyPast.length > 0 || historySignature(toState()) !== historySignature(historyBaseline);
+        canRedo.value = historyFuture.length > 0;
+    };
+    const applyHistoryState = (state: SequenceState) => {
+        applyingHistory = true;
+        loadFromDecoded(state);
+        nextTick(() => { applyingHistory = false; });
+    };
+    const commitHistory = () => {
+        if (historyTimer !== null) {
+            clearTimeout(historyTimer);
+            historyTimer = null;
+        }
+        if (applyingHistory) return;
+        const current = cloneSequenceState(toState());
+        if (historySignature(current) === historySignature(historyBaseline)) {
+            refreshHistoryFlags();
+            return;
+        }
+        historyPast.push(historyBaseline);
+        if (historyPast.length > HISTORY_LIMIT) historyPast.shift();
+        historyBaseline = current;
+        historyFuture.length = 0;
+        refreshHistoryFlags();
+    };
+    const undo = () => {
+        if (historyTimer !== null) {
+            clearTimeout(historyTimer);
+            historyTimer = null;
+        }
+        const current = cloneSequenceState(toState());
+        if (historySignature(current) !== historySignature(historyBaseline)) {
+            historyFuture.push(current);
+            historyBaseline = cloneSequenceState(historyBaseline);
+            applyHistoryState(historyBaseline);
+            refreshHistoryFlags();
+            return;
+        }
+        const previous = historyPast.pop();
+        if (!previous) return;
+        historyFuture.push(historyBaseline);
+        historyBaseline = previous;
+        applyHistoryState(previous);
+        refreshHistoryFlags();
+    };
+    const redo = () => {
+        if (historyTimer !== null) {
+            clearTimeout(historyTimer);
+            historyTimer = null;
+        }
+        const next = historyFuture.pop();
+        if (!next) return;
+        historyPast.push(historyBaseline);
+        if (historyPast.length > HISTORY_LIMIT) historyPast.shift();
+        historyBaseline = next;
+        applyHistoryState(next);
+        refreshHistoryFlags();
+    };
+
+    watch(toState, () => {
+        if (applyingHistory) return;
+        if (historyTimer !== null) clearTimeout(historyTimer);
+        historyTimer = setTimeout(commitHistory, HISTORY_COMMIT_MS);
+        refreshHistoryFlags();
+    }, { deep: true });
+
     const buildSysEx = (channel = 0) => encodeCurrentSequenceDump(toState(), channel);
 
     const clearSendRetryTimer = () => {
@@ -413,7 +503,11 @@ export const useSequencerStore = defineStore('sequencer', () => {
         lastSendFailure,
         smfBarOffset,
         canInsertTie,
+        canUndo,
+        canRedo,
         toState,
+        undo,
+        redo,
         noteAt,
         selectedNote,
         selectNote,
@@ -436,6 +530,8 @@ export const useSequencerStore = defineStore('sequencer', () => {
         insertTie,
         loadFromDecoded,
         randomizeSteps,
+        shiftSteps,
+        copyStep,
         buildSysEx,
         sendToDevice,
         handleStepNote,

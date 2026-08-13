@@ -1,17 +1,38 @@
 <template>
+  <AppDialog v-model="showFocusHelp" :title="t('sequence.focusUsedPitchesTitle')">
+    <p class="focus-help-copy">{{ t('sequence.focusUsedPitchesDescription') }}</p>
+    <label class="focus-help-skip">
+      <input v-model="dontShowFocusHelpAgain" type="checkbox" />
+      <span>{{ t('sequence.randomizeDontShowAgain') }}</span>
+    </label>
+    <template #actions>
+      <v-btn variant="text" @click="showFocusHelp = false">{{ t('common.cancel') }}</v-btn>
+      <v-btn @click="confirmFocusHelp">{{ t('common.ok') }}</v-btn>
+    </template>
+  </AppDialog>
+
   <div class="roll">
-    <div class="roll-header">
-      <div class="pitch-gutter header-gutter">
-        <button type="button" class="pitch-filter" :class="{ on: focusUsedPitches }"
+    <div class="roll-header" :class="{ 'is-copying': stepCopy?.dragging }"
+      @pointerdown="startStepCopy" @pointermove="moveStepCopy" @pointerup="endStepCopy" @pointercancel="cancelStepCopy">
+      <div class="pitch-gutter header-gutter" @pointerdown.stop>
+        <button type="button" class="header-tool" :title="t('sequence.shiftStepsLeft')"
+          :aria-label="t('sequence.shiftStepsLeft')" @click="sequence.shiftSteps(-1)">
+          <ChevronLeft :size="16" />
+        </button>
+        <button type="button" class="header-tool" :title="t('sequence.shiftStepsRight')"
+          :aria-label="t('sequence.shiftStepsRight')" @click="sequence.shiftSteps(1)">
+          <ChevronRight :size="16" />
+        </button>
+        <button type="button" class="header-tool" :class="{ on: focusUsedPitches }"
           :aria-pressed="focusUsedPitches" :title="t('sequence.focusUsedPitches')"
-          :aria-label="t('sequence.focusUsedPitches')" @click="focusUsedPitches = !focusUsedPitches">
-          <Focus :size="15" />
-          <span>{{ t('sequence.focusUsedPitchesShort') }}</span>
+          :aria-label="t('sequence.focusUsedPitches')" @click="requestFocusUsedPitches">
+          <Focus :size="16" />
         </button>
       </div>
       <div v-for="step in 16" :key="step" class="step-cell header-cell"
-        :class="{ beat:(step-1)%4===0, cursor:sequence.stepInputActive&&step-1===sequence.stepCursor, muted:!sequence.stepOn[step-1], skipped:!sequence.activeStep[step-1] }"
-        role="button" tabindex="0" :aria-label="t('sequence.stepAria', { count: step })" @click="selectHeader(step-1)" @keydown.enter.prevent="selectHeader(step-1)">{{ step }}</div>
+        :class="{ beat:(step-1)%4===0, cursor:sequence.stepInputActive&&step-1===sequence.stepCursor, muted:!sequence.stepOn[step-1], skipped:!sequence.activeStep[step-1], 'copy-source': stepCopy && step-1===stepCopy.from, 'drop-target': stepCopy?.dragging && step-1===stepCopy.to && step-1!==stepCopy.from }"
+        role="button" tabindex="0" :aria-label="t('sequence.stepAria', { count: step })" :title="t('sequence.stepCopyHint')"
+        @keydown.enter.prevent="selectHeader(step-1)">{{ step }}</div>
     </div>
     <div class="roll-row step-flags" @pointerdown="startFlag('stepOn', $event)" @pointermove="moveFlag" @pointerup="endFlag" @pointercancel="endFlag">
       <div class="pitch-gutter">{{ t('sequence.stepOn') }}</div>
@@ -85,21 +106,48 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Trash2, Focus } from '@lucide/vue'
+import { Trash2, Focus, ChevronLeft, ChevronRight } from '@lucide/vue'
 import AppToggle from '@/components/AppToggle.vue'
+import AppDialog from '@/components/dialogs/AppDialog.vue'
 import { usePersistedFlag } from '@/composables/usePersistedFlag'
 import { useSequencerStore } from '@/stores/sequencerStore'
 import { useNoteAudition } from '@/features/sequence/composables/useNoteAudition'
 import MotionControlPanel from '@/features/sequence/components/MotionControlPanel.vue'
 import { MOTION_PARAM_KEYS } from '@/types/sequence'
+import { getPref, setPref } from '@/utils/appPrefs'
 import { displayToMidi, formatMotionValue, getMotionDisplayRange, midiToDisplay } from '@/utils/motionValue'
 
+const SKIP_FOCUS_PREF = 'skipFocusUsedPitchesDialog'
 const { t }=useI18n(); const sequence=useSequencerStore(); const { audition }=useNoteAudition()
 const motionItems = computed(() => MOTION_PARAM_KEYS.map((key, index) => ({ label: t(`sequence.motionParams.${key}`), value: index })))
 const ALL_PITCHES = Array.from({ length: 61 }, (_, index) => 96 - index)
 const PITCH_MIN = 36
 const PITCH_MAX = 96
 const focusUsedPitches = usePersistedFlag('volca-fm2-focus-used-pitches')
+const skipFocusHelp = ref(false)
+const showFocusHelp = ref(false)
+const dontShowFocusHelpAgain = ref(false)
+getPref<boolean>(SKIP_FOCUS_PREF).then(value => { if (value === true) skipFocusHelp.value = true })
+const requestFocusUsedPitches = () => {
+  if (focusUsedPitches.value) {
+    focusUsedPitches.value = false
+    return
+  }
+  if (skipFocusHelp.value) {
+    focusUsedPitches.value = true
+    return
+  }
+  dontShowFocusHelpAgain.value = false
+  showFocusHelp.value = true
+}
+const confirmFocusHelp = () => {
+  if (dontShowFocusHelpAgain.value) {
+    skipFocusHelp.value = true
+    setPref(SKIP_FOCUS_PREF, true).catch(() => { skipFocusHelp.value = false })
+  }
+  showFocusHelp.value = false
+  focusUsedPitches.value = true
+}
 const pitches = computed(() => {
   if (!focusUsedPitches.value || sequence.notes.length === 0) return ALL_PITCHES
   const visible = new Set<number>()
@@ -163,6 +211,32 @@ const rowDown=(pitch:number,event:PointerEvent)=>{
 const rowMove=(pitch:number,event:PointerEvent)=>{if(drag.value?.pitch===pitch)drag.value.end=stepAt(event)}
 const rowUp=(pitch:number,event:PointerEvent)=>{if(drag.value?.pitch!==pitch)return;const start=Math.min(drag.value.start,drag.value.end),end=Math.max(drag.value.start,drag.value.end);if(sequence.addNote(pitch,start,end-start+1))audition([pitch]);drag.value=null}
 const selectHeader=(step:number)=>{if(sequence.stepInputActive)sequence.selectStepInput(step);audition(sequence.notes.filter(note=>note.startStep<=step&&note.startStep+note.length>step).map(note=>note.pitch))}
+const stepCopy=ref<{from:number;to:number;dragging:boolean}|null>(null)
+const startStepCopy=(event:PointerEvent)=>{
+  if((event.target as HTMLElement).closest('.pitch-gutter')) return
+  event.preventDefault()
+  const step=stepAt(event)
+  stepCopy.value={from:step,to:step,dragging:false}
+  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+}
+const moveStepCopy=(event:PointerEvent)=>{
+  if(!stepCopy.value) return
+  const step=stepAt(event)
+  if(step!==stepCopy.value.from) stepCopy.value.dragging=true
+  stepCopy.value.to=step
+}
+const cancelStepCopy=()=>{ stepCopy.value=null }
+const endStepCopy=()=>{
+  const drag=stepCopy.value
+  stepCopy.value=null
+  if(!drag) return
+  if(drag.dragging && drag.to!==drag.from){
+    sequence.copyStep(drag.from, drag.to)
+    audition(sequence.notes.filter(note=>note.startStep<=drag.to&&note.startStep+note.length>drag.to).map(note=>note.pitch))
+    return
+  }
+  selectHeader(drag.from)
+}
 const cellClass=(step:number,pitch:number)=>{
   const note=sequence.noteAt(step,pitch)
   const preview=drag.value?.pitch===pitch&&step>=Math.min(drag.value.start,drag.value.end)&&step<=Math.max(drag.value.start,drag.value.end)
@@ -207,5 +281,8 @@ const endFlag=()=>{ flagDrag.value=null }
 </script>
 
 <style scoped>
-.roll{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;border:1px solid #55454780;border-radius:4px;overflow:hidden}.roll-header,.roll-row{display:flex}.roll-body{flex:1;min-height:0;overflow-y:auto}.motion-row{flex:0 0 auto;border-top:2px solid var(--volca-accent)}.pitch-gutter{position:sticky;left:0;display:flex;flex:0 0 180px;align-items:center;justify-content:flex-end;box-sizing:border-box;padding:0 10px;background:#382b2d;color:var(--volca-text);font-size:var(--volca-type-label);font-weight:700;letter-spacing:.02em;line-height:1.2;white-space:nowrap}.flag-gutter,.step-flags .pitch-gutter,.motion-step-row .pitch-gutter{justify-content:center;color:var(--volca-accent);text-align:center}.header-gutter{justify-content:center;padding:0 8px}.pitch-filter{display:flex;align-items:center;justify-content:center;gap:5px;width:100%;height:28px;margin:0;padding:0 8px;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;color:var(--volca-muted);font:inherit;font-size:11px;font-weight:700;letter-spacing:.02em;cursor:pointer}.pitch-filter:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.pitch-filter.on{border-color:var(--volca-accent);background:rgba(206,179,147,.18);color:var(--volca-text)}.pitch-filter:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.motion-gutter{flex-direction:column;justify-content:center;align-items:stretch;gap:6px;padding:8px 6px;white-space:normal;color:var(--volca-accent);text-align:center}.motion-gutter__label{flex:0 0 auto;font-weight:700}.motion-target-select{flex:0 0 auto;min-width:0;width:100%;font-size:var(--volca-type-label)}.motion-gutter :deep(.v-field){border-radius:0!important;background:transparent!important;font-size:var(--volca-type-label);min-height:32px!important}.motion-gutter :deep(.v-field__input){min-height:28px;padding-top:2px;padding-bottom:2px;padding-inline:0;line-height:1.2}.motion-gutter :deep(.v-select__selection-text){white-space:nowrap;text-align:center}.motion-gutter__actions{display:flex;align-items:center;justify-content:center;gap:6px}.motion-gutter__clear{display:grid;place-items:center;width:50px;height:50px;min-width:50px;min-height:50px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:9px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.motion-gutter__clear:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.motion-gutter__clear:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.pitch-gutter.black-key{background:#2a2021;color:#9d8570}.step-cell{flex:1 1 0;width:0;min-width:28px;box-sizing:border-box;border-left:1px solid #55454740}.header-cell{position:relative;padding:4px 0;background:#4a3a3c;text-align:center;cursor:pointer}.header-cell.muted{opacity:.38}.header-cell.skipped{color:#8f8170;text-decoration:line-through}.note-cell{position:relative;display:flex;align-items:center;height:20px;border-top:1px solid #55454726;cursor:pointer;touch-action:none}.note-cell.muted,.note-cell.skipped{opacity:.42}.note-cell__label{z-index:2;overflow:hidden;padding-left:4px;color:#382b2d;font-size:var(--volca-type-label);font-weight:700;white-space:nowrap}.step-cell.cursor::after{content:'';position:absolute;inset:0;z-index:1;background:rgba(206,179,147,.2);pointer-events:none}.step-cell{position:relative}.step-cell.beat{border-left-color:#ceb39380}.note-cell.active,.motion-fill{background:var(--volca-accent)}.note-cell.selected{box-shadow:inset 0 0 0 2px #f8eee4}.note-cell.full{cursor:not-allowed}.step-flags{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426;touch-action:none}.step-flags .step-cell{border-left-color:transparent}.step-flags .step-cell.beat{border-left-color:transparent}.flag-cell{display:grid;min-height:22px;padding:0;cursor:pointer}.flag{min-height:0;margin:3px;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer;touch-action:none;pointer-events:none}.flag.on{background:#ceb393;border-color:#e7bd76}.flag.sound.on{background:#9dce91;border-color:#b7e0ad}.flag:focus-visible{outline:2px solid var(--volca-accent);outline-offset:1px}.motion-bars{display:flex;flex:1;height:160px;touch-action:none;cursor:pointer}.motion-bars.disabled{opacity:.55}.motion-col{display:flex;align-items:flex-end}.motion-col.off{opacity:.35}.motion-fill{position:absolute;inset:auto 0 0}.motion-fill.point{right:auto}.motion-value,.motion-value-input{position:absolute;top:6px;right:2px;left:2px;z-index:2;color:var(--volca-text);font-size:11px;font-weight:700;line-height:22px;text-align:center}.motion-value-input{height:24px;border:1px solid var(--volca-accent);border-radius:4px;background:#382b2d}.motion-step-row{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426}.motion-step-cell{height:18px;margin:3px;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer}.motion-step-cell.on{background:#ceb393;border-color:#e7bd76}
+.roll{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;border:1px solid #55454780;border-radius:4px;overflow:hidden}.roll-header,.roll-row{display:flex}.roll-body{flex:1;min-height:0;overflow-y:auto}.motion-row{flex:0 0 auto;border-top:2px solid var(--volca-accent)}.pitch-gutter{position:sticky;left:0;display:flex;flex:0 0 180px;align-items:center;justify-content:flex-end;box-sizing:border-box;padding:0 10px;background:#382b2d;color:var(--volca-text);font-size:var(--volca-type-label);font-weight:700;letter-spacing:.02em;line-height:1.2;white-space:nowrap}.flag-gutter,.step-flags .pitch-gutter,.motion-step-row .pitch-gutter{justify-content:center;color:var(--volca-accent);text-align:center}.header-gutter{justify-content:center;gap:4px;padding:4px 6px}.header-tool{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.header-tool:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.header-tool:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.header-tool.on{border-color:var(--volca-accent);background:rgba(206,179,147,.18);color:var(--volca-text)}.header-cell{min-height:40px;display:flex;align-items:center;justify-content:center}.motion-gutter{flex-direction:column;justify-content:center;align-items:stretch;gap:6px;padding:8px 6px;white-space:normal;color:var(--volca-accent);text-align:center}.motion-gutter__label{flex:0 0 auto;font-weight:700}.motion-target-select{flex:0 0 auto;min-width:0;width:100%;font-size:var(--volca-type-label)}.motion-gutter :deep(.v-field){border-radius:0!important;background:transparent!important;font-size:var(--volca-type-label);min-height:32px!important}.motion-gutter :deep(.v-field__input){min-height:28px;padding-top:2px;padding-bottom:2px;padding-inline:0;line-height:1.2}.motion-gutter :deep(.v-select__selection-text){white-space:nowrap;text-align:center}.motion-gutter__actions{display:flex;align-items:center;justify-content:center;gap:6px}.motion-gutter__clear{display:grid;place-items:center;width:50px;height:50px;min-width:50px;min-height:50px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:9px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.motion-gutter__clear:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.motion-gutter__clear:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.pitch-gutter.black-key{background:#2a2021;color:#9d8570}.step-cell{flex:1 1 0;width:0;min-width:28px;box-sizing:border-box;border-left:1px solid #55454740}.header-cell{position:relative;padding:4px 0;background:#4a3a3c;text-align:center;cursor:pointer}.header-cell.muted{opacity:.38}.header-cell.skipped{color:#8f8170;text-decoration:line-through}.note-cell{position:relative;display:flex;align-items:center;height:20px;border-top:1px solid #55454726;cursor:pointer;touch-action:none}.note-cell.muted,.note-cell.skipped{opacity:.42}.note-cell__label{z-index:2;overflow:hidden;padding-left:4px;color:#382b2d;font-size:var(--volca-type-label);font-weight:700;white-space:nowrap}.step-cell.cursor::after{content:'';position:absolute;inset:0;z-index:1;background:rgba(206,179,147,.2);pointer-events:none}.step-cell{position:relative}.step-cell.beat{border-left-color:#ceb39380}.note-cell.active,.motion-fill{background:var(--volca-accent)}.note-cell.selected{box-shadow:inset 0 0 0 2px #f8eee4}.note-cell.full{cursor:not-allowed}.step-flags{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426;touch-action:none}.step-flags .step-cell{border-left-color:transparent}.step-flags .step-cell.beat{border-left-color:transparent}.flag-cell{display:grid;min-height:22px;padding:0;cursor:pointer}.flag{min-height:0;margin:3px;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer;touch-action:none;pointer-events:none}.flag.on{background:#ceb393;border-color:#e7bd76}.flag.sound.on{background:#9dce91;border-color:#b7e0ad}.flag:focus-visible{outline:2px solid var(--volca-accent);outline-offset:1px}.motion-bars{display:flex;flex:1;height:160px;touch-action:none;cursor:pointer}.motion-bars.disabled{opacity:.55}.motion-col{display:flex;align-items:flex-end}.motion-col.off{opacity:.35}.motion-fill{position:absolute;inset:auto 0 0}.motion-fill.point{right:auto}.motion-value,.motion-value-input{position:absolute;top:6px;right:2px;left:2px;z-index:2;color:var(--volca-text);font-size:11px;font-weight:700;line-height:22px;text-align:center}.motion-value-input{height:24px;border:1px solid var(--volca-accent);border-radius:4px;background:#382b2d}.motion-step-row{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426}.motion-step-cell{height:18px;margin:3px;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer}.motion-step-cell.on{background:#ceb393;border-color:#e7bd76}.roll-header{touch-action:none}.header-cell{cursor:grab;user-select:none}.roll-header.is-copying,.roll-header.is-copying .header-cell{cursor:grabbing}.header-cell.copy-source{background:#6a5348;color:#f1e9e1}.header-cell.drop-target{background:var(--volca-accent);color:#33282a}
+.focus-help-copy { margin: 0; }
+.focus-help-skip { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 0; color: var(--volca-muted); font-size: var(--volca-type-body); line-height: 1.4; cursor: pointer; }
+.focus-help-skip input { width: 16px; height: 16px; margin-top: 2px; flex: 0 0 auto; accent-color: var(--volca-accent); }
 </style>

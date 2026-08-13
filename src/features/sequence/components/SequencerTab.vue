@@ -29,7 +29,7 @@
     <AppErrorDialog v-model="showProgramFetchErrorDialog" :title="t('sequence.programFetchFailedTitle')"
       :message="t('sequence.programFetchFailed')" />
 
-    <AppProgressDialog :model-value="midiStore.isFetchingCurrentProgram" :title="t('sequence.programFetchTitle')"
+    <AppProgressDialog :model-value="midiStore.isFetchingCurrentProgram && !seqStore.showCaptureDialog" :title="t('sequence.programFetchTitle')"
       :description="programFetchStatusText"
       :value="midiStore.currentProgramFetchState === 'loading-programs' ? (midiStore.currentProgramFetchProgress / 64) * 100 : 0"
       :indeterminate="midiStore.currentProgramFetchState === 'requesting'" max-width="460">
@@ -64,6 +64,7 @@ import { useMidiStore } from '@/stores/midiStore';
 import { Dices } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import { useStepInput } from '@/features/sequence/composables/useStepInput';
+import { useSequenceUndo } from '@/features/sequence/composables/useSequenceUndo';
 import SequenceCaptureDialog from '@/features/sequence/components/SequenceCaptureDialog.vue';
 import SequenceToolbar from '@/features/sequence/components/SequenceToolbar.vue';
 import PianoRollEditor from '@/features/sequence/components/PianoRollEditor.vue';
@@ -73,6 +74,7 @@ const seqStore = useSequencerStore();
 const midiStore = useMidiStore();
 const { t } = useI18n();
 useStepInput();
+useSequenceUndo();
 const dontShowRandomizeAgain = ref(false);
 
 watch(() => seqStore.showRandomizeDialog, open => {
@@ -92,7 +94,7 @@ const sendErrorMessage = computed(() =>
 );
 
 watch(() => midiStore.currentProgramFetchState, state => {
-  if (state === 'error') showProgramFetchErrorDialog.value = true;
+  if (state === 'error' && !seqStore.showCaptureDialog) showProgramFetchErrorDialog.value = true;
 });
 </script>
 
