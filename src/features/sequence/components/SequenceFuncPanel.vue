@@ -15,8 +15,8 @@
           <div class="func-toggle"><span>{{ t('sequence.func.mono') }}</span><AppToggle v-model="sequence.func.voiceMono" :aria-label="t('sequence.func.mono')" /></div>
           <div class="func-toggle"><span>{{ t('sequence.func.unison') }}</span><AppToggle v-model="sequence.func.voiceUnison" :aria-label="t('sequence.func.unison')" /></div>
           <div class="func-toggle"><span>{{ t('sequence.func.chorus') }}</span><AppToggle v-model="sequence.func.chorus" :aria-label="t('sequence.func.chorus')" /></div>
-          <div class="func-toggle"><span>{{ t('sequence.func.reverb') }}</span><AppToggle v-model="sequence.func.reverb" :aria-label="t('sequence.func.reverb')" /></div>
           <KnobControl v-model="sequence.func.chorusDepth" :label="t('sequence.func.chorusDepth')" :min="0" :max="127" compact />
+          <div class="func-toggle"><span>{{ t('sequence.func.reverb') }}</span><AppToggle v-model="sequence.func.reverb" :aria-label="t('sequence.func.reverb')" /></div>
           <KnobControl v-model="sequence.func.reverbDepth" :label="t('sequence.func.reverbDepth')" :min="0" :max="127" compact />
         </div>
       </section>
