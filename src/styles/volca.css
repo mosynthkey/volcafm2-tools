@@ -31,11 +31,19 @@ html, body, #app {
 img, svg, canvas { -webkit-user-drag: none; user-drag: none; }
 input, textarea, [contenteditable="true"] { user-select: text; -webkit-user-select: text; }
 .volca-inline-panel { display: flex; flex: 0 0 auto; align-items: start; margin-top: 10px; padding: 10px 12px 12px; overflow-x: auto; border: 1px solid rgba(206,179,147,.18); border-radius: 10px; background: rgba(48,36,38,.55); }
+.volca-inline-panel.collapsed { align-items: center; padding: 6px 12px; cursor: pointer; }
 .volca-groups { display: flex; flex: 1 1 auto; flex-wrap: nowrap; align-items: start; gap: 14px; min-width: 0; }
+.volca-inline-panel.collapsed .volca-groups { align-items: center; }
 .volca-group { flex: 0 0 auto; min-width: 0; padding-left: 14px; border-left: 1px solid rgba(206,179,147,.22); }
 .volca-group:first-child { padding-left: 0; border-left: 0; }
 .volca-section-title { color: var(--volca-accent); font-size: var(--volca-type-label); font-weight: 750; letter-spacing: .06em; white-space: nowrap; }
 .volca-group > h4 { margin: 0 0 8px; color: var(--volca-accent); font-size: var(--volca-type-label); font-weight: 750; letter-spacing: .06em; white-space: nowrap; }
+.volca-inline-panel.collapsed .volca-group > h4 { margin: 0; }
+.panel-fold { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto; margin-right: 8px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--volca-accent); cursor: pointer; }
+.panel-fold:hover { background: rgba(206,179,147,.12); }
+.panel-fold:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
+.panel-fold svg { transition: transform .16s ease; }
+.panel-fold.is-folded svg { transform: rotate(-90deg); }
 .volca-field-label { color: var(--volca-muted); font-size: var(--volca-type-label); }
 .editor-toolbar { display: flex; flex: 0 0 auto; align-items: center; gap: 0; min-height: 48px; padding: 4px 0; overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; scrollbar-width: thin; }
 .editor-toolbar > .v-col { flex-shrink: 0; }

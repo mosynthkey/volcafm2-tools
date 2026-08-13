@@ -1,9 +1,14 @@
 <template>
-  <section class="volca-inline-panel">
+  <section class="volca-inline-panel" :class="{ collapsed }" @click="collapsed && (collapsed = false)">
+    <button type="button" class="panel-fold" :class="{ 'is-folded': collapsed }"
+      :aria-expanded="!collapsed" :aria-label="collapsed ? t('sequence.expandPanel') : t('sequence.collapsePanel')"
+      @click.stop="collapsed = !collapsed">
+      <ChevronDown :size="16" />
+    </button>
     <div class="volca-groups">
       <section class="volca-group">
         <h4>{{ focusedNote ? t('sequence.selectedNote') : t('sequence.noteDefaults') }}</h4>
-        <div class="func-row">
+        <div v-show="!collapsed" class="func-row">
           <label class="value-field"><span>{{ t('sequence.velocity') }}</span><input v-model.number="noteVelocity" type="number" min="1" max="127" /></label>
           <label class="value-field"><span>{{ t('sequence.gate') }}</span><input v-model.number="noteGate" type="number" min="0" max="100" /></label>
         </div>
@@ -11,7 +16,7 @@
 
       <section class="volca-group">
         <h4>{{ t('sequence.func.voiceMode') }}</h4>
-        <div class="func-row">
+        <div v-show="!collapsed" class="func-row">
           <div class="func-toggle"><span>{{ t('sequence.func.mono') }}</span><AppToggle v-model="sequence.func.voiceMono" :aria-label="t('sequence.func.mono')" /></div>
           <div class="func-toggle"><span>{{ t('sequence.func.unison') }}</span><AppToggle v-model="sequence.func.voiceUnison" :aria-label="t('sequence.func.unison')" /></div>
           <div class="func-toggle"><span>{{ t('sequence.func.chorus') }}</span><AppToggle v-model="sequence.func.chorus" :aria-label="t('sequence.func.chorus')" /></div>
@@ -23,7 +28,7 @@
 
       <section class="volca-group">
         <h4>{{ t('sequence.func.arpGroup') }}</h4>
-        <div class="func-row">
+        <div v-show="!collapsed" class="func-row">
           <div class="func-toggle"><span>{{ t('sequence.func.onOff') }}</span><AppToggle v-model="sequence.func.arp" :aria-label="t('sequence.func.arp')" /></div>
           <div class="func-select">
             <label>{{ t('sequence.func.arpType') }}</label>
@@ -38,7 +43,7 @@
 
       <section class="volca-group">
         <h4>{{ t('sequence.func.tempo') }}</h4>
-        <div class="func-row">
+        <div v-show="!collapsed" class="func-row">
           <div class="func-segment">
             <span>{{ t('sequence.func.tempo') }}</span>
             <div class="segment" role="group" :aria-label="t('sequence.func.tempo')">
@@ -58,8 +63,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ChevronDown } from '@lucide/vue'
 import AppToggle from '@/components/AppToggle.vue'
 import KnobControl from '@/components/KnobControl.vue'
+import { usePersistedFlag } from '@/composables/usePersistedFlag'
 import { useSequencerStore } from '@/stores/sequencerStore'
 
 const TEMPO_LABELS = ['1/1', '1/2', '1/4']
@@ -68,6 +75,7 @@ const ARP_DIV_KEYS = ['d12', 'd8', 'd4', 'd3', 'd2', 'd23', 'd1', 'd32', 'd21', 
 
 const { t } = useI18n()
 const sequence = useSequencerStore()
+const collapsed = usePersistedFlag('volca-fm2-collapse-func-panel')
 const tempoLabels = TEMPO_LABELS
 const arpTypeItems = computed(() => ARP_TYPE_KEYS.map((key, value) => ({ title: t(`sequence.arpTypes.${key}`), value })))
 const arpDivItems = computed(() => ARP_DIV_KEYS.map((key, value) => ({ title: t(`sequence.arpDivs.${key}`), value })))

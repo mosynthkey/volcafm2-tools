@@ -190,6 +190,8 @@ check('sine uses requested min/max', Math.min(...sine) === 24 && Math.max(...sin
 check('sine starts at min and reaches max at half cycle', sine[0] === 24 && sine[8] === 104);
 const sineTwoCycles = createMotionPattern('sine', { min: 20, max: 100, cycles: 2 });
 check('sine cycle count changes the phase', sineTwoCycles[4] === 100 && sineTwoCycles[8] === 20 && sineTwoCycles[12] === 100);
+const sineOffset = createMotionPattern('sine', { min: 24, max: 104, cycles: 1, offset: 8 });
+check('sine offset shifts phase by steps', sineOffset[0] === 104 && sineOffset[8] === 24);
 const reversedRange = createMotionPattern('linearUp', { min: 110, max: 30 });
 check('reversed min/max are normalized', reversedRange[0] === 30 && reversedRange[15] === 110);
 
