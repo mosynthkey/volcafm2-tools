@@ -1,15 +1,18 @@
 <template>
   <button class="app-toggle" type="button" role="switch" :aria-checked="modelValue"
-    :aria-label="ariaLabel" :disabled="disabled" :class="{ on: modelValue }"
+    :aria-label="ariaLabel ?? t('common.toggle')" :disabled="disabled" :class="{ on: modelValue }"
     @click="$emit('update:modelValue', !modelValue)">
-    <span class="app-toggle__state">{{ modelValue ? 'ON' : 'OFF' }}</span>
+    <span class="app-toggle__state">{{ modelValue ? t('common.on') : t('common.off') }}</span>
     <span class="app-toggle__thumb" aria-hidden="true" />
   </button>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 withDefaults(defineProps<{ modelValue: boolean; ariaLabel?: string; disabled?: boolean }>(), {
-  ariaLabel: 'Toggle', disabled: false,
+  ariaLabel: undefined, disabled: false,
 });
 defineEmits<{ 'update:modelValue': [value: boolean] }>();
 </script>

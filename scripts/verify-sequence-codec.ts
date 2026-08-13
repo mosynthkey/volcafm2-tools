@@ -16,7 +16,7 @@ import {
     pack8to7,
     unpack7to8,
 } from '../src/utils/sequenceCodec';
-import { MOTION_PARAM_COUNT, NUM_OF_STEPS, type SequenceNote, type SequenceState } from '../src/types/sequence';
+import { MOTION_PARAM_COUNT, NUM_OF_STEPS, createEmptySequenceState, createMotionPoints, createSequenceNote, type SequenceNote, type SequenceState } from '../src/types/sequence';
 import { reorderSequenceSteps } from '../src/utils/sequenceRandomizer';
 import { clearSequenceStep, tieSequenceStep } from '../src/utils/sequenceStepEditing';
 import { createMotionPattern } from '../src/utils/motionPatterns';
@@ -49,24 +49,44 @@ for (const size of [1, 6, 7, 8, 13, 128, 140, 1920]) {
 // ---------------------------------------------------------------------------
 console.log('[2] SEQUENCE DATA header/footer bytes');
 const sampleState: SequenceState = {
+    ...createEmptySequenceState(),
     programNo: 12,
     velocity: 110,
     gatePercent: 80,
     notes: [
-        // ステップ0〜3をタイで繋いだCメジャーコード (「ステップをつなげた和音」)
-        { pitch: 60, startStep: 0, length: 4 },
-        { pitch: 64, startStep: 0, length: 4 },
-        { pitch: 67, startStep: 0, length: 4 },
-        // 単発ノート
-        { pitch: 72, startStep: 4, length: 1 },
-        // 2ステップだけタイで繋いだノート
-        { pitch: 65, startStep: 8, length: 2 },
-        { pitch: 60, startStep: 12, length: 1 },
+        createSequenceNote(60, 0, 4, 110, 80),
+        createSequenceNote(64, 0, 4, 100, 70),
+        createSequenceNote(67, 0, 4, 90, 60),
+        createSequenceNote(72, 4, 1, 120, 50),
+        createSequenceNote(65, 8, 2, 85, 40),
+        createSequenceNote(60, 12, 1, 75, 30),
     ],
-    motionEnabled: Array.from({ length: MOTION_PARAM_COUNT }, (_, i) => i === 2 || i === 7), // ALGORITHM, LFO RATE
-    motionValues: Array.from({ length: MOTION_PARAM_COUNT }, (_, p) =>
-        Array.from({ length: NUM_OF_STEPS }, (_, s) => (p === 2 ? s * 8 : 127 - s * 8))
+    motionEnabled: Array.from({ length: MOTION_PARAM_COUNT }, (_, i) => i === 2 || i === 7),
+    motionStepEnabled: Array.from({ length: MOTION_PARAM_COUNT }, (_, p) =>
+        Array.from({ length: NUM_OF_STEPS }, (_, s) => p !== 2 || s !== 3)
     ),
+    motionValues: Array.from({ length: MOTION_PARAM_COUNT }, (_, p) =>
+        Array.from({ length: NUM_OF_STEPS }, (_, s) => createMotionPoints(p === 2 ? s * 8 : 127 - s * 8).map((value, point) => Math.min(127, value + point)))
+    ),
+    stepOn: Array.from({ length: NUM_OF_STEPS }, (_, step) => step !== 5),
+    activeStep: Array.from({ length: NUM_OF_STEPS }, (_, step) => step !== 15),
+    transposeFuncOn: Array.from({ length: NUM_OF_STEPS }, (_, step) => step === 0 || step === 8),
+    func: {
+        motionOn: true,
+        motionSmooth: true,
+        warpActiveStep: true,
+        tempo: 2,
+        voiceMono: true,
+        voiceUnison: false,
+        chorus: true,
+        arp: true,
+        transposeNote: true,
+        reverb: true,
+        arpType: 3,
+        arpDiv: 6,
+        chorusDepth: 40,
+        reverbDepth: 80,
+    },
 };
 
 const seqBytes = buildSequenceDataBytes(sampleState);
@@ -76,6 +96,12 @@ check('devCode === 0x4ee8 (LE: E8,4E)', seqBytes[4] === 0xe8 && seqBytes[5] === 
 check("footer 'PTED'", String.fromCharCode(...seqBytes.slice(1916, 1920)) === 'PTED');
 check('programNo byte (offset 9)', seqBytes[9] === sampleState.programNo);
 check('FUNC MOTION on (offset 68 bit0)', (seqBytes[68] & 0x01) === 1);
+check('FUNC SMOOTH / WARP / TEMPO / MONO / CHORUS', seqBytes[68] === (0x01 | 0x02 | 0x04 | (2 << 3) | 0x20 | 0x80));
+check('FUNC ARP / TRANSPOSE NOTE / REVERB', seqBytes[69] === (0x01 | 0x02 | 0x04));
+check('ARP TYPE / DIV / depths', seqBytes[70] === 3 && seqBytes[71] === 6 && seqBytes[72] === 40 && seqBytes[73] === 80);
+check('STEP 6 muted', (seqBytes[6] & (1 << 5)) === 0);
+check('STEP 16 not active', (seqBytes[13] & 0x80) === 0);
+check('transpose func on steps 1 and 9', seqBytes[1872] === 1 && seqBytes[1880] === 1);
 
 // ---------------------------------------------------------------------------
 // 3) SysExメッセージ全体 (送信フォーマット) の検証
@@ -108,8 +134,8 @@ const sortNotes = (notes: SequenceNote[]) =>
 const a = sortNotes(sampleState.notes);
 const b = sortNotes(decodedState.notes);
 check(
-    'notes round-trip (incl. tied multi-step chords)',
-    a.length === b.length && a.every((n, i) => n.pitch === b[i].pitch && n.startStep === b[i].startStep && n.length === b[i].length),
+    'notes round-trip (incl. tied multi-step chords, velocity, gate)',
+    a.length === b.length && a.every((n, i) => n.pitch === b[i].pitch && n.startStep === b[i].startStep && n.length === b[i].length && n.velocity === b[i].velocity && n.gatePercent === b[i].gatePercent),
     `sent=${JSON.stringify(a)} got=${JSON.stringify(b)}`
 );
 check(
@@ -117,11 +143,21 @@ check(
     sampleState.motionEnabled.every((v, i) => v === decodedState.motionEnabled[i])
 );
 check(
-    'motionValues round-trip for enabled params',
-    sampleState.motionEnabled.every((enabled, p) =>
-        !enabled || sampleState.motionValues[p].every((v, s) => v === decodedState.motionValues[p][s])
+    'motion step enable round-trips',
+    sampleState.motionStepEnabled.every((flags, p) => flags.every((on, s) => on === decodedState.motionStepEnabled[p][s]))
+);
+check(
+    'motionValues round-trip 5-point data',
+    sampleState.motionValues.every((rows, p) =>
+        rows.every((points, s) => points.every((value, point) => value === decodedState.motionValues[p][s][point]))
     )
 );
+check('step on / active step / transpose func round-trip',
+    sampleState.stepOn.every((on, step) => on === decodedState.stepOn[step])
+    && sampleState.activeStep.every((on, step) => on === decodedState.activeStep[step])
+    && sampleState.transposeFuncOn.every((on, step) => on === decodedState.transposeFuncOn[step])
+);
+check('FUNC fields round-trip', JSON.stringify(decodedState.func) === JSON.stringify(sampleState.func));
 
 // ---------------------------------------------------------------------------
 // 5) ステップ並べ替え: ノート/タイとモーションが同じ順列で移動すること
@@ -138,7 +174,12 @@ check(
 );
 check(
     'motion values follow the step permutation',
-    reordered.motionValues.every((values, parameter) => values.every((value, step) => value === sampleState.motionValues[parameter][reversedOrder[step]]))
+    reordered.motionValues.every((values, parameter) => values.every((points, step) =>
+        points.every((value, point) => value === sampleState.motionValues[parameter][reversedOrder[step]][point])))
+);
+check('step flags follow the permutation',
+    reordered.stepOn.every((on, step) => on === sampleState.stepOn[reversedOrder[step]])
+    && reordered.activeStep.every((on, step) => on === sampleState.activeStep[reversedOrder[step]])
 );
 check('program/velocity/gate stay unchanged', reordered.programNo === sampleState.programNo
     && reordered.velocity === sampleState.velocity && reordered.gatePercent === sampleState.gatePercent);
@@ -157,8 +198,8 @@ check('reversed min/max are normalized', reversedRange[0] === 30 && reversedRang
 // ---------------------------------------------------------------------------
 console.log('[6] Step input Rest / Tie');
 const editingNotes: SequenceNote[] = [
-    { pitch: 60, startStep: 0, length: 4 },
-    { pitch: 64, startStep: 1, length: 1 },
+    createSequenceNote(60, 0, 4, 110, 80),
+    createSequenceNote(64, 1, 1, 90, 50),
 ];
 const rested = clearSequenceStep(editingNotes, 2);
 check('Rest clears only the target step', JSON.stringify(activePitches({ ...sampleState, notes: rested }, 2)) === '[]');

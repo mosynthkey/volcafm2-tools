@@ -1,9 +1,15 @@
+import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import { createEmptySequenceState, MOTION_PARAM_COUNT, NUM_OF_STEPS, NUM_OF_VOICES_PER_STEP, type SequenceNote, type SequenceState } from '../types/sequence';
+import { useMidiStore } from '@/stores/midiStore';
+import {
+    createEmptySequenceState, createMotionGrid, createMotionPoints, createMotionStepEnabled,
+    createSequenceNote, MOTION_PARAM_COUNT, NUM_OF_STEPS, NUM_OF_VOICES_PER_STEP,
+    normalizeSequenceState, type SequenceNote, type SequenceState,
+} from '../types/sequence';
 import { encodeCurrentSequenceDump } from '../utils/sequenceCodec';
 import { createRandomStepOrder, reorderSequenceSteps } from '../utils/sequenceRandomizer';
 import { clearSequenceStep, tieSequenceStep } from '../utils/sequenceStepEditing';
+import { extractStepNotes, parseSmf } from '../utils/smfImport';
 
 export const useSequencerStore = defineStore('sequencer', () => {
     const initial = createEmptySequenceState();
@@ -13,10 +19,52 @@ export const useSequencerStore = defineStore('sequencer', () => {
     const gatePercent = ref(initial.gatePercent);
     const notes = ref<SequenceNote[]>(initial.notes);
     const motionEnabled = ref<boolean[]>(initial.motionEnabled);
-    const motionValues = ref<number[][]>(initial.motionValues);
+    const motionStepEnabled = ref<boolean[][]>(initial.motionStepEnabled);
+    const motionValues = ref<number[][][]>(initial.motionValues);
+    const stepOn = ref<boolean[]>(initial.stepOn);
+    const activeStep = ref<boolean[]>(initial.activeStep);
+    const transposeFuncOn = ref<boolean[]>(initial.transposeFuncOn);
+    const func = ref(initial.func);
+    const selectedNoteKey = ref<{ pitch: number; startStep: number } | null>(null);
+    const motionIndex = ref(0);
+    const stepInputActive = ref(false);
+    const stepCursor = ref(0);
+    const chordBuffer = ref(new Set<number>());
+    const heldNotes = ref(new Set<number>());
+    const showLibrary = ref(false);
+    const showRandomizeDialog = ref(false);
+    const showCaptureDialog = ref(false);
+    const showImportDialog = ref(false);
+    const importError = ref<string | null>(null);
+    const smfBarOffset = ref(1);
+    let pendingSmfFile: File | null = null;
+
+    const toState = (): SequenceState => ({
+        programNo: programNo.value,
+        velocity: velocity.value,
+        gatePercent: gatePercent.value,
+        notes: notes.value,
+        motionEnabled: motionEnabled.value,
+        motionStepEnabled: motionStepEnabled.value,
+        motionValues: motionValues.value,
+        stepOn: stepOn.value,
+        activeStep: activeStep.value,
+        transposeFuncOn: transposeFuncOn.value,
+        func: func.value,
+    });
 
     const noteAt = (step: number, pitch: number) =>
         notes.value.find(n => n.pitch === pitch && n.startStep <= step && n.startStep + n.length - 1 >= step);
+
+    const selectedNote = () => {
+        const key = selectedNoteKey.value;
+        if (!key) return null;
+        return notes.value.find(note => note.pitch === key.pitch && note.startStep === key.startStep) ?? null;
+    };
+
+    const selectNote = (note: SequenceNote | null) => {
+        selectedNoteKey.value = note ? { pitch: note.pitch, startStep: note.startStep } : null;
+    };
 
     const stepNoteCount = (step: number) =>
         notes.value.filter(n => n.startStep <= step && n.startStep + n.length - 1 >= step).length;
@@ -24,14 +72,12 @@ export const useSequencerStore = defineStore('sequencer', () => {
     const removeNote = (target: SequenceNote) => {
         const idx = notes.value.indexOf(target);
         if (idx >= 0) notes.value.splice(idx, 1);
+        if (selectedNoteKey.value?.pitch === target.pitch && selectedNoteKey.value.startStep === target.startStep) {
+            selectedNoteKey.value = null;
+        }
     };
 
-    /**
-     * pitchのstartStep〜startStep+length-1にまたがるノート(=タイで繋いだ和音)を追加する。
-     * 同じpitchで範囲が重なる既存ノートは置き換える。範囲内のいずれかのステップで
-     * 既に6音(NUM_OF_VOICES_PER_STEP)に達している場合は追加できず false を返す。
-     */
-    const addNote = (pitch: number, startStep: number, length: number): boolean => {
+    const addNote = (pitch: number, startStep: number, length: number, noteVelocity?: number, noteGate?: number): boolean => {
         const start = Math.max(0, Math.min(NUM_OF_STEPS - 1, startStep));
         const len = Math.max(1, Math.min(NUM_OF_STEPS - start, length));
         const end = start + len - 1;
@@ -46,23 +92,71 @@ export const useSequencerStore = defineStore('sequencer', () => {
             if (count >= NUM_OF_VOICES_PER_STEP) return false;
         }
 
-        withoutOverlap.push({ pitch, startStep: start, length: len });
+        const created = createSequenceNote(
+            pitch, start, len, noteVelocity ?? velocity.value, noteGate ?? gatePercent.value,
+        );
+        withoutOverlap.push(created);
         notes.value = withoutOverlap;
         return true;
     };
 
-    const setMotionValue = (paramIndex: number, step: number, value: number) => {
-        motionValues.value[paramIndex][step] = Math.max(0, Math.min(127, Math.round(value)));
+    const setMotionValue = (paramIndex: number, step: number, value: number, point?: number) => {
+        const clamped = Math.max(0, Math.min(127, Math.round(value)));
+        const current = motionValues.value[paramIndex][step] ?? createMotionPoints(64);
+        motionValues.value[paramIndex][step] = point === undefined
+            ? createMotionPoints(clamped)
+            : current.map((existing, index) => index === point ? clamped : existing);
+        func.value.motionOn = true;
+    };
+
+    const toggleMotionStep = (paramIndex: number, step: number) => {
+        motionStepEnabled.value[paramIndex][step] = !motionStepEnabled.value[paramIndex][step];
+        if (motionStepEnabled.value[paramIndex][step]) {
+            motionEnabled.value[paramIndex] = true;
+            func.value.motionOn = true;
+        }
+    };
+
+    const toggleStepOn = (step: number) => {
+        stepOn.value[step] = !stepOn.value[step];
+    };
+
+    const toggleActiveStep = (step: number) => {
+        setActiveStep(step, !activeStep.value[step]);
+    };
+
+    const toggleTransposeFunc = (step: number) => {
+        transposeFuncOn.value[step] = !transposeFuncOn.value[step];
+    };
+
+    const setStepOn = (step: number, value: boolean) => {
+        stepOn.value[step] = value;
+    };
+
+    const setActiveStep = (step: number, value: boolean) => {
+        if (!value && activeStep.value[step] && activeStep.value.filter(Boolean).length <= 1) return;
+        activeStep.value[step] = value;
+    };
+
+    const setTransposeFunc = (step: number, value: boolean) => {
+        transposeFuncOn.value[step] = value;
     };
 
     const clearAll = () => {
         notes.value = [];
+        selectedNoteKey.value = null;
         motionEnabled.value = Array.from({ length: MOTION_PARAM_COUNT }, () => false);
-        motionValues.value = Array.from({ length: MOTION_PARAM_COUNT }, () => Array.from({ length: NUM_OF_STEPS }, () => 64));
+        motionStepEnabled.value = createMotionStepEnabled(true);
+        motionValues.value = createMotionGrid(64);
+        stepOn.value = Array.from({ length: NUM_OF_STEPS }, () => true);
+        activeStep.value = Array.from({ length: NUM_OF_STEPS }, () => true);
+        transposeFuncOn.value = Array.from({ length: NUM_OF_STEPS }, () => false);
+        func.value = createEmptySequenceState().func;
     };
 
     const insertRest = (step: number) => {
         notes.value = clearSequenceStep(notes.value, step);
+        selectedNoteKey.value = null;
     };
 
     const insertTie = (step: number): boolean => {
@@ -72,35 +166,140 @@ export const useSequencerStore = defineStore('sequencer', () => {
         return true;
     };
 
-    const loadFromDecoded = (state: SequenceState) => {
-        programNo.value = state.programNo;
-        velocity.value = state.velocity;
-        gatePercent.value = state.gatePercent;
-        notes.value = state.notes;
-        motionEnabled.value = state.motionEnabled;
-        motionValues.value = state.motionValues;
+    const setProgramNo = (value: number) => {
+        programNo.value = Math.max(0, Math.min(63, Math.round(value)));
+    };
+
+    const importNotes = (next: SequenceNote[], defaultVelocity: number) => {
+        notes.value = [];
+        selectedNoteKey.value = null;
+        velocity.value = defaultVelocity;
+        for (const note of next) {
+            addNote(note.pitch, note.startStep, note.length, note.velocity, note.gatePercent);
+        }
+    };
+
+    const loadFromDecoded = (state: SequenceState | Partial<SequenceState>) => {
+        const normalized = normalizeSequenceState(state);
+        programNo.value = normalized.programNo;
+        velocity.value = normalized.velocity;
+        gatePercent.value = normalized.gatePercent;
+        notes.value = normalized.notes;
+        motionEnabled.value = normalized.motionEnabled;
+        motionStepEnabled.value = normalized.motionStepEnabled;
+        motionValues.value = normalized.motionValues;
+        stepOn.value = normalized.stepOn;
+        activeStep.value = normalized.activeStep;
+        transposeFuncOn.value = normalized.transposeFuncOn;
+        func.value = normalized.func;
+        selectedNoteKey.value = null;
     };
 
     const randomizeSteps = (random: () => number = Math.random) => {
-        const state = reorderSequenceSteps({
-            programNo: programNo.value,
-            velocity: velocity.value,
-            gatePercent: gatePercent.value,
-            notes: notes.value,
-            motionEnabled: motionEnabled.value,
-            motionValues: motionValues.value,
-        }, createRandomStepOrder(random));
-        loadFromDecoded(state);
+        loadFromDecoded(reorderSequenceSteps(toState(), createRandomStepOrder(random)));
     };
 
-    const buildSysEx = (channel = 0) => encodeCurrentSequenceDump({
-        programNo: programNo.value,
-        velocity: velocity.value,
-        gatePercent: gatePercent.value,
-        notes: notes.value,
-        motionEnabled: motionEnabled.value,
-        motionValues: motionValues.value,
-    }, channel);
+    const buildSysEx = (channel = 0) => encodeCurrentSequenceDump(toState(), channel);
+
+    const sendToDevice = () => {
+        useMidiStore().sendCurrentSequenceDump(buildSysEx());
+    };
+
+    const canInsertTie = computed(() => stepCursor.value > 0 && stepNoteCount(stepCursor.value - 1) > 0);
+
+    const clearStepInputBuffers = () => {
+        heldNotes.value = new Set();
+        chordBuffer.value = new Set();
+    };
+
+    const finishStepInput = () => {
+        stepInputActive.value = false;
+        clearStepInputBuffers();
+        sendToDevice();
+    };
+
+    const advanceStepInput = () => {
+        if (stepCursor.value === 15) finishStepInput();
+        else stepCursor.value++;
+    };
+
+    const handleStepNote = (note: number, on: boolean) => {
+        if (!stepInputActive.value) return;
+        if (on) {
+            heldNotes.value = new Set(heldNotes.value).add(note);
+            chordBuffer.value = new Set(chordBuffer.value).add(note);
+            return;
+        }
+        const nextHeld = new Set(heldNotes.value);
+        nextHeld.delete(note);
+        heldNotes.value = nextHeld;
+        if (nextHeld.size === 0 && chordBuffer.value.size > 0) {
+            for (const pitch of chordBuffer.value) addNote(pitch, stepCursor.value, 1);
+            chordBuffer.value = new Set();
+            advanceStepInput();
+        }
+    };
+
+    const toggleStepInput = () => {
+        stepInputActive.value = !stepInputActive.value;
+        if (stepInputActive.value) stepCursor.value = 0;
+        clearStepInputBuffers();
+    };
+
+    const insertStepRest = () => {
+        clearStepInputBuffers();
+        insertRest(stepCursor.value);
+        advanceStepInput();
+    };
+
+    const insertStepTie = () => {
+        clearStepInputBuffers();
+        if (insertTie(stepCursor.value)) advanceStepInput();
+    };
+
+    const selectStepInput = (step: number) => {
+        if (!stepInputActive.value) return;
+        clearStepInputBuffers();
+        stepCursor.value = Math.max(0, Math.min(15, step));
+    };
+
+    const confirmRandomize = () => {
+        randomizeSteps();
+        showRandomizeDialog.value = false;
+        sendToDevice();
+    };
+
+    const queueSmfImport = (file: File) => {
+        importError.value = null;
+        pendingSmfFile = file;
+        showImportDialog.value = true;
+    };
+
+    const cancelSmfImport = () => {
+        showImportDialog.value = false;
+        pendingSmfFile = null;
+    };
+
+    const confirmSmfImport = async () => {
+        const file = pendingSmfFile;
+        if (!file) return;
+        showImportDialog.value = false;
+        try {
+            const parsed = parseSmf(await file.arrayBuffer());
+            const { notes: imported, velocity: importedVelocity } = extractStepNotes(parsed, 4, Math.max(0, smfBarOffset.value - 1));
+            importNotes(imported, importedVelocity);
+            importError.value = null;
+        } catch (error) {
+            importError.value = String(error instanceof Error ? error.message : error);
+        } finally {
+            pendingSmfFile = null;
+        }
+    };
+
+    const loadPreset = (data: unknown) => {
+        loadFromDecoded(data as SequenceState);
+        sendToDevice();
+    };
 
     return {
         programNo,
@@ -108,17 +307,57 @@ export const useSequencerStore = defineStore('sequencer', () => {
         gatePercent,
         notes,
         motionEnabled,
+        motionStepEnabled,
         motionValues,
+        stepOn,
+        activeStep,
+        transposeFuncOn,
+        func,
+        selectedNoteKey,
+        motionIndex,
+        stepInputActive,
+        stepCursor,
+        chordBuffer,
+        showLibrary,
+        showRandomizeDialog,
+        showCaptureDialog,
+        showImportDialog,
+        importError,
+        smfBarOffset,
+        canInsertTie,
+        toState,
         noteAt,
+        selectedNote,
+        selectNote,
         stepNoteCount,
+        setProgramNo,
+        importNotes,
         addNote,
         removeNote,
         setMotionValue,
+        toggleMotionStep,
+        toggleStepOn,
+        toggleActiveStep,
+        toggleTransposeFunc,
+        setStepOn,
+        setActiveStep,
+        setTransposeFunc,
         clearAll,
         insertRest,
         insertTie,
         loadFromDecoded,
         randomizeSteps,
         buildSysEx,
+        sendToDevice,
+        handleStepNote,
+        toggleStepInput,
+        insertStepRest,
+        insertStepTie,
+        selectStepInput,
+        confirmRandomize,
+        queueSmfImport,
+        cancelSmfImport,
+        confirmSmfImport,
+        loadPreset,
     };
 });

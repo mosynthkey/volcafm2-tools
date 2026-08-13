@@ -21,8 +21,8 @@ const result = recorder.finish();
 
 assert.equal(result.clockCount, 96);
 assert.deepEqual(result.notes, [
-    { pitch: 60, startStep: 0, length: 1 },
-    { pitch: 64, startStep: 1, length: 2 },
+    { pitch: 60, startStep: 0, length: 1, velocity: 96, gatePercent: 83 },
+    { pitch: 64, startStep: 1, length: 2, velocity: 112, gatePercent: 100 },
 ]);
 assert.equal(result.velocity, 112);
 assert.ok(result.gatePercent >= 80 && result.gatePercent <= 100);
@@ -54,7 +54,7 @@ for (let i = 0; i < 12; i++) boundary.handleMessage(clock);
 boundary.handleMessage(new Uint8Array([0x80, 60, 0]));
 const boundaryResult = boundary.finish();
 assert.deepEqual(boundaryResult.notes, [
-    { pitch: 60, startStep: 0, length: 1 },
-    { pitch: 60, startStep: 1, length: 1 },
+    { pitch: 60, startStep: 0, length: 1, velocity: 100, gatePercent: 100 },
+    { pitch: 60, startStep: 1, length: 1, velocity: 100, gatePercent: 100 },
 ]);
 console.log('  repeated note on an exact step boundary: OK');

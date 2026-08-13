@@ -4,7 +4,7 @@
       <v-icon size="small" class="mr-2">{{ expanded ? 'mdi-chevron-down' : 'mdi-chevron-up' }}</v-icon>
       <span class="log-title">{{ t('app.log') }} ({{ midiStore.logs.length }})</span>
       <v-spacer />
-      <v-btn size="small" variant="text" @click.stop="midiStore.clearLogs">{{ t('sequence.clear') }}</v-btn>
+      <v-btn size="small" variant="text" @click.stop="midiStore.clearLogs">{{ t('common.clear') }}</v-btn>
     </div>
     <textarea v-if="expanded" ref="logBoxRef" class="log-box" readonly :value="logText"></textarea>
   </div>

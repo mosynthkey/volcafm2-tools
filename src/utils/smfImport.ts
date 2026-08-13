@@ -157,7 +157,13 @@ export const extractStepNotes = (
         if (startStep < 0 || startStep > 15) continue;
         const rawEndStep = Math.round((n.endTick - windowStartTick) / ticksPerStep) - 1;
         const endStep = Math.min(15, Math.max(startStep, rawEndStep));
-        notes.push({ pitch: n.pitch, startStep, length: endStep - startStep + 1 });
+        notes.push({
+            pitch: n.pitch,
+            startStep,
+            length: endStep - startStep + 1,
+            velocity: Math.max(1, Math.min(127, n.velocity)),
+            gatePercent: 80,
+        });
         velocitySum += n.velocity;
     }
 

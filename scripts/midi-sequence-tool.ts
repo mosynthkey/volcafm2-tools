@@ -18,7 +18,7 @@ import {
     encodeCurrentSequenceDump,
     unpack7to8,
 } from '../src/utils/sequenceCodec';
-import { MOTION_PARAM_COUNT, NUM_OF_STEPS, type SequenceNote, type SequenceState } from '../src/types/sequence';
+import { MOTION_PARAM_COUNT, NUM_OF_STEPS, createEmptySequenceState, createSequenceNote, type SequenceNote, type SequenceState } from '../src/types/sequence';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -200,26 +200,26 @@ const cmdRead = async () => {
         console.log(`  note pitch=${n.pitch} startStep=${n.startStep + 1} length=${n.length}${n.length > 1 ? ' (tied)' : ''}`);
     });
     r.motionEnabled.forEach((enabled, p) => {
-        if (enabled) console.log(`  motion[${p}] enabled: values=[${r.motionValues[p].join(',')}]`);
+        if (enabled) console.log(`  motion[${p}] enabled: values=[${r.motionValues[p].map(points => points[0]).join(',')}]`);
     });
     process.exit(0);
 };
 
 const buildTestState = (): SequenceState => ({
+    ...createEmptySequenceState(),
     programNo: 5,
     velocity: 100,
     gatePercent: 80,
     notes: [
-        // ステップをつなげた和音 (タイ): 0〜3
-        { pitch: 60, startStep: 0, length: 4 },
-        { pitch: 64, startStep: 0, length: 4 },
-        { pitch: 67, startStep: 0, length: 4 },
-        { pitch: 72, startStep: 4, length: 1 },
-        { pitch: 65, startStep: 8, length: 2 },
+        createSequenceNote(60, 0, 4),
+        createSequenceNote(64, 0, 4),
+        createSequenceNote(67, 0, 4),
+        createSequenceNote(72, 4, 1),
+        createSequenceNote(65, 8, 2),
     ],
     motionEnabled: Array.from({ length: MOTION_PARAM_COUNT }, (_, i) => i === 2),
     motionValues: Array.from({ length: MOTION_PARAM_COUNT }, (_, p) =>
-        Array.from({ length: NUM_OF_STEPS }, (_, s) => (p === 2 ? (s * 8) % 128 : 64))
+        Array.from({ length: NUM_OF_STEPS }, (_, s) => Array.from({ length: 5 }, () => (p === 2 ? (s * 8) % 128 : 64)))
     ),
 });
 
@@ -307,7 +307,7 @@ const cmdRoundtrip = async () => {
     sent.motionEnabled.forEach((en, p) => {
         check(`motion[${p}] enabled`, r.motionEnabled[p] === en);
         if (en) {
-            check(`motion[${p}] values`, sent.motionValues[p].every((v, s) => v === r.motionValues[p][s]));
+            check(`motion[${p}] values`, sent.motionValues[p].every((points, s) => points.every((value, point) => value === r.motionValues[p][s][point])));
         }
     });
 

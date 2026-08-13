@@ -97,6 +97,12 @@ export class MidiSequenceCapture {
         );
         const finalStepTicks = ((durationTicks - 1) % this.clocksPerStep) + 1;
         this.gateRatios.push(finalStepTicks / this.clocksPerStep);
-        this.capturedNotes.push({ pitch, startStep, length });
+        this.capturedNotes.push({
+            pitch,
+            startStep,
+            length,
+            velocity: Math.max(1, Math.min(127, active.velocity)),
+            gatePercent: Math.max(1, Math.min(100, Math.round((finalStepTicks / this.clocksPerStep) * 100))),
+        });
     }
 }

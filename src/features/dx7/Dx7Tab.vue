@@ -1,16 +1,15 @@
 <template>
   <v-container>
-    <div
-      v-if="midiStore.connectionState === MIDIConnectionState.DETECTED || midiStore.connectionState === MIDIConnectionState.RECEIVING || midiStore.connectionState === MIDIConnectionState.RECEIVED">
+    <div v-if="midiStore.isDeviceReady">
       <v-card v-for="(cartridge, index) in 2" :key="index" class="mb-4 pa-4" style="margin: 0 auto;">
         <v-row align="center">
           <v-col>
             <v-card-title>{{ t('dx7.cartridge', { count: index + 1 }) }}</v-card-title>
           </v-col>
           <v-col class="text-right">
-            <v-btn @click="midiStore.downloadSysEx(index === 0)"
-              :disabled="midiStore.connectionState !== MIDIConnectionState.RECEIVED"
-              :class="{ dimmed: midiStore.connectionState !== MIDIConnectionState.RECEIVED }">
+            <v-btn @click="downloadCartridge(index)"
+              :disabled="!midiStore.isLibraryReady"
+              :class="{ dimmed: !midiStore.isLibraryReady }">
               {{ t('dx7.download') }}
               <Download :size="16" class="ml-1" />
             </v-btn>
@@ -30,12 +29,17 @@
 </template>
 
 <script setup lang="ts">
-import { useMidiStore, MIDIConnectionState } from '@/stores/midiStore';
+import { useMidiStore } from '@/stores/midiStore';
+import { downloadBinary } from '@/utils/downloadBinary';
 import { Download } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 
 const midiStore = useMidiStore();
 const { t } = useI18n();
+const downloadCartridge = (index: number) => {
+  const bank = index === 0 ? 0 : 1;
+  downloadBinary(midiStore.dx7CartridgeBytes(bank), `volca_fm2_dx7_cartridge_${index + 1}.syx`);
+};
 </script>
 
 <style scoped>

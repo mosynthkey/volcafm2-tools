@@ -1,23 +1,23 @@
 <template>
   <div class="operator-overview">
-    <article v-for="(operator, index) in operators" :key="index" class="operator-summary" :class="{ off: !operator.enabled }">
+    <article v-for="(operator, index) in program.operators" :key="index" class="operator-summary" :class="{ off: !operator.enabled }">
       <button type="button" class="operator-summary-heading" :aria-label="t('sound.operator', { count: index + 1 })"
-        @click="$emit('select', index)">
+        @click="sound.selectOperator(index)">
         <strong>{{ index + 1 }}</strong>
         <span>{{ frequencyLabel(operator) }}</span>
-        <i :class="{ enabled: operator.enabled }">{{ operator.enabled ? 'ON' : 'OFF' }}</i>
+        <i :class="{ enabled: operator.enabled }">{{ operator.enabled ? t('common.on') : t('common.off') }}</i>
       </button>
 
       <div class="mini-graphs">
         <div>
-          <span>EG</span>
+          <span>{{ t('sound.eg') }}</span>
           <svg viewBox="0 0 180 62" aria-hidden="true">
             <path class="graph-grid" d="M0 31H180M45 0V62M90 0V62M135 0V62" />
             <polyline class="graph-line" :points="envelopePoints(operator)" />
           </svg>
         </div>
         <div>
-          <span>Keyboard Scaling</span>
+          <span>{{ t('sound.keyboardScaling') }}</span>
           <svg viewBox="0 0 180 62" aria-hidden="true">
             <path class="graph-grid" d="M0 31H180M90 0V62" />
             <path class="graph-line" :d="scalingPath(operator)" />
@@ -40,15 +40,15 @@
       </dl>
 
       <div class="eg-values">
-        <span>Level</span><button v-for="(value, valueIndex) in operator.egLevels" :key="`l${valueIndex}`" type="button"
-          class="drag-value" :aria-label="`Level ${valueIndex + 1} ${value}`"
+        <span>{{ t('sound.levelLabel') }}</span><button v-for="(value, valueIndex) in operator.egLevels" :key="`l${valueIndex}`" type="button"
+          class="drag-value" :aria-label="t('sound.level', { count: valueIndex + 1 }) + ` ${value}`"
           @pointerdown="startDrag($event, index, 'egLevels', 0, 99, value, valueIndex)" @pointermove="moveDrag"
           @pointerup="endDrag" @pointercancel="endDrag"
           @keydown="adjustWithKeyboard($event, index, 'egLevels', 0, 99, value, valueIndex)">
           <span>{{ value }}</span><MiniKnob :value="value" :min="0" :max="99" />
         </button>
-        <span>Rate</span><button v-for="(value, valueIndex) in operator.egRates" :key="`r${valueIndex}`" type="button"
-          class="drag-value" :aria-label="`Rate ${valueIndex + 1} ${value}`"
+        <span>{{ t('sound.rateLabel') }}</span><button v-for="(value, valueIndex) in operator.egRates" :key="`r${valueIndex}`" type="button"
+          class="drag-value" :aria-label="t('sound.rate', { count: valueIndex + 1 }) + ` ${value}`"
           @pointerdown="startDrag($event, index, 'egRates', 0, 99, value, valueIndex)" @pointermove="moveDrag"
           @pointerup="endDrag" @pointercancel="endDrag"
           @keydown="adjustWithKeyboard($event, index, 'egRates', 0, 99, value, valueIndex)">
@@ -61,16 +61,15 @@
 
 <script setup lang="ts">
 import { defineComponent, h, ref } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import type { SoundOperator } from '@/types/soundProgram';
+import { useSoundStore } from '@/stores/soundStore';
 import { dx7EnvelopePoints } from '@/utils/dx7Envelope';
 import { formatOperatorFrequency } from '@/utils/operatorFrequency';
 
-defineProps<{ operators: SoundOperator[] }>();
-const emit = defineEmits<{
-  select: [operatorIndex: number];
-  update: [payload: { operatorIndex: number; field: keyof SoundOperator; value: number; arrayIndex?: number }];
-}>();
+const sound = useSoundStore();
+const { program } = storeToRefs(sound);
 const { t } = useI18n();
 const curveNames = ['−LN', '−EX', '+EX', '+LN'];
 const curvePaths = ['M3 4 L33 15', 'M3 4 C17 4 29 7 33 15', 'M3 15 C17 15 29 12 33 4', 'M3 15 L33 4'];
@@ -104,7 +103,7 @@ const MiniKnob = defineComponent({
 const dragState = ref<null | { operatorIndex: number; field: keyof SoundOperator; min: number; max: number; startY: number; startValue: number; arrayIndex?: number }>(null);
 
 const setValue = (operatorIndex: number, field: keyof SoundOperator, min: number, max: number, value: number, arrayIndex?: number) => {
-  emit('update', { operatorIndex, field, value: Math.max(min, Math.min(max, Math.round(value))), arrayIndex });
+  sound.updateOperator({ operatorIndex, field, value: Math.max(min, Math.min(max, Math.round(value))), arrayIndex });
 };
 const startDrag = (event: PointerEvent, operatorIndex: number, field: keyof SoundOperator, min: number, max: number, value: number, arrayIndex?: number) => {
   dragState.value = { operatorIndex, field, min, max, startY: event.clientY, startValue: value, arrayIndex };
@@ -144,18 +143,18 @@ const scalingPath = (operator: SoundOperator) => {
   return `M4 ${leftY}${curveSegment(4, leftY, breakX, centerY, operator.leftCurve)}${curveSegment(breakX, centerY, 176, rightY, operator.rightCurve)}`;
 };
 const parameters = (operator: SoundOperator) => [
-  { label: 'Detune', value: operator.detune - 7, rawValue: operator.detune, field: 'detune' as const, min: 0, max: 14 },
-  { label: 'Coarse', value: operator.coarse, rawValue: operator.coarse, field: 'coarse' as const, min: 0, max: 31 },
-  { label: 'Fine', value: operator.fine, rawValue: operator.fine, field: 'fine' as const, min: 0, max: 99 },
-  { label: 'Output', value: operator.outputLevel, rawValue: operator.outputLevel, field: 'outputLevel' as const, min: 0, max: 99 },
-  { label: 'Amp Mod', value: operator.ampModSensitivity, rawValue: operator.ampModSensitivity, field: 'ampModSensitivity' as const, min: 0, max: 3 },
-  { label: 'Key Vel', value: operator.keyVelocitySensitivity, rawValue: operator.keyVelocitySensitivity, field: 'keyVelocitySensitivity' as const, min: 0, max: 7 },
-  { label: 'Rate Scale', value: operator.rateScaling, rawValue: operator.rateScaling, field: 'rateScaling' as const, min: 0, max: 7 },
-  { label: 'Break', value: operator.breakPoint, rawValue: operator.breakPoint, field: 'breakPoint' as const, min: 0, max: 99 },
-  { label: 'L Depth', value: operator.leftDepth, rawValue: operator.leftDepth, field: 'leftDepth' as const, min: 0, max: 99 },
-  { label: 'R Depth', value: operator.rightDepth, rawValue: operator.rightDepth, field: 'rightDepth' as const, min: 0, max: 99 },
-  { label: 'L Curve', value: curveNames[operator.leftCurve], curve: operator.leftCurve, direction: 'right' },
-  { label: 'R Curve', value: curveNames[operator.rightCurve], curve: operator.rightCurve, direction: 'left' },
+  { label: t('sound.detune'), value: operator.detune - 7, rawValue: operator.detune, field: 'detune' as const, min: 0, max: 14 },
+  { label: t('sound.coarse'), value: operator.coarse, rawValue: operator.coarse, field: 'coarse' as const, min: 0, max: 31 },
+  { label: t('sound.fine'), value: operator.fine, rawValue: operator.fine, field: 'fine' as const, min: 0, max: 99 },
+  { label: t('sound.compact.output'), value: operator.outputLevel, rawValue: operator.outputLevel, field: 'outputLevel' as const, min: 0, max: 99 },
+  { label: t('sound.compact.ampMod'), value: operator.ampModSensitivity, rawValue: operator.ampModSensitivity, field: 'ampModSensitivity' as const, min: 0, max: 3 },
+  { label: t('sound.compact.keyVel'), value: operator.keyVelocitySensitivity, rawValue: operator.keyVelocitySensitivity, field: 'keyVelocitySensitivity' as const, min: 0, max: 7 },
+  { label: t('sound.compact.rateScale'), value: operator.rateScaling, rawValue: operator.rateScaling, field: 'rateScaling' as const, min: 0, max: 7 },
+  { label: t('sound.compact.break'), value: operator.breakPoint, rawValue: operator.breakPoint, field: 'breakPoint' as const, min: 0, max: 99 },
+  { label: t('sound.compact.leftDepth'), value: operator.leftDepth, rawValue: operator.leftDepth, field: 'leftDepth' as const, min: 0, max: 99 },
+  { label: t('sound.compact.rightDepth'), value: operator.rightDepth, rawValue: operator.rightDepth, field: 'rightDepth' as const, min: 0, max: 99 },
+  { label: t('sound.compact.leftCurve'), value: curveNames[operator.leftCurve], curve: operator.leftCurve, direction: 'right' },
+  { label: t('sound.compact.rightCurve'), value: curveNames[operator.rightCurve], curve: operator.rightCurve, direction: 'left' },
 ];
 </script>
 

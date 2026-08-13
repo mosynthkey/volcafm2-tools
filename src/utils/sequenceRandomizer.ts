@@ -1,4 +1,6 @@
-import { NUM_OF_STEPS, type SequenceNote, type SequenceState } from '../types/sequence';
+import {
+    NUM_OF_STEPS, createSequenceNote, type SequenceNote, type SequenceState,
+} from '../types/sequence';
 
 export const createRandomStepOrder = (random: () => number = Math.random): number[] => {
     const order = Array.from({ length: NUM_OF_STEPS }, (_, step) => step);
@@ -11,6 +13,11 @@ export const createRandomStepOrder = (random: () => number = Math.random): numbe
 
 const isActiveAt = (note: SequenceNote, step: number) =>
     note.startStep <= step && note.startStep + note.length > step;
+
+const attrsAt = (notes: SequenceNote[], pitch: number, step: number) => {
+    const note = notes.find(candidate => candidate.pitch === pitch && isActiveAt(candidate, step));
+    return { velocity: note?.velocity ?? 100, gatePercent: note?.gatePercent ?? 80 };
+};
 
 export const reorderSequenceSteps = (state: SequenceState, order: number[]): SequenceState => {
     if (order.length !== NUM_OF_STEPS || new Set(order).size !== NUM_OF_STEPS
@@ -27,18 +34,23 @@ export const reorderSequenceSteps = (state: SequenceState, order: number[]): Seq
                 && state.notes.some(note => note.pitch === pitch && isActiveAt(note, order[newStep]));
             if (active && runStart < 0) runStart = newStep;
             if (!active && runStart >= 0) {
-                reorderedNotes.push({ pitch, startStep: runStart, length: newStep - runStart });
+                const attrs = attrsAt(state.notes, pitch, order[runStart]);
+                reorderedNotes.push(createSequenceNote(pitch, runStart, newStep - runStart, attrs.velocity, attrs.gatePercent));
                 runStart = -1;
             }
         }
     }
 
+    const reorderFlags = (flags: boolean[]) => order.map(oldStep => flags[oldStep]);
     return {
-        programNo: state.programNo,
-        velocity: state.velocity,
-        gatePercent: state.gatePercent,
+        ...state,
         notes: reorderedNotes,
         motionEnabled: [...state.motionEnabled],
-        motionValues: state.motionValues.map(values => order.map(oldStep => values[oldStep])),
+        motionStepEnabled: state.motionStepEnabled.map(flags => reorderFlags(flags)),
+        motionValues: state.motionValues.map(values => order.map(oldStep => [...values[oldStep]])),
+        stepOn: reorderFlags(state.stepOn),
+        activeStep: reorderFlags(state.activeStep),
+        transposeFuncOn: reorderFlags(state.transposeFuncOn),
+        func: { ...state.func },
     };
 };

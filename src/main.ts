@@ -7,6 +7,7 @@
 // Plugins
 import { registerPlugins } from '@/plugins'
 import { createPinia } from 'pinia'
+import '@/styles/volca.css'
 
 // Components
 import App from './App.vue'

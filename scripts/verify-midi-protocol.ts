@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { createMidiMessageRouter } from '../src/midi/midiMessageRouter'
+import { createSysexAssembler } from '../src/midi/sysexAssembler'
+import { buildDx7Cartridge } from '../src/midi/dx7Cartridge'
 import { createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry, createProgramRequest,
   decodeCurrentVoice, isCurrentVoiceDump, unpackProgramDump } from '../src/midi/volcaFm2Protocol'
 import { loadProgramReferences, matchCurrentVoice } from '../src/midi/programLoader'
@@ -37,5 +39,17 @@ assert.equal(matchCurrentVoice(voice.slice(0, 128), programs, names).programNo, 
 const received = new Set<number>([0]); const requests: number[] = []
 const missing = await loadProgramReferences({ hasProgram: program => received.has(program), request: program => { requests.push(program); received.add(program) }, waitFor: async program => received.has(program), log: () => {} })
 assert.deepEqual(missing, []); assert.equal(requests.length, 63)
+
+const assembler = createSysexAssembler()
+assert.equal(assembler.isChannelMessage(new Uint8Array([0x90, 60, 100])), true)
+const first = assembler.push(new Uint8Array([0xf0, 0x42, 0x30]))
+const second = assembler.push(new Uint8Array([0x00, 0xf8, 0x01, 0xf7]))
+assert.deepEqual([...first], [])
+assert.deepEqual([...second[0]], [0xf0, 0x42, 0x30, 0x00, 0x01, 0xf7])
+
+const cartridge = buildDx7Cartridge([new Uint8Array([1, 2]), new Uint8Array([3])])
+assert.deepEqual([...cartridge.slice(0, 6)], [0xf0, 0x43, 0x00, 0x09, 0x20, 0x00])
+assert.equal(cartridge[cartridge.length - 1], 0xf7)
+assert.equal(cartridge[cartridge.length - 2], (0x100 - (1 + 2 + 3)) & 0x7f)
 
 console.log('MIDI protocol and message router verification passed.')

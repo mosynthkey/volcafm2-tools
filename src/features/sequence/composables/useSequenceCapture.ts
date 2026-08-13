@@ -1,15 +1,20 @@
-import { onUnmounted, ref } from 'vue'
-import type { ComposerTranslation } from 'vue-i18n'
-import type { useMidiStore } from '@/stores/midiStore'
-import type { useSequencerStore } from '@/stores/sequencerStore'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useMidiStore } from '@/stores/midiStore'
+import { useSequencerStore } from '@/stores/sequencerStore'
 import { MidiSequenceCapture, type SequencePlaybackResolution } from '@/utils/midiSequenceCapture'
 
-type MidiStore = ReturnType<typeof useMidiStore>
-type SequencerStore = ReturnType<typeof useSequencerStore>
 export type CapturePhase = 'ready' | 'capturing' | 'done' | 'error'
 
-export function useSequenceCapture(midi: MidiStore, sequence: SequencerStore, t: ComposerTranslation) {
-  const open = ref(false); const phase = ref<CapturePhase>('ready'); const progress = ref(0)
+export function useSequenceCapture() {
+  const midi = useMidiStore()
+  const sequence = useSequencerStore()
+  const { t } = useI18n()
+  const open = computed({
+    get: () => sequence.showCaptureDialog,
+    set: value => { sequence.showCaptureDialog = value },
+  })
+  const phase = ref<CapturePhase>('ready'); const progress = ref(0)
   const stepCount = ref(0); const noteCount = ref(0); const errorMessage = ref('')
   const resolution = ref<SequencePlaybackResolution>(1)
   let capture: MidiSequenceCapture | null = null; let unsubscribe: (() => void) | null = null
@@ -24,7 +29,10 @@ export function useSequenceCapture(midi: MidiStore, sequence: SequencerStore, t:
     if (clockTimeout) clearTimeout(clockTimeout); clockTimeout = null
     if (startDelay) clearTimeout(startDelay); startDelay = null
   }
-  const show = () => { phase.value = 'ready'; progress.value = 0; stepCount.value = 0; noteCount.value = 0; errorMessage.value = ''; open.value = true }
+  const resetView = () => {
+    phase.value = 'ready'; progress.value = 0; stepCount.value = 0; noteCount.value = 0; errorMessage.value = ''
+  }
+  watch(open, isOpen => { if (isOpen) resetView() })
   const fail = (message: string) => {
     log(`FAILED: ${message} clocks=${capture?.clockCount ?? 0} elapsed=${Math.round(performance.now() - startedAt)}ms`)
     clearResources(); midi.sendMidiMessage(new Uint8Array([0xfc])); errorMessage.value = message; phase.value = 'error'
@@ -33,7 +41,7 @@ export function useSequenceCapture(midi: MidiStore, sequence: SequencerStore, t:
     if (!capture || capture.clockCount === 0) return fail(t('sequence.captureNoClock'))
     const result = capture.finish(); clearResources(); midi.sendMidiMessage(new Uint8Array([0xfc])); sequence.notes = []
     let added = 0
-    for (const note of result.notes) if (sequence.addNote(note.pitch, note.startStep, note.length)) added++
+    for (const note of result.notes) if (sequence.addNote(note.pitch, note.startStep, note.length, note.velocity, note.gatePercent)) added++
     if (added > 0) { sequence.velocity = result.velocity; sequence.gatePercent = result.gatePercent }
     noteCount.value = added; stepCount.value = 16; progress.value = 100; phase.value = 'done'
     log(`DONE: clocks=${result.clockCount}, importedNotes=${added}, ignoredDuplicates=${ignoredDuplicates}`)
@@ -69,6 +77,5 @@ export function useSequenceCapture(midi: MidiStore, sequence: SequencerStore, t:
   }
   const cancel = () => { clearResources(); midi.sendMidiMessage(new Uint8Array([0xfc])); phase.value = 'ready'; open.value = false }
   onUnmounted(clearResources)
-  return { open, phase, progress, stepCount, noteCount, errorMessage, resolution, show, start, cancel }
+  return { open, phase, progress, stepCount, noteCount, errorMessage, resolution, start, cancel }
 }
-

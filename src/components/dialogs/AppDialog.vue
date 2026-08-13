@@ -4,7 +4,7 @@
     <v-card class="app-dialog" :class="cardClass">
       <div class="dialog-title-row">
         <v-card-title>{{ title }}</v-card-title>
-        <DialogCloseButton v-if="closable && !persistent" :label="t('common.close')"
+        <DialogCloseButton v-if="closable" :label="t('common.close')"
           @click="emit('update:modelValue', false)" />
       </div>
       <v-card-text><slot /></v-card-text>

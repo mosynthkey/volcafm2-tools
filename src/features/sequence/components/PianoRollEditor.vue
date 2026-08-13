@@ -1,84 +1,144 @@
 <template>
   <div class="roll">
-    <div class="roll-header"><div class="pitch-gutter" /><div v-for="step in 16" :key="step" class="step-cell header-cell" :class="{ beat:(step-1)%4===0,cursor:stepInputActive&&step-1===stepCursor }" role="button" tabindex="0" :aria-label="`Step ${step}`" @click="selectHeader(step-1)" @keydown.enter.prevent="selectHeader(step-1)">{{ step }}</div></div>
+    <div class="roll-header">
+      <div class="pitch-gutter" />
+      <div v-for="step in 16" :key="step" class="step-cell header-cell"
+        :class="{ beat:(step-1)%4===0, cursor:sequence.stepInputActive&&step-1===sequence.stepCursor, muted:!sequence.stepOn[step-1], skipped:!sequence.activeStep[step-1] }"
+        role="button" tabindex="0" :aria-label="t('sequence.stepAria', { count: step })" @click="selectHeader(step-1)" @keydown.enter.prevent="selectHeader(step-1)">{{ step }}</div>
+    </div>
+    <div class="roll-row step-flags" @pointerdown="startFlag('stepOn', $event)" @pointermove="moveFlag" @pointerup="endFlag" @pointercancel="endFlag">
+      <div class="pitch-gutter">{{ t('sequence.stepOn') }}</div>
+      <div v-for="step in 16" :key="step" class="step-cell flag-cell" :class="{ beat:(step-1)%4===0 }">
+        <button type="button" class="flag sound" :class="{ on: sequence.stepOn[step-1] }"
+          :aria-pressed="sequence.stepOn[step-1]" :aria-label="`${t('sequence.stepOn')} ${step}`"
+          @keydown.enter.prevent="sequence.toggleStepOn(step-1)" />
+      </div>
+    </div>
+    <div class="roll-row step-flags" @pointerdown="startFlag('activeStep', $event)" @pointermove="moveFlag" @pointerup="endFlag" @pointercancel="endFlag">
+      <div class="pitch-gutter">{{ t('sequence.activeStep') }}</div>
+      <div v-for="step in 16" :key="step" class="step-cell flag-cell" :class="{ beat:(step-1)%4===0 }">
+        <button type="button" class="flag" :class="{ on: sequence.activeStep[step-1] }"
+          :aria-pressed="sequence.activeStep[step-1]" :aria-label="`${t('sequence.activeStep')} ${step}`"
+          @keydown.enter.prevent="sequence.toggleActiveStep(step-1)" />
+      </div>
+    </div>
+    <div class="roll-row step-flags" @pointerdown="startFlag('transpose', $event)" @pointermove="moveFlag" @pointerup="endFlag" @pointercancel="endFlag">
+      <div class="pitch-gutter">{{ t('sequence.funcTranspose') }}</div>
+      <div v-for="step in 16" :key="step" class="step-cell flag-cell" :class="{ beat:(step-1)%4===0 }">
+        <button type="button" class="flag"
+          :class="{ on: sequence.transposeFuncOn[step-1] }"
+          :aria-pressed="sequence.transposeFuncOn[step-1]" :aria-label="`${t('sequence.funcTranspose')} ${step}`"
+          @keydown.enter.prevent="sequence.toggleTransposeFunc(step-1)" />
+      </div>
+    </div>
     <div class="roll-body"><div v-for="pitch in pitches" :key="pitch" class="roll-row" @pointerdown="rowDown(pitch,$event)" @pointermove="rowMove(pitch,$event)" @pointerup="rowUp(pitch,$event)">
       <div class="pitch-gutter" :class="{ 'black-key':isBlackKey(pitch) }">{{ noteLabel(pitch) }}</div>
       <div v-for="step in 16" :key="step" class="step-cell note-cell" :class="cellClass(step-1,pitch)"><span v-if="cellLabel(step-1,pitch)" class="note-cell__label">{{ cellLabel(step-1,pitch) }}</span></div>
     </div></div>
-    <div class="roll-row motion-row"><div class="pitch-gutter" /><div class="motion-bars" :class="{ disabled:!sequence.motionEnabled[motionIndex] }" @pointerdown="startMotion" @pointermove="moveMotion" @pointerup="draggingMotion=false" @pointerleave="draggingMotion=false">
-      <div v-for="step in 16" :key="step" class="step-cell motion-col" :class="{ beat:(step-1)%4===0,cursor:stepInputActive&&step-1===stepCursor }"><div class="motion-fill" :style="{height:(sequence.motionValues[motionIndex][step-1]/127*100)+'%'}" />
-        <input v-if="editingStep===step-1" v-model.number="editValue" class="motion-value-input" type="number" min="0" max="127" @pointerdown.stop @blur="commitMotion" @keydown.enter.prevent="commitMotion" @keydown.escape.prevent="editingStep=null" />
-        <span v-else class="motion-value" @pointerdown.stop @dblclick.stop="beginMotionEdit(step-1)">{{ sequence.motionValues[motionIndex][step-1] }}</span>
-      </div>
-    </div></div>
-  </div>
-  <div class="motion-control">
-    <div class="select-control"><label>{{ t('sequence.motionTarget') }}</label><v-select :model-value="motionIndex" :items="motionItems" item-title="label" item-value="value" density="compact" hide-details @update:model-value="emit('update:motionIndex',$event)" /></div>
-    <div class="motion-toggle"><span>On/Off</span><AppToggle v-model="sequence.motionEnabled[motionIndex]" :aria-label="t('sequence.motionEnable')" /></div>
-    <div class="motion-generator">
-      <span>{{ t('sequence.autoMotion') }}</span>
-      <v-menu v-model="generatorOpen" :close-on-content-click="false" location="top start" offset="8">
-        <template #activator="{ props: activatorProps }">
-          <button v-bind="activatorProps" type="button" class="generator-trigger" :aria-label="t('sequence.autoMotion')">
-            <WandSparkles :size="18" />{{ t('sequence.writeMotion') }}
-          </button>
-        </template>
-        <div class="pattern-menu" role="menu" :aria-label="t('sequence.autoMotion')">
-          <div class="pattern-settings">
-            <label><span>{{ t('sequence.motionMin') }}</span><input v-model.number="patternMin" type="number" min="0" max="127" /></label>
-            <label><span>{{ t('sequence.motionMax') }}</span><input v-model.number="patternMax" type="number" min="0" max="127" /></label>
-            <label><span>{{ t('sequence.motionCycles') }}</span><select v-model.number="patternCycles"><option v-for="cycle in 8" :key="cycle" :value="cycle">{{ cycle }}</option></select></label>
-          </div>
-          <div class="pattern-options">
-          <button v-for="pattern in motionPatterns" :key="pattern.key" type="button" class="pattern-option"
-            role="menuitem" @click="applyPattern(pattern.key)">
-            <svg viewBox="0 0 160 58" aria-hidden="true">
-              <path d="M0 29H160" class="pattern-axis" />
-              <polyline :points="patternPoints(pattern.key)" />
-            </svg>
-            <span>{{ pattern.label }}</span>
-          </button>
-          </div>
+    <div class="roll-row motion-row">
+      <div class="pitch-gutter">{{ t('sequence.motion') }}</div>
+      <div class="motion-bars" :class="{ disabled:!sequence.motionEnabled[sequence.motionIndex] }" @pointerdown="startMotion" @pointermove="moveMotion" @pointerup="draggingMotion=false" @pointerleave="draggingMotion=false">
+        <div v-for="step in 16" :key="step" class="step-cell motion-col"
+          :class="{ beat:(step-1)%4===0, cursor:sequence.stepInputActive&&step-1===sequence.stepCursor, off:!sequence.motionStepEnabled[sequence.motionIndex][step-1] }">
+          <template v-if="sequence.func.motionSmooth">
+            <div v-for="point in 5" :key="point" class="motion-fill point"
+              :style="{ height: (sequence.motionValues[sequence.motionIndex][step-1][point-1]/127*100)+'%', left: ((point-1)*20)+'%', width: '20%' }" />
+          </template>
+          <div v-else class="motion-fill" :style="{ height:(sequence.motionValues[sequence.motionIndex][step-1][0]/127*100)+'%' }" />
+          <input v-if="editingStep===step-1" v-model.number="editValue" class="motion-value-input" type="number"
+            :min="motionRange.min" :max="motionRange.max" @pointerdown.stop @blur="commitMotion"
+            @keydown.enter.prevent="commitMotion" @keydown.escape.prevent="editingStep=null" />
+          <span v-else class="motion-value" @pointerdown.stop @dblclick.stop="beginMotionEdit(step-1)">{{ formatStepValue(step-1) }}</span>
         </div>
-      </v-menu>
+      </div>
+    </div>
+    <div class="roll-row motion-step-row">
+      <div class="pitch-gutter">{{ t('sequence.motionStep') }}</div>
+      <button v-for="step in 16" :key="step" type="button" class="step-cell motion-step-cell"
+        :class="{ beat:(step-1)%4===0, on: sequence.motionStepEnabled[sequence.motionIndex][step-1] }"
+        :aria-pressed="sequence.motionStepEnabled[sequence.motionIndex][step-1]" :aria-label="`${t('sequence.motionStep')} ${step}`"
+        @click="sequence.toggleMotionStep(sequence.motionIndex, step-1)" />
     </div>
   </div>
+  <MotionControlPanel />
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { WandSparkles } from '@lucide/vue'
-import AppToggle from '@/components/AppToggle.vue'
-import { useMidiStore } from '@/stores/midiStore'
 import { useSequencerStore } from '@/stores/sequencerStore'
-import { MOTION_PARAM_KEYS } from '@/types/sequence'
 import { useNoteAudition } from '@/features/sequence/composables/useNoteAudition'
-import { createMotionPattern, MOTION_PATTERN_KEYS, previewMotionPattern, type MotionPatternKey } from '@/utils/motionPatterns'
+import MotionControlPanel from '@/features/sequence/components/MotionControlPanel.vue'
+import { displayToMidi, formatMotionValue, getMotionDisplayRange, midiToDisplay } from '@/utils/motionValue'
 
-const props = defineProps<{ stepInputActive:boolean; stepCursor:number; chordBuffer:Set<number>; motionIndex:number }>()
-const emit = defineEmits<{ 'select-step':[step:number]; 'update:motionIndex':[index:number] }>()
-const { t }=useI18n(); const sequence=useSequencerStore(); const midi=useMidiStore(); const { audition }=useNoteAudition(midi,sequence)
-const motionItems=MOTION_PARAM_KEYS.map((key,index)=>({label:t(`sequence.motionParams.${key}`),value:index})); const pitches=Array.from({length:61},(_,index)=>96-index)
-const motionPatterns=MOTION_PATTERN_KEYS.map(key=>({key,label:t(`sequence.motionPatterns.${key}`)}));const generatorOpen=ref(false)
-const patternMin=ref(0);const patternMax=ref(127);const patternCycles=ref(1)
+const { t }=useI18n(); const sequence=useSequencerStore(); const { audition }=useNoteAudition()
+const pitches=Array.from({length:61},(_,index)=>96-index)
+const motionRange=computed(()=>getMotionDisplayRange(sequence.motionIndex, sequence.func.transposeNote))
+const formatStepValue=(step:number)=>formatMotionValue(sequence.motionIndex, sequence.motionValues[sequence.motionIndex][step][0], sequence.func.transposeNote)
 const drag=ref<{pitch:number;start:number;end:number}|null>(null); const draggingMotion=ref(false); const editingStep=ref<number|null>(null); const editValue=ref(0)
+type FlagKind = 'stepOn' | 'activeStep' | 'transpose'
+const flagDrag=ref<{ kind: FlagKind; value: boolean; origin: number; snapshot: boolean[] }|null>(null)
 const noteNames=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; const noteLabel=(pitch:number)=>`${noteNames[pitch%12]}${Math.floor(pitch/12)-1}`; const isBlackKey=(pitch:number)=>[1,3,6,8,10].includes(pitch%12)
-const stepAt=(event:PointerEvent)=>{const rect=(event.currentTarget as HTMLElement).getBoundingClientRect();return Math.min(15,Math.max(0,Math.floor((event.clientX-rect.left-56)/((rect.width-56)/16))))}
-const rowDown=(pitch:number,event:PointerEvent)=>{const step=stepAt(event);const existing=sequence.noteAt(step,pitch);if(existing)return sequence.removeNote(existing);drag.value={pitch,start:step,end:step};(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)}
+const GUTTER_WIDTH = 112
+const stepAt=(event:PointerEvent)=>{const rect=(event.currentTarget as HTMLElement).getBoundingClientRect();return Math.min(15,Math.max(0,Math.floor((event.clientX-rect.left-GUTTER_WIDTH)/((rect.width-GUTTER_WIDTH)/16))))}
+const rowDown=(pitch:number,event:PointerEvent)=>{
+  const step=stepAt(event); const existing=sequence.noteAt(step,pitch)
+  if (existing) {
+    if (event.shiftKey) {
+      const selected = sequence.selectedNoteKey?.pitch === existing.pitch && sequence.selectedNoteKey?.startStep === existing.startStep
+      sequence.selectNote(selected ? null : existing)
+      return
+    }
+    return sequence.removeNote(existing)
+  }
+  drag.value={pitch,start:step,end:step};(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+}
 const rowMove=(pitch:number,event:PointerEvent)=>{if(drag.value?.pitch===pitch)drag.value.end=stepAt(event)}
 const rowUp=(pitch:number,event:PointerEvent)=>{if(drag.value?.pitch!==pitch)return;const start=Math.min(drag.value.start,drag.value.end),end=Math.max(drag.value.start,drag.value.end);if(sequence.addNote(pitch,start,end-start+1))audition([pitch]);drag.value=null}
-const selectHeader=(step:number)=>{if(props.stepInputActive)emit('select-step',step);audition(sequence.notes.filter(note=>note.startStep<=step&&note.startStep+note.length>step).map(note=>note.pitch))}
-const cellClass=(step:number,pitch:number)=>{const note=sequence.noteAt(step,pitch),preview=drag.value?.pitch===pitch&&step>=Math.min(drag.value.start,drag.value.end)&&step<=Math.max(drag.value.start,drag.value.end),input=props.stepInputActive&&step===props.stepCursor&&props.chordBuffer.has(pitch);return{beat:step%4===0,active:!!note||preview||input,full:!note&&!preview&&sequence.stepNoteCount(step)>=6,cursor:props.stepInputActive&&step===props.stepCursor}}
-const cellLabel=(step:number,pitch:number)=>{const note=sequence.noteAt(step,pitch),preview=drag.value?.pitch===pitch&&step===Math.min(drag.value.start,drag.value.end),input=props.stepInputActive&&step===props.stepCursor&&props.chordBuffer.has(pitch);return note?.startStep===step||preview||input?noteLabel(pitch):''}
-const motionStep=(event:PointerEvent)=>{const rect=(event.currentTarget as HTMLElement).getBoundingClientRect(),step=Math.min(15,Math.max(0,Math.floor((event.clientX-rect.left)/(rect.width/16)))),ratio=1-Math.min(1,Math.max(0,(event.clientY-rect.top)/rect.height));sequence.setMotionValue(props.motionIndex,step,ratio*127)}
-const startMotion=(event:PointerEvent)=>{if(!sequence.motionEnabled[props.motionIndex])return;draggingMotion.value=true;motionStep(event)};const moveMotion=(event:PointerEvent)=>{if(draggingMotion.value)motionStep(event)}
-const beginMotionEdit=(step:number)=>{editingStep.value=step;editValue.value=sequence.motionValues[props.motionIndex][step];nextTick(()=>document.querySelector<HTMLInputElement>('.motion-value-input')?.select())};const commitMotion=()=>{if(editingStep.value!==null)sequence.setMotionValue(props.motionIndex,editingStep.value,editValue.value);editingStep.value=null}
-const patternRange=()=>({min:Math.max(0,Math.min(127,Number(patternMin.value)||0)),max:Math.max(0,Math.min(127,Number(patternMax.value)||0)),cycles:patternCycles.value})
-const patternPoints=(key:MotionPatternKey)=>previewMotionPattern(key,patternRange().min,patternRange().max,patternRange().cycles).map((value,index)=>`${index*(160/15)},${55-value/127*52}`).join(' ')
-const applyPattern=(key:MotionPatternKey)=>{createMotionPattern(key,patternRange()).forEach((value,step)=>sequence.setMotionValue(props.motionIndex,step,value));sequence.motionEnabled[props.motionIndex]=true;generatorOpen.value=false}
+const selectHeader=(step:number)=>{if(sequence.stepInputActive)sequence.selectStepInput(step);audition(sequence.notes.filter(note=>note.startStep<=step&&note.startStep+note.length>step).map(note=>note.pitch))}
+const cellClass=(step:number,pitch:number)=>{
+  const note=sequence.noteAt(step,pitch)
+  const preview=drag.value?.pitch===pitch&&step>=Math.min(drag.value.start,drag.value.end)&&step<=Math.max(drag.value.start,drag.value.end)
+  const input=sequence.stepInputActive&&step===sequence.stepCursor&&sequence.chordBuffer.has(pitch)
+  const selected=!!note && sequence.selectedNoteKey?.pitch===note.pitch && sequence.selectedNoteKey?.startStep===note.startStep
+  return{beat:step%4===0,active:!!note||preview||input,selected,full:!note&&!preview&&sequence.stepNoteCount(step)>=6,cursor:sequence.stepInputActive&&step===sequence.stepCursor,muted:!sequence.stepOn[step],skipped:!sequence.activeStep[step]}
+}
+const cellLabel=(step:number,pitch:number)=>{const note=sequence.noteAt(step,pitch),preview=drag.value?.pitch===pitch&&step===Math.min(drag.value.start,drag.value.end),input=sequence.stepInputActive&&step===sequence.stepCursor&&sequence.chordBuffer.has(pitch);return note?.startStep===step||preview||input?noteLabel(pitch):''}
+const motionHit=(event:PointerEvent)=>{
+  const rect=(event.currentTarget as HTMLElement).getBoundingClientRect()
+  const step=Math.min(15,Math.max(0,Math.floor((event.clientX-rect.left)/(rect.width/16))))
+  const local=((event.clientX-rect.left)/(rect.width/16))-step
+  const point=sequence.func.motionSmooth ? Math.min(4, Math.max(0, Math.floor(local*5))) : undefined
+  const ratio=1-Math.min(1,Math.max(0,(event.clientY-rect.top)/rect.height))
+  return { step, point, value: ratio*127 }
+}
+const motionStep=(event:PointerEvent)=>{const hit=motionHit(event);sequence.motionEnabled[sequence.motionIndex]=true;if(!sequence.motionStepEnabled[sequence.motionIndex][hit.step])sequence.motionStepEnabled[sequence.motionIndex][hit.step]=true;sequence.setMotionValue(sequence.motionIndex,hit.step,hit.value,hit.point)}
+const startMotion=(event:PointerEvent)=>{draggingMotion.value=true;motionStep(event)};const moveMotion=(event:PointerEvent)=>{if(draggingMotion.value)motionStep(event)}
+const beginMotionEdit=(step:number)=>{editingStep.value=step;editValue.value=midiToDisplay(sequence.motionIndex,sequence.motionValues[sequence.motionIndex][step][0],sequence.func.transposeNote);nextTick(()=>document.querySelector<HTMLInputElement>('.motion-value-input')?.select())};const commitMotion=()=>{if(editingStep.value!==null)sequence.setMotionValue(sequence.motionIndex,editingStep.value,displayToMidi(sequence.motionIndex,editValue.value,sequence.func.transposeNote));editingStep.value=null}
+const flagSnapshot=(kind:FlagKind)=>kind==='stepOn'?[...sequence.stepOn]:kind==='activeStep'?[...sequence.activeStep]:[...sequence.transposeFuncOn]
+const writeFlag=(kind:FlagKind,step:number,value:boolean)=>{
+  if(kind==='stepOn')sequence.setStepOn(step,value)
+  else if(kind==='activeStep')sequence.setActiveStep(step,value)
+  else sequence.setTransposeFunc(step,value)
+}
+const applyFlagRange=(current:number)=>{
+  const paint=flagDrag.value; if(!paint)return
+  const from=Math.min(paint.origin,current), to=Math.max(paint.origin,current)
+  for(let step=0; step<16; step++) writeFlag(paint.kind, step, step>=from && step<=to ? paint.value : paint.snapshot[step])
+  if(paint.kind==='activeStep' && !sequence.activeStep.some(Boolean)) sequence.setActiveStep(paint.origin, true)
+}
+const startFlag=(kind:FlagKind,event:PointerEvent)=>{
+  if((event.target as HTMLElement).closest('.pitch-gutter')) return
+  const step=stepAt(event)
+  const snapshot=flagSnapshot(kind)
+  flagDrag.value={ kind, value:!snapshot[step], origin:step, snapshot }
+  applyFlagRange(step)
+  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+}
+const moveFlag=(event:PointerEvent)=>{ if(flagDrag.value) applyFlagRange(stepAt(event)) }
+const endFlag=()=>{ flagDrag.value=null }
 </script>
 
 <style scoped>
-.roll{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;border:1px solid #55454780;border-radius:4px;overflow:hidden}.roll-header,.roll-row{display:flex}.roll-body{flex:1;min-height:0;overflow-y:auto}.motion-row{flex:0 0 auto;border-top:2px solid var(--volca-accent)}.pitch-gutter{position:sticky;left:0;display:flex;flex:0 0 56px;align-items:center;justify-content:flex-end;box-sizing:border-box;padding-right:6px;background:#382b2d}.pitch-gutter.black-key{background:#2a2021;color:#9d8570}.step-cell{flex:1 1 0;width:0;min-width:28px;box-sizing:border-box;border-left:1px solid #55454740}.header-cell{position:relative;padding:4px 0;background:#4a3a3c;text-align:center;cursor:pointer}.note-cell{position:relative;display:flex;align-items:center;height:20px;border-top:1px solid #55454726;cursor:pointer;touch-action:none}.note-cell__label{z-index:2;overflow:hidden;padding-left:4px;color:#382b2d;font-size:var(--volca-type-label);font-weight:700;white-space:nowrap}.step-cell.cursor::after{content:'';position:absolute;inset:0;z-index:1;background:rgba(206,179,147,.2);pointer-events:none}.step-cell{position:relative}.step-cell.beat{border-left-color:#ceb39380}.note-cell.active,.motion-fill{background:var(--volca-accent)}.note-cell.full{cursor:not-allowed}.motion-bars{display:flex;flex:1;height:160px;touch-action:none;cursor:pointer}.motion-bars.disabled{opacity:.35;pointer-events:none}.motion-col{display:flex;align-items:flex-end}.motion-fill{position:absolute;inset:auto 0 0}.motion-value,.motion-value-input{position:absolute;top:6px;right:3px;left:3px;z-index:2;color:var(--volca-text);font-size:var(--volca-type-label);line-height:22px;text-align:center}.motion-value-input{height:24px;border:1px solid var(--volca-accent);border-radius:4px;background:#382b2d}.motion-control{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px}.select-control{display:grid;flex:0 0 280px;gap:5px}.select-control label,.motion-toggle span,.motion-generator>span{color:var(--volca-muted);font-size:var(--volca-type-label)}.motion-toggle,.motion-generator{display:grid;justify-items:center;gap:5px}.generator-trigger{height:40px;display:flex;align-items:center;gap:7px;padding:0 12px;border:1px solid rgba(206,179,147,.32);border-radius:9px;background:#382b2d;color:var(--volca-text);font:inherit;font-size:var(--volca-type-body);font-weight:700;cursor:pointer}.generator-trigger:hover{border-color:rgba(206,179,147,.62);background:#443537}.generator-trigger:focus-visible,.pattern-option:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.pattern-menu{width:370px;padding:10px;border:1px solid rgba(206,179,147,.32);border-radius:11px;background:#2b2022;box-shadow:0 12px 32px rgba(0,0,0,.38)}.pattern-settings{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:9px}.pattern-settings label{display:grid;gap:4px;color:var(--volca-muted);font-size:var(--volca-type-label)}.pattern-settings input,.pattern-settings select{width:100%;height:34px;box-sizing:border-box;padding:0 8px;border:1px solid rgba(206,179,147,.3);border-radius:7px;background:#251c1e;color:var(--volca-text);font:inherit}.pattern-options{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.pattern-option{display:grid;gap:4px;padding:7px;border:1px solid rgba(206,179,147,.16);border-radius:8px;background:#251c1e;color:var(--volca-text);font:inherit;font-size:var(--volca-type-label);cursor:pointer;text-align:left}.pattern-option:hover{border-color:rgba(206,179,147,.55);background:#35282a}.pattern-option svg{width:100%;height:58px;background:#21191a}.pattern-option polyline{fill:none;stroke:var(--volca-accent);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}.pattern-axis{fill:none;stroke:rgba(206,179,147,.12);stroke-width:1}
+.roll{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;border:1px solid #55454780;border-radius:4px;overflow:hidden}.roll-header,.roll-row{display:flex}.roll-body{flex:1;min-height:0;overflow-y:auto}.motion-row{flex:0 0 auto;border-top:2px solid var(--volca-accent)}.pitch-gutter{position:sticky;left:0;display:flex;flex:0 0 112px;align-items:center;justify-content:flex-end;box-sizing:border-box;padding:0 10px;background:#382b2d;color:var(--volca-text);font-size:var(--volca-type-label);font-weight:700;letter-spacing:.02em;line-height:1.2;white-space:nowrap}.flag-gutter,.step-flags .pitch-gutter,.motion-step-row .pitch-gutter,.motion-row .pitch-gutter{justify-content:center;color:var(--volca-accent);text-align:center}.pitch-gutter.black-key{background:#2a2021;color:#9d8570}.step-cell{flex:1 1 0;width:0;min-width:28px;box-sizing:border-box;border-left:1px solid #55454740}.header-cell{position:relative;padding:4px 0;background:#4a3a3c;text-align:center;cursor:pointer}.header-cell.muted{opacity:.38}.header-cell.skipped{color:#8f8170;text-decoration:line-through}.note-cell{position:relative;display:flex;align-items:center;height:20px;border-top:1px solid #55454726;cursor:pointer;touch-action:none}.note-cell.muted,.note-cell.skipped{opacity:.42}.note-cell__label{z-index:2;overflow:hidden;padding-left:4px;color:#382b2d;font-size:var(--volca-type-label);font-weight:700;white-space:nowrap}.step-cell.cursor::after{content:'';position:absolute;inset:0;z-index:1;background:rgba(206,179,147,.2);pointer-events:none}.step-cell{position:relative}.step-cell.beat{border-left-color:#ceb39380}.note-cell.active,.motion-fill{background:var(--volca-accent)}.note-cell.selected{box-shadow:inset 0 0 0 2px #f8eee4}.note-cell.full{cursor:not-allowed}.step-flags{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426;touch-action:none}.step-flags .step-cell{border-left-color:transparent}.step-flags .step-cell.beat{border-left-color:transparent}.flag-cell{display:grid;min-height:22px;padding:0;cursor:pointer}.flag{min-height:0;margin:3px;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer;touch-action:none;pointer-events:none}.flag.on{background:#ceb393;border-color:#e7bd76}.flag.sound.on{background:#9dce91;border-color:#b7e0ad}.flag:focus-visible{outline:2px solid var(--volca-accent);outline-offset:1px}.motion-bars{display:flex;flex:1;height:160px;touch-action:none;cursor:pointer}.motion-bars.disabled{opacity:.55}.motion-col{display:flex;align-items:flex-end}.motion-col.off{opacity:.35}.motion-fill{position:absolute;inset:auto 0 0}.motion-fill.point{right:auto}.motion-value,.motion-value-input{position:absolute;top:6px;right:2px;left:2px;z-index:2;color:var(--volca-text);font-size:11px;font-weight:700;line-height:22px;text-align:center}.motion-value-input{height:24px;border:1px solid var(--volca-accent);border-radius:4px;background:#382b2d}.motion-step-row{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426}.motion-step-cell{height:18px;margin:3px;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer}.motion-step-cell.on{background:#ceb393;border-color:#e7bd76}
 </style>
