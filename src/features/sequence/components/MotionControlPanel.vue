@@ -8,15 +8,6 @@
           <div class="motion-toggle"><span>{{ t('sequence.func.smooth') }}</span><AppToggle v-model="sequence.func.motionSmooth" :aria-label="t('sequence.func.smooth')" /></div>
         </div>
       </section>
-      <section class="volca-group">
-        <h4>{{ t('sequence.motionTarget') }}</h4>
-        <div class="control-row">
-          <div class="select-control">
-            <v-select v-model="sequence.motionIndex" :items="motionItems" item-title="label" item-value="value" density="compact" hide-details :aria-label="t('sequence.motionTarget')" />
-          </div>
-          <div class="motion-toggle"><span>{{ t('sequence.func.onOff') }}</span><AppToggle v-model="sequence.motionEnabled[sequence.motionIndex]" :aria-label="t('sequence.motionEnable')" /></div>
-        </div>
-      </section>
       <section class="volca-group auto-write-group">
         <h4>{{ t('sequence.autoMotion') }}</h4>
         <div class="pattern-panel" :aria-label="t('sequence.autoMotion')">
@@ -47,13 +38,11 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppToggle from '@/components/AppToggle.vue'
 import { useSequencerStore } from '@/stores/sequencerStore'
-import { MOTION_PARAM_KEYS } from '@/types/sequence'
 import { createMotionPattern, MOTION_PATTERN_KEYS, previewMotionPattern, type MotionPatternKey } from '@/utils/motionPatterns'
 import { displayToMidi, getMotionDisplayRange } from '@/utils/motionValue'
 
 const { t } = useI18n()
 const sequence = useSequencerStore()
-const motionItems = MOTION_PARAM_KEYS.map((key, index) => ({ label: t(`sequence.motionParams.${key}`), value: index }))
 const motionPatterns = MOTION_PATTERN_KEYS.map(key => ({ key, label: t(`sequence.motionPatterns.${key}`) }))
 const patternMin = ref(0)
 const patternMax = ref(127)
@@ -86,5 +75,5 @@ const applyPattern = (key: MotionPatternKey) => {
 </script>
 
 <style scoped>
-.control-row{display:flex;flex-wrap:nowrap;align-items:start;gap:8px 12px}.select-control{display:grid;grid-template-rows:2.6em auto;flex:0 0 280px;min-width:220px;align-content:start;gap:4px}.select-control::before{content:'';display:block;min-height:2.6em}.motion-toggle{display:grid;grid-template-rows:2.6em auto;justify-items:center;align-content:start;gap:4px;color:var(--volca-muted);font-size:var(--volca-type-label);text-align:center}.motion-toggle>span{display:flex;align-items:flex-end;justify-content:center;min-height:2.6em;line-height:1.2}.auto-write-group{flex:1 1 420px}.pattern-panel{display:grid;grid-template-columns:minmax(168px,210px) minmax(0,1fr);gap:8px;align-items:stretch;justify-content:start}.pattern-option:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.pattern-settings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.pattern-settings label{display:grid;grid-template-rows:2.6em auto;justify-items:center;align-content:start;gap:4px;color:var(--volca-muted);font-size:var(--volca-type-label);text-align:center}.pattern-settings label>span{display:flex;align-items:flex-end;justify-content:center;min-height:2.6em;line-height:1.2}.pattern-settings input,.pattern-settings select{width:100%;height:34px;box-sizing:border-box;padding:0 8px;border:1px solid rgba(206,179,147,.3);border-radius:7px;background:#251c1e;color:var(--volca-text);font:inherit}.pattern-options{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}.pattern-option{display:grid;grid-template-rows:1fr auto;justify-items:center;align-items:end;gap:4px;height:100%;min-width:0;padding:8px 8px 8px;border:1px solid rgba(206,179,147,.16);border-radius:6px;background:#251c1e;color:var(--volca-text);font:inherit;font-size:10px;cursor:pointer;text-align:center}.pattern-option:hover{border-color:rgba(206,179,147,.55);background:#35282a}.pattern-option svg{width:100%;height:100%;min-height:40px;display:block;border-radius:4px;background:#21191a}.pattern-option>span{justify-self:stretch;overflow:hidden;padding:2px 2px 0;line-height:1.2;text-align:center;text-overflow:ellipsis;white-space:nowrap}.pattern-option .pattern-wave{fill:none;stroke:var(--volca-accent);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}.pattern-axis{fill:none;stroke:rgba(206,179,147,.12);stroke-width:1}@media (max-width:1280px){.pattern-panel{grid-template-columns:1fr}}
+.control-row{display:flex;flex-wrap:nowrap;align-items:start;gap:8px 12px}.motion-toggle{display:grid;grid-template-rows:2.6em auto;justify-items:center;align-content:start;gap:4px;color:var(--volca-muted);font-size:var(--volca-type-label);text-align:center}.motion-toggle>span{display:flex;align-items:flex-end;justify-content:center;min-height:2.6em;line-height:1.2}.auto-write-group{flex:1 1 420px}.pattern-panel{display:grid;grid-template-columns:minmax(168px,210px) minmax(0,1fr);gap:8px;align-items:stretch;justify-content:start}.pattern-option:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.pattern-settings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.pattern-settings label{display:grid;grid-template-rows:2.6em auto;justify-items:center;align-content:start;gap:4px;color:var(--volca-muted);font-size:var(--volca-type-label);text-align:center}.pattern-settings label>span{display:flex;align-items:flex-end;justify-content:center;min-height:2.6em;line-height:1.2}.pattern-settings input,.pattern-settings select{width:100%;height:34px;box-sizing:border-box;padding:0 8px;border:1px solid rgba(206,179,147,.3);border-radius:7px;background:#251c1e;color:var(--volca-text);font:inherit}.pattern-options{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}.pattern-option{display:grid;grid-template-rows:1fr auto;justify-items:center;align-items:end;gap:4px;height:100%;min-width:0;padding:8px 8px 8px;border:1px solid rgba(206,179,147,.16);border-radius:6px;background:#251c1e;color:var(--volca-text);font:inherit;font-size:10px;cursor:pointer;text-align:center}.pattern-option:hover{border-color:rgba(206,179,147,.55);background:#35282a}.pattern-option svg{width:100%;height:100%;min-height:40px;display:block;border-radius:4px;background:#21191a}.pattern-option>span{justify-self:stretch;overflow:hidden;padding:2px 2px 0;line-height:1.2;text-align:center;text-overflow:ellipsis;white-space:nowrap}.pattern-option .pattern-wave{fill:none;stroke:var(--volca-accent);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}.pattern-axis{fill:none;stroke:rgba(206,179,147,.12);stroke-width:1}@media (max-width:1280px){.pattern-panel{grid-template-columns:1fr}}
 </style>
