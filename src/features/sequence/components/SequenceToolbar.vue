@@ -22,7 +22,7 @@
         <AutoSendToggle />
         <v-btn @click="sequence.clearAll"><Trash2 :size="16" class="mr-1" />{{ t('sequence.clear') }}</v-btn>
         <v-btn @click="sequence.toggleStepInput()"><Piano :size="16" class="mr-1" />{{ t('sequence.stepInput') }}</v-btn>
-        <v-btn @click="sequence.showRandomizeDialog = true"><Dices :size="16" class="mr-1" />{{ t('sequence.randomize') }}</v-btn>
+        <v-btn @click="sequence.requestRandomize()"><Dices :size="16" class="mr-1" />{{ t('sequence.randomize') }}</v-btn>
         <v-menu location="bottom end" offset="6">
           <template #activator="{ props: menuProps }">
             <v-btn v-bind="menuProps" icon variant="text" :title="t('common.more')" :aria-label="t('common.more')"><MoreHorizontal :size="21" /></v-btn>

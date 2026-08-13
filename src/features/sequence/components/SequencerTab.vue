@@ -11,10 +11,14 @@
     <AppErrorDialog v-model="showSendErrorDialog" :title="t('sequence.sendFailedTitle')" :message="sendErrorMessage" />
 
     <AppDialog v-model="seqStore.showRandomizeDialog" :title="t('sequence.randomizeTitle')">
-      {{ t('sequence.randomizeDescription') }}
+      <p class="randomize-copy">{{ t('sequence.randomizeDescription') }}</p>
+      <label class="randomize-skip">
+        <input v-model="dontShowRandomizeAgain" type="checkbox" />
+        <span>{{ t('sequence.randomizeDontShowAgain') }}</span>
+      </label>
       <template #actions>
         <v-btn variant="text" @click="seqStore.showRandomizeDialog = false">{{ t('common.cancel') }}</v-btn>
-        <v-btn @click="seqStore.confirmRandomize()"><Dices :size="16" class="mr-1" />{{ t('sequence.randomizeRun') }}</v-btn>
+        <v-btn @click="seqStore.confirmRandomize(dontShowRandomizeAgain)"><Dices :size="16" class="mr-1" />{{ t('sequence.randomizeRun') }}</v-btn>
       </template>
     </AppDialog>
 
@@ -65,6 +69,11 @@ const seqStore = useSequencerStore();
 const midiStore = useMidiStore();
 const { t } = useI18n();
 useStepInput();
+const dontShowRandomizeAgain = ref(false);
+
+watch(() => seqStore.showRandomizeDialog, open => {
+  if (open) dontShowRandomizeAgain.value = false;
+});
 
 const programFetchStatusText = computed(() =>
   midiStore.currentProgramFetchState === 'loading-programs'
@@ -99,5 +108,28 @@ watch(() => midiStore.currentProgramFetchState, state => {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+}
+
+.randomize-copy {
+  margin: 0;
+}
+
+.randomize-skip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 0 0;
+  color: var(--volca-muted);
+  font-size: var(--volca-type-body);
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.randomize-skip input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex: 0 0 auto;
+  accent-color: var(--volca-accent);
 }
 </style>

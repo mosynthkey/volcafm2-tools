@@ -10,6 +10,9 @@ import { encodeCurrentSequenceDump } from '../utils/sequenceCodec';
 import { createRandomStepOrder, reorderSequenceSteps } from '../utils/sequenceRandomizer';
 import { clearSequenceStep, tieSequenceStep } from '../utils/sequenceStepEditing';
 import { extractStepNotes, parseSmf } from '../utils/smfImport';
+import { getPref, setPref } from '../utils/appPrefs';
+
+const SKIP_RANDOMIZE_PREF = 'skipRandomizeDialog';
 
 export const useSequencerStore = defineStore('sequencer', () => {
     const initial = createEmptySequenceState();
@@ -33,6 +36,10 @@ export const useSequencerStore = defineStore('sequencer', () => {
     const heldNotes = ref(new Set<number>());
     const showLibrary = ref(false);
     const showRandomizeDialog = ref(false);
+    const skipRandomizeDialog = ref(false);
+    getPref<boolean>(SKIP_RANDOMIZE_PREF).then(value => {
+        if (value === true) skipRandomizeDialog.value = true;
+    });
     const showCaptureDialog = ref(false);
     const showImportDialog = ref(false);
     const importError = ref<string | null>(null);
@@ -263,10 +270,28 @@ export const useSequencerStore = defineStore('sequencer', () => {
         stepCursor.value = Math.max(0, Math.min(15, step));
     };
 
-    const confirmRandomize = () => {
+    const applyRandomize = () => {
         randomizeSteps();
         showRandomizeDialog.value = false;
         sendToDevice();
+    };
+
+    const requestRandomize = () => {
+        if (skipRandomizeDialog.value) {
+            applyRandomize();
+            return;
+        }
+        showRandomizeDialog.value = true;
+    };
+
+    const confirmRandomize = (dontShowAgain = false) => {
+        if (dontShowAgain && !skipRandomizeDialog.value) {
+            skipRandomizeDialog.value = true;
+            setPref(SKIP_RANDOMIZE_PREF, true).catch(() => {
+                skipRandomizeDialog.value = false;
+            });
+        }
+        applyRandomize();
     };
 
     const queueSmfImport = (file: File) => {
@@ -354,6 +379,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
         insertStepRest,
         insertStepTie,
         selectStepInput,
+        requestRandomize,
         confirmRandomize,
         queueSmfImport,
         cancelSmfImport,
