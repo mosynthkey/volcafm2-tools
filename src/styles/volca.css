@@ -45,8 +45,9 @@ input, textarea, [contenteditable="true"] { user-select: text; -webkit-user-sele
 .panel-fold svg { transition: transform .16s ease; }
 .panel-fold.is-folded svg { transform: rotate(-90deg); }
 .volca-field-label { color: var(--volca-muted); font-size: var(--volca-type-label); }
-.editor-toolbar { display: flex; flex: 0 0 auto; align-items: center; gap: 0; min-height: 48px; padding: 4px 0; overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; scrollbar-width: thin; }
-.editor-toolbar > .v-col { flex-shrink: 0; }
+.editor-toolbar { display: flex; flex: 0 0 48px; align-items: center; gap: 0; box-sizing: border-box; height: 48px; min-height: 48px; max-height: 48px; padding: 0; overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap !important; scrollbar-width: thin; }
+.editor-toolbar > * { flex-shrink: 0; }
+.editor-toolbar-spacer { flex: 1 1 auto; min-width: 8px; }
 .editor-identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .editor-identity__label { white-space: nowrap; }
 .editor-identity__name { max-width: 140px; min-width: 72px; overflow: hidden; color: var(--volca-accent-bright); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }

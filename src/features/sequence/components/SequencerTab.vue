@@ -38,9 +38,6 @@
 
     <SequenceCaptureDialog />
 
-    <PresetLibraryDialog v-model="seqStore.showLibrary" kind="sequence" :title="t('sequence.library')"
-      :suggested-name="t('sequence.libraryName', { count: seqStore.programNo + 1 })" :snapshot="sequenceSnapshot" @load="seqStore.loadPreset" />
-
     <v-card class="pa-4 sequencer-card">
       <SequenceToolbar />
       <v-alert v-if="seqStore.importError" type="error" density="compact" class="mt-3" variant="tonal">
@@ -56,7 +53,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useSequencerStore } from '@/stores/sequencerStore';
-import PresetLibraryDialog from '@/components/PresetLibraryDialog.vue';
 import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue';
 import AppProgressDialog from '@/components/dialogs/AppProgressDialog.vue';
 import AppDialog from '@/components/dialogs/AppDialog.vue';
@@ -87,7 +83,6 @@ const programFetchStatusText = computed(() =>
     : t('sequence.matchingCurrentProgram')
 );
 
-const sequenceSnapshot = () => JSON.parse(JSON.stringify(seqStore.toState()));
 const showProgramFetchErrorDialog = ref(false);
 const sendErrorMessage = computed(() =>
   seqStore.lastSendFailure === 'nak' ? t('sequence.sendNak') : t('sequence.sendError')

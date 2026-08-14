@@ -1,13 +1,17 @@
-export type PresetKind = 'sound' | 'sequence';
+import type { LibraryKind, LibraryPayload } from './libraryFormat';
 
-export interface PresetRecord<T = unknown> {
+export type { LibraryKind };
+
+export interface LibraryRecord {
     id: string;
-    kind: PresetKind;
+    kind: LibraryKind;
     name: string;
-    data: T;
+    payload: LibraryPayload;
     createdAt: number;
     updatedAt: number;
 }
+
+type StoredRecord = LibraryRecord & { data?: unknown };
 
 const DB_NAME = 'volcafm2-editor';
 const DB_VERSION = 1;
@@ -41,18 +45,47 @@ const runRequest = async <T>(mode: IDBTransactionMode, operation: (store: IDBObj
     }
 };
 
-export const listPresets = async <T>(kind: PresetKind): Promise<PresetRecord<T>[]> => {
-    const records = await runRequest('readonly', store => store.index('kind').getAll(kind)) as PresetRecord<T>[];
-    return records.sort((a, b) => b.updatedAt - a.updatedAt);
+const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+const normalizeRecord = (raw: StoredRecord): LibraryRecord => {
+    if (raw.payload && typeof raw.payload === 'object') {
+        return {
+            id: raw.id,
+            kind: raw.kind,
+            name: raw.name,
+            payload: raw.payload,
+            createdAt: raw.createdAt,
+            updatedAt: raw.updatedAt,
+        };
+    }
+    const payload: LibraryPayload = {};
+    if (raw.kind === 'sound') payload.sound = raw.data;
+    if (raw.kind === 'sequence') payload.sequence = raw.data;
+    if (raw.kind === 'sound-list' && raw.data) payload.soundList = raw.data as LibraryPayload['soundList'];
+    return {
+        id: raw.id,
+        kind: raw.kind,
+        name: raw.name,
+        payload,
+        createdAt: raw.createdAt,
+        updatedAt: raw.updatedAt,
+    };
 };
 
-export const savePreset = async <T>(kind: PresetKind, name: string, data: T): Promise<PresetRecord<T>> => {
+export const listLibrary = async (kind?: LibraryKind): Promise<LibraryRecord[]> => {
+    const records = kind
+        ? await runRequest('readonly', store => store.index('kind').getAll(kind)) as StoredRecord[]
+        : await runRequest('readonly', store => store.getAll()) as StoredRecord[];
+    return records.map(normalizeRecord).sort((a, b) => b.updatedAt - a.updatedAt);
+};
+
+export const saveLibrary = async (kind: LibraryKind, name: string, payload: LibraryPayload): Promise<LibraryRecord> => {
     const now = Date.now();
-    const record: PresetRecord<T> = {
+    const record: LibraryRecord = {
         id: crypto.randomUUID(),
         kind,
         name: name.trim(),
-        data: JSON.parse(JSON.stringify(data)) as T,
+        payload: cloneJson(payload),
         createdAt: now,
         updatedAt: now,
     };
@@ -60,6 +93,6 @@ export const savePreset = async <T>(kind: PresetKind, name: string, data: T): Pr
     return record;
 };
 
-export const deletePreset = async (id: string) => {
+export const deleteLibrary = async (id: string) => {
     await runRequest('readwrite', store => store.delete(id));
 };

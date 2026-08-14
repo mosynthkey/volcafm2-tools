@@ -45,6 +45,7 @@ export const useAutoSendStore = defineStore('autoSend', () => {
         || midi.soundEditState === 'sending'
         || midi.soundEditState === 'requesting'
         || midi.sequenceWriteState === 'sending'
+        || midi.programWriteState === 'sending'
         || sequence.sendRetrying
         || midi.connectionState === MIDIConnectionState.RECEIVING
         || sequence.showCaptureDialog;

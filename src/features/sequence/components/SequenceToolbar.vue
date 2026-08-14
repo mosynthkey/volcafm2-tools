@@ -22,7 +22,22 @@
         <AutoSendToggle />
         <v-btn @click="sequence.clearAll"><Trash2 :size="16" class="mr-1" />{{ t('sequence.clear') }}</v-btn>
         <v-btn @click="sequence.toggleStepInput()"><Piano :size="16" class="mr-1" />{{ t('sequence.stepInput') }}</v-btn>
-        <v-btn @click="sequence.requestRandomize()"><Dices :size="16" class="mr-1" />{{ t('sequence.randomize') }}</v-btn>
+        <div class="randomize-split">
+          <v-btn class="randomize-main" @click="sequence.requestRandomize()"><Dices :size="16" class="mr-1" />{{ t('sequence.randomize') }}</v-btn>
+          <v-menu location="bottom end" offset="6">
+            <template #activator="{ props: menuProps }">
+              <v-btn v-bind="menuProps" class="randomize-menu-btn" icon :title="t('sequence.randomizeMore')"
+                :aria-label="t('sequence.randomizeMore')">
+                <ChevronDown :size="16" />
+              </v-btn>
+            </template>
+            <v-list class="sequence-more-menu" density="compact">
+              <v-list-item :title="t('sequence.randomizeNotes')" @click="sequence.randomizeSteps(Math.random, 'notes')" />
+              <v-list-item :title="t('sequence.randomizeMotion')" @click="sequence.randomizeSteps(Math.random, 'motion')" />
+              <v-list-item :title="t('sequence.reverseSequence')" @click="sequence.reverseSteps()" />
+            </v-list>
+          </v-menu>
+        </div>
         <v-menu location="bottom end" offset="6">
           <template #activator="{ props: menuProps }">
             <v-btn v-bind="menuProps" icon variant="text" :title="t('common.more')" :aria-label="t('common.more')"><MoreHorizontal :size="21" /></v-btn>
@@ -37,8 +52,10 @@
       </v-col>
       <v-spacer />
       <v-col cols="auto" class="editor-toolbar-section editor-library">
-        <span class="editor-toolbar-section__label volca-section-title">{{ t('common.library') }}</span>
-        <v-btn icon variant="text" :title="t('common.library')" :aria-label="t('common.library')" @click="sequence.showLibrary = true"><Library :size="19" /></v-btn>
+        <PageHintButton page="sequence" />
+        <v-btn @click="ui.openLibrary('sequence')">
+          <Library :size="16" class="mr-1" />{{ t('common.library') }}
+        </v-btn>
       </v-col>
     </template>
   </v-row>
@@ -47,12 +64,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Dices, FileUp, HardDriveDownload, HardDriveUpload, Library, MoreHorizontal, Piano, Trash2, X } from '@lucide/vue'
+import { ChevronDown, Dices, FileUp, HardDriveDownload, HardDriveUpload, Library, MoreHorizontal, Piano, Trash2, X } from '@lucide/vue'
 import AutoSendToggle from '@/components/AutoSendToggle.vue'
+import PageHintButton from '@/components/PageHintButton.vue'
 import { useMidiStore } from '@/stores/midiStore'
 import { useSequencerStore } from '@/stores/sequencerStore'
+import { useUiStore } from '@/stores/uiStore'
 
-const { t } = useI18n(); const midi = useMidiStore(); const sequence = useSequencerStore(); const fileInput = ref<HTMLInputElement | null>(null)
+const { t } = useI18n(); const midi = useMidiStore(); const sequence = useSequencerStore(); const ui = useUiStore(); const fileInput = ref<HTMLInputElement | null>(null)
 const canSend = computed(() => midi.isIdleConnected)
 const currentProgramName = computed(() => midi.programNames[Number(sequence.programNo)]?.name.trim() ?? '')
 const selectFile = (event: Event) => { const input = event.target as HTMLInputElement; const file = input.files?.[0]; if (file) sequence.queueSmfImport(file); input.value = '' }
@@ -61,5 +80,8 @@ const selectFile = (event: Event) => { const input = event.target as HTMLInputEl
 <style scoped>
 .step-input-status { color: var(--volca-accent-bright); font-weight: 750; font-variant-numeric: tabular-nums; }
 .program-no-input { width: 72px; flex: 0 0 72px; }
-.sequence-more-menu { min-width: 190px; border: 1px solid rgba(206,179,147,.28); border-radius: 10px; background: #2b2022; color: var(--volca-text); }
+.sequence-more-menu { min-width: 220px; border: 1px solid rgba(206,179,147,.28); border-radius: 10px; background: #2b2022; color: var(--volca-text); }
+.randomize-split { display: inline-flex; align-items: stretch; }
+.randomize-split :deep(.randomize-main) { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+.randomize-split :deep(.randomize-menu-btn) { width: 28px; min-width: 28px; border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; box-shadow: inset 1px 0 rgba(51,40,42,.22), inset 0 1px rgba(255,255,255,.28), 0 3px 10px rgba(0,0,0,.16) !important; }
 </style>

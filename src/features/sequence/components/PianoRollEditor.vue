@@ -11,6 +11,17 @@
     </template>
   </AppDialog>
 
+  <EuclidCopyDialog v-model="showEuclidCopy" :source-step="euclidSourceStep" :source-note="euclidSourceNote" />
+
+  <Teleport to="body">
+    <div v-if="euclidMenu" class="euclid-menu-layer" @pointerdown="closeEuclidMenu">
+      <div class="euclid-menu" :style="{ left: `${euclidMenu.x}px`, top: `${euclidMenu.y}px` }"
+        role="menu" @pointerdown.stop>
+        <button type="button" role="menuitem" @click="openEuclidCopy">{{ t('sequence.euclidCopy') }}</button>
+      </div>
+    </div>
+  </Teleport>
+
   <div class="roll">
     <div class="roll-header" :class="{ 'is-copying': stepCopy?.dragging }"
       @pointerdown="startStepCopy" @pointermove="moveStepCopy" @pointerup="endStepCopy" @pointercancel="cancelStepCopy">
@@ -28,10 +39,18 @@
           :aria-label="t('sequence.focusUsedPitches')" @click="requestFocusUsedPitches">
           <Focus :size="16" />
         </button>
+        <button type="button" class="header-tool" :class="{ on: marqueeSelect }"
+          :aria-pressed="marqueeSelect" :title="t('sequence.marqueeSelect')"
+          :aria-label="t('sequence.marqueeSelect')" @click="marqueeSelect = !marqueeSelect">
+          <svg class="marquee-icon" viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="2.5" y="2.5" width="11" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.5 2" />
+          </svg>
+        </button>
       </div>
       <div v-for="step in 16" :key="step" class="step-cell header-cell"
         :class="{ beat:(step-1)%4===0, cursor:sequence.stepInputActive&&step-1===sequence.stepCursor, muted:!sequence.stepOn[step-1], skipped:!sequence.activeStep[step-1], 'copy-source': stepCopy && step-1===stepCopy.from, 'drop-target': stepCopy?.dragging && step-1===stepCopy.to && step-1!==stepCopy.from }"
         role="button" tabindex="0" :aria-label="t('sequence.stepAria', { count: step })" :title="t('sequence.stepCopyHint')"
+        @contextmenu.prevent="openStepEuclidMenu(step-1, $event)"
         @keydown.enter.prevent="selectHeader(step-1)">{{ step }}</div>
     </div>
     <div class="roll-row step-flags" @pointerdown="startFlag('stepOn', $event)" @pointermove="moveFlag" @pointerup="endFlag" @pointercancel="endFlag">
@@ -59,10 +78,17 @@
           @keydown.enter.prevent="sequence.toggleTransposeFunc(step-1)" />
       </div>
     </div>
-    <div ref="rollBody" class="roll-body"><div v-for="pitch in pitches" :key="pitch" class="roll-row" @pointerdown="rowDown(pitch,$event)" @pointermove="rowMove(pitch,$event)" @pointerup="rowUp(pitch,$event)">
+    <div ref="rollBody" class="roll-body" :class="{ 'is-moving': drag?.kind === 'move', 'is-resizing': drag?.kind === 'resize', 'is-marquee': marqueeSelect }"
+      @pointerdown="rollDown" @pointermove="rollMove" @pointerup="rollUp" @pointercancel="rollUp" @dblclick="rollDblClick">
+      <div class="roll-pitches">
+      <div v-if="marqueeStyle" class="note-marquee" :style="marqueeStyle"></div>
+      <div v-for="pitch in pitches" :key="pitch" class="roll-row" @contextmenu.prevent="onNoteContextMenu(pitch,$event)">
       <div class="pitch-gutter" :class="{ 'black-key':isBlackKey(pitch) }">{{ noteLabel(pitch) }}</div>
-      <div v-for="step in 16" :key="step" class="step-cell note-cell" :class="cellClass(step-1,pitch)"><span v-if="cellLabel(step-1,pitch)" class="note-cell__label">{{ cellLabel(step-1,pitch) }}</span></div>
-    </div></div>
+      <div v-for="step in 16" :key="step" class="step-cell note-cell" :class="cellClass(step-1,pitch)">
+        <span v-if="cellLabel(step-1,pitch)" class="note-cell__label">{{ cellLabel(step-1,pitch) }}</span>
+        <span v-if="isNoteEnd(step-1,pitch)" class="note-resize-handle"></span>
+      </div>
+    </div></div></div>
     <div class="roll-row motion-row">
       <div class="pitch-gutter motion-gutter" @pointerdown.stop>
         <span class="motion-gutter__label">{{ t('sequence.motion') }}</span>
@@ -111,14 +137,17 @@ import AppToggle from '@/components/AppToggle.vue'
 import AppDialog from '@/components/dialogs/AppDialog.vue'
 import { usePersistedFlag } from '@/composables/usePersistedFlag'
 import { useSequencerStore } from '@/stores/sequencerStore'
+import { useUiStore } from '@/stores/uiStore'
 import { useNoteAudition } from '@/features/sequence/composables/useNoteAudition'
+import EuclidCopyDialog from '@/features/sequence/components/EuclidCopyDialog.vue'
 import MotionControlPanel from '@/features/sequence/components/MotionControlPanel.vue'
-import { MOTION_PARAM_KEYS } from '@/types/sequence'
+import { MOTION_PARAM_KEYS, type SequenceNote } from '@/types/sequence'
+import { notesIntersectingRect, previewMovedNotes, type NoteKey } from '@/utils/sequenceNoteEditing'
 import { getPref, setPref } from '@/utils/appPrefs'
 import { displayToMidi, formatMotionValue, getMotionDisplayRange, midiToDisplay } from '@/utils/motionValue'
 
 const SKIP_FOCUS_PREF = 'skipFocusUsedPitchesDialog'
-const { t }=useI18n(); const sequence=useSequencerStore(); const { audition }=useNoteAudition()
+const { t }=useI18n(); const sequence=useSequencerStore(); const ui=useUiStore(); const { audition }=useNoteAudition()
 const motionItems = computed(() => MOTION_PARAM_KEYS.map((key, index) => ({ label: t(`sequence.motionParams.${key}`), value: index })))
 const ALL_PITCHES = Array.from({ length: 61 }, (_, index) => 96 - index)
 const PITCH_MIN = 36
@@ -190,29 +219,209 @@ onMounted(() => {
 })
 const motionRange=computed(()=>getMotionDisplayRange(sequence.motionIndex, sequence.func.transposeNote))
 const formatStepValue=(step:number)=>formatMotionValue(sequence.motionIndex, sequence.motionValues[sequence.motionIndex][step][0], sequence.func.transposeNote)
-const drag=ref<{pitch:number;start:number;end:number}|null>(null); const draggingMotion=ref(false); const editingStep=ref<number|null>(null); const editValue=ref(0)
+type RollDrag =
+  | { kind: 'paint'; pitch: number; start: number; end: number }
+  | { kind: 'resize'; key: NoteKey; end: number }
+  | { kind: 'move'; originPitch: number; originStep: number; dPitch: number; dStep: number }
+  | { kind: 'marquee'; startStep: number; startPitch: number; endStep: number; endPitch: number; additive: boolean }
+const drag=ref<RollDrag|null>(null)
+const marqueeSelect=ref(false)
+const draggingMotion=ref(false); const editingStep=ref<number|null>(null); const editValue=ref(0)
 type FlagKind = 'stepOn' | 'activeStep' | 'transpose'
 const flagDrag=ref<{ kind: FlagKind; value: boolean; origin: number; snapshot: boolean[] }|null>(null)
 const noteNames=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; const noteLabel=(pitch:number)=>`${noteNames[pitch%12]}${Math.floor(pitch/12)-1}`; const isBlackKey=(pitch:number)=>[1,3,6,8,10].includes(pitch%12)
 const GUTTER_WIDTH = 180
-const stepAt=(event:PointerEvent)=>{const rect=(event.currentTarget as HTMLElement).getBoundingClientRect();return Math.min(15,Math.max(0,Math.floor((event.clientX-rect.left-GUTTER_WIDTH)/((rect.width-GUTTER_WIDTH)/16))))}
-const rowDown=(pitch:number,event:PointerEvent)=>{
-  const step=stepAt(event); const existing=sequence.noteAt(step,pitch)
+const stepAt=(event:PointerEvent | MouseEvent)=>{const rect=(event.currentTarget as HTMLElement).getBoundingClientRect();return Math.min(15,Math.max(0,Math.floor((event.clientX-rect.left-GUTTER_WIDTH)/((rect.width-GUTTER_WIDTH)/16))))}
+type EuclidMenu = { x: number; y: number; step: number; note: SequenceNote | null }
+const euclidMenu = ref<EuclidMenu | null>(null)
+const showEuclidCopy = ref(false)
+const euclidSourceStep = ref(0)
+const euclidSourceNote = ref<SequenceNote | null>(null)
+const placeEuclidMenu = (event: MouseEvent, step: number, note: SequenceNote | null): EuclidMenu => {
+  const menuWidth = 220
+  const menuHeight = 44
+  return {
+    x: Math.min(Math.max(8, event.clientX), window.innerWidth - menuWidth - 8),
+    y: Math.min(Math.max(8, event.clientY), window.innerHeight - menuHeight - 8),
+    step,
+    note,
+  }
+}
+const closeEuclidMenu = () => { euclidMenu.value = null }
+const openStepEuclidMenu = (step: number, event: MouseEvent) => {
+  euclidMenu.value = placeEuclidMenu(event, step, null)
+}
+const onNoteContextMenu = (pitch: number, event: MouseEvent) => {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  if (event.clientX - rect.left < GUTTER_WIDTH) return
+  const step = stepAt(event)
+  const note = sequence.noteAt(step, pitch)
+  if (!note) return
+  euclidMenu.value = placeEuclidMenu(event, note.startStep, { ...note })
+}
+const openEuclidCopy = () => {
+  const menu = euclidMenu.value
+  if (!menu) return
+  euclidSourceStep.value = menu.step
+  euclidSourceNote.value = menu.note
+  euclidMenu.value = null
+  showEuclidCopy.value = true
+}
+onMounted(() => window.addEventListener('keydown', onRollKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onRollKeydown))
+const onRollKeydown = (event: KeyboardEvent) => {
+  if (ui.activeTab !== 'sequencer') return
+  if (event.key === 'Escape') {
+    closeEuclidMenu()
+    sequence.clearNoteSelection()
+    return
+  }
+  const target = event.target
+  if (target instanceof HTMLElement) {
+    const tag = target.tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return
+  }
+  if (event.key !== 'Backspace' && event.key !== 'Delete') return
+  if (!sequence.selectedNoteKeys.length) return
+  event.preventDefault()
+  sequence.removeSelectedNotes()
+}
+const hitRoll = (event: PointerEvent | MouseEvent) => {
+  const body = rollBody.value
+  if (!body) return null
+  const rect = body.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  if (x < GUTTER_WIDTH) return null
+  const y = event.clientY - rect.top + body.scrollTop
+  const pitch = pitches.value[Math.floor(y / NOTE_ROW_HEIGHT)]
+  if (pitch === undefined) return null
+  const cellWidth = (rect.width - GUTTER_WIDTH) / 16
+  const step = Math.min(15, Math.max(0, Math.floor((x - GUTTER_WIDTH) / cellWidth)))
+  const localX = (x - GUTTER_WIDTH) - step * cellWidth
+  return { pitch, step, localX, cellWidth }
+}
+const RESIZE_HANDLE = 10
+const isNoteEnd = (step: number, pitch: number) => {
+  const note = sequence.noteAt(step, pitch)
+  return !!note && step === note.startStep + note.length - 1
+}
+const rollDown = (event: PointerEvent) => {
+  if (event.button !== 0) return
+  const hit = hitRoll(event)
+  if (!hit) return
+  event.preventDefault()
+  const existing = sequence.noteAt(hit.step, hit.pitch)
+  if (marqueeSelect.value || (!existing && event.shiftKey)) {
+    drag.value = {
+      kind: 'marquee',
+      startStep: hit.step,
+      startPitch: hit.pitch,
+      endStep: hit.step,
+      endPitch: hit.pitch,
+      additive: event.shiftKey,
+    }
+    ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+    return
+  }
   if (existing) {
     if (event.shiftKey) {
-      const selected = sequence.selectedNoteKey?.pitch === existing.pitch && sequence.selectedNoteKey?.startStep === existing.startStep
-      sequence.selectNote(selected ? null : existing)
+      sequence.selectNote(existing, true)
       return
     }
-    return sequence.removeNote(existing)
+    const lastStep = existing.startStep + existing.length - 1
+    const onHandle = !!(event.target as HTMLElement).closest('.note-resize-handle')
+    const resize = hit.step === lastStep && (onHandle || hit.localX >= hit.cellWidth - RESIZE_HANDLE)
+    if (!sequence.isNoteSelected(existing)) sequence.selectNote(existing)
+    drag.value = resize
+      ? { kind: 'resize', key: { pitch: existing.pitch, startStep: existing.startStep }, end: lastStep }
+      : { kind: 'move', originPitch: hit.pitch, originStep: hit.step, dPitch: 0, dStep: 0 }
+    ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+    return
   }
-  drag.value={pitch,start:step,end:step};(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+  drag.value = { kind: 'paint', pitch: hit.pitch, start: hit.step, end: hit.step }
+  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
 }
-const rowMove=(pitch:number,event:PointerEvent)=>{if(drag.value?.pitch===pitch)drag.value.end=stepAt(event)}
-const rowUp=(pitch:number,event:PointerEvent)=>{if(drag.value?.pitch!==pitch)return;const start=Math.min(drag.value.start,drag.value.end),end=Math.max(drag.value.start,drag.value.end);if(sequence.addNote(pitch,start,end-start+1))audition([pitch]);drag.value=null}
+const rollMove = (event: PointerEvent) => {
+  const state = drag.value
+  if (!state) return
+  const hit = hitRoll(event)
+  if (!hit) return
+  if (state.kind === 'paint') state.end = hit.step
+  else if (state.kind === 'resize') state.end = Math.max(state.key.startStep, hit.step)
+  else if (state.kind === 'move') {
+    state.dPitch = hit.pitch - state.originPitch
+    state.dStep = hit.step - state.originStep
+  } else {
+    state.endStep = hit.step
+    state.endPitch = hit.pitch
+  }
+}
+const rollUp = () => {
+  const state = drag.value
+  drag.value = null
+  if (!state) return
+  if (state.kind === 'paint') {
+    const start = Math.min(state.start, state.end)
+    const end = Math.max(state.start, state.end)
+    if (sequence.addNote(state.pitch, start, end - start + 1)) {
+      sequence.selectNote(sequence.noteAt(start, state.pitch) ?? null)
+      audition([state.pitch])
+    }
+    return
+  }
+  if (state.kind === 'resize') {
+    sequence.resizeNote(state.key, state.end - state.key.startStep + 1)
+    return
+  }
+  if (state.kind === 'move') {
+    if (state.dPitch || state.dStep) sequence.moveSelectedNotes(state.dPitch, state.dStep, PITCH_MIN, PITCH_MAX)
+    return
+  }
+  const picked = notesIntersectingRect(
+    sequence.notes, state.startStep, state.startPitch, state.endStep, state.endPitch,
+  ).map(note => ({ pitch: note.pitch, startStep: note.startStep }))
+  if (state.additive) {
+    const extra = picked.filter(key => !sequence.selectedNoteKeys.some(item => item.pitch === key.pitch && item.startStep === key.startStep))
+    sequence.setNoteSelection([...sequence.selectedNoteKeys, ...extra])
+  } else {
+    sequence.setNoteSelection(picked)
+  }
+}
+const rollDblClick = (event: MouseEvent) => {
+  const hit = hitRoll(event)
+  if (!hit) return
+  const existing = sequence.noteAt(hit.step, hit.pitch)
+  if (existing) sequence.removeNote(existing)
+}
+const movePreview = computed(() => {
+  const state = drag.value
+  if (state?.kind !== 'move' || (!state.dPitch && !state.dStep)) return []
+  return previewMovedNotes(sequence.notes, sequence.selectedNoteKeys, state.dPitch, state.dStep, PITCH_MIN, PITCH_MAX)
+})
+const marqueeStyle = computed(() => {
+  const state = drag.value
+  const body = rollBody.value
+  if (state?.kind !== 'marquee' || !body) return null
+  const list = pitches.value
+  const a = list.indexOf(state.startPitch)
+  const b = list.indexOf(state.endPitch)
+  if (a < 0 || b < 0) return null
+  const cellWidth = (body.clientWidth - GUTTER_WIDTH) / 16
+  const stepMin = Math.min(state.startStep, state.endStep)
+  const stepMax = Math.max(state.startStep, state.endStep)
+  const pitchMin = Math.min(a, b)
+  const pitchMax = Math.max(a, b)
+  return {
+    left: `${GUTTER_WIDTH + stepMin * cellWidth}px`,
+    top: `${pitchMin * NOTE_ROW_HEIGHT}px`,
+    width: `${(stepMax - stepMin + 1) * cellWidth}px`,
+    height: `${(pitchMax - pitchMin + 1) * NOTE_ROW_HEIGHT}px`,
+  }
+})
 const selectHeader=(step:number)=>{if(sequence.stepInputActive)sequence.selectStepInput(step);audition(sequence.notes.filter(note=>note.startStep<=step&&note.startStep+note.length>step).map(note=>note.pitch))}
 const stepCopy=ref<{from:number;to:number;dragging:boolean}|null>(null)
 const startStepCopy=(event:PointerEvent)=>{
+  if(event.button!==0) return
   if((event.target as HTMLElement).closest('.pitch-gutter')) return
   event.preventDefault()
   const step=stepAt(event)
@@ -239,12 +448,21 @@ const endStepCopy=()=>{
 }
 const cellClass=(step:number,pitch:number)=>{
   const note=sequence.noteAt(step,pitch)
-  const preview=drag.value?.pitch===pitch&&step>=Math.min(drag.value.start,drag.value.end)&&step<=Math.max(drag.value.start,drag.value.end)
+  const paint=drag.value?.kind==='paint'&&drag.value.pitch===pitch&&step>=Math.min(drag.value.start,drag.value.end)&&step<=Math.max(drag.value.start,drag.value.end)
+  const resize=drag.value?.kind==='resize'&&pitch===drag.value.key.pitch&&step>=drag.value.key.startStep&&step<=drag.value.end
+  const preview=movePreview.value.some(item=>item.pitch===pitch&&item.startStep<=step&&item.startStep+item.length>step)
+  const moving=drag.value?.kind==='move'&&!!note&&sequence.isNoteSelected(note)
   const input=sequence.stepInputActive&&step===sequence.stepCursor&&sequence.chordBuffer.has(pitch)
-  const selected=!!note && sequence.selectedNoteKey?.pitch===note.pitch && sequence.selectedNoteKey?.startStep===note.startStep
-  return{beat:step%4===0,active:!!note||preview||input,selected,full:!note&&!preview&&sequence.stepNoteCount(step)>=6,cursor:sequence.stepInputActive&&step===sequence.stepCursor,muted:!sequence.stepOn[step],skipped:!sequence.activeStep[step]}
+  const selected=!!note && sequence.isNoteSelected(note)
+  return{beat:step%4===0,active:(!!note&&!moving)||paint||resize||preview||input,selected:selected||preview,full:!note&&!paint&&!preview&&sequence.stepNoteCount(step)>=6,cursor:sequence.stepInputActive&&step===sequence.stepCursor,muted:!sequence.stepOn[step],skipped:!sequence.activeStep[step]}
 }
-const cellLabel=(step:number,pitch:number)=>{const note=sequence.noteAt(step,pitch),preview=drag.value?.pitch===pitch&&step===Math.min(drag.value.start,drag.value.end),input=sequence.stepInputActive&&step===sequence.stepCursor&&sequence.chordBuffer.has(pitch);return note?.startStep===step||preview||input?noteLabel(pitch):''}
+const cellLabel=(step:number,pitch:number)=>{
+  const note=sequence.noteAt(step,pitch)
+  const paint=drag.value?.kind==='paint'&&drag.value.pitch===pitch&&step===Math.min(drag.value.start,drag.value.end)
+  const preview=movePreview.value.find(item=>item.pitch===pitch&&item.startStep===step)
+  const input=sequence.stepInputActive&&step===sequence.stepCursor&&sequence.chordBuffer.has(pitch)
+  return note?.startStep===step||paint||preview||input?noteLabel(pitch):''
+}
 const motionHit=(event:PointerEvent)=>{
   const rect=(event.currentTarget as HTMLElement).getBoundingClientRect()
   const step=Math.min(15,Math.max(0,Math.floor((event.clientX-rect.left)/(rect.width/16))))
@@ -281,8 +499,38 @@ const endFlag=()=>{ flagDrag.value=null }
 </script>
 
 <style scoped>
-.roll{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;border:1px solid #55454780;border-radius:4px;overflow:hidden}.roll-header,.roll-row{display:flex}.roll-body{flex:1;min-height:0;overflow-y:auto}.motion-row{flex:0 0 auto;border-top:2px solid var(--volca-accent)}.pitch-gutter{position:sticky;left:0;display:flex;flex:0 0 180px;align-items:center;justify-content:flex-end;box-sizing:border-box;padding:0 10px;background:#382b2d;color:var(--volca-text);font-size:var(--volca-type-label);font-weight:700;letter-spacing:.02em;line-height:1.2;white-space:nowrap}.flag-gutter,.step-flags .pitch-gutter,.motion-step-row .pitch-gutter{justify-content:center;color:var(--volca-accent);text-align:center}.header-gutter{justify-content:center;gap:4px;padding:4px 6px}.header-tool{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.header-tool:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.header-tool:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.header-tool.on{border-color:var(--volca-accent);background:rgba(206,179,147,.18);color:var(--volca-text)}.header-cell{min-height:40px;display:flex;align-items:center;justify-content:center}.motion-gutter{flex-direction:column;justify-content:center;align-items:stretch;gap:6px;padding:8px 6px;white-space:normal;color:var(--volca-accent);text-align:center}.motion-gutter__label{flex:0 0 auto;font-weight:700}.motion-target-select{flex:0 0 auto;min-width:0;width:100%;font-size:var(--volca-type-label)}.motion-gutter :deep(.v-field){border-radius:0!important;background:transparent!important;font-size:var(--volca-type-label);min-height:32px!important}.motion-gutter :deep(.v-field__input){min-height:28px;padding-top:2px;padding-bottom:2px;padding-inline:0;line-height:1.2}.motion-gutter :deep(.v-select__selection-text){white-space:nowrap;text-align:center}.motion-gutter__actions{display:flex;align-items:center;justify-content:center;gap:6px}.motion-gutter__clear{display:grid;place-items:center;width:50px;height:50px;min-width:50px;min-height:50px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:9px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.motion-gutter__clear:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.motion-gutter__clear:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.pitch-gutter.black-key{background:#2a2021;color:#9d8570}.step-cell{flex:1 1 0;width:0;min-width:28px;box-sizing:border-box;border-left:1px solid #55454740}.header-cell{position:relative;padding:4px 0;background:#4a3a3c;text-align:center;cursor:pointer}.header-cell.muted{opacity:.38}.header-cell.skipped{color:#8f8170;text-decoration:line-through}.note-cell{position:relative;display:flex;align-items:center;height:20px;border-top:1px solid #55454726;cursor:pointer;touch-action:none}.note-cell.muted,.note-cell.skipped{opacity:.42}.note-cell__label{z-index:2;overflow:hidden;padding-left:4px;color:#382b2d;font-size:var(--volca-type-label);font-weight:700;white-space:nowrap}.step-cell.cursor::after{content:'';position:absolute;inset:0;z-index:1;background:rgba(206,179,147,.2);pointer-events:none}.step-cell{position:relative}.step-cell.beat{border-left-color:#ceb39380}.note-cell.active,.motion-fill{background:var(--volca-accent)}.note-cell.selected{box-shadow:inset 0 0 0 2px #f8eee4}.note-cell.full{cursor:not-allowed}.step-flags{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426;touch-action:none}.step-flags .step-cell{border-left-color:transparent}.step-flags .step-cell.beat{border-left-color:transparent}.flag-cell{display:grid;min-height:22px;padding:0;cursor:pointer}.flag{min-height:0;margin:3px;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer;touch-action:none;pointer-events:none}.flag.on{background:#ceb393;border-color:#e7bd76}.flag.sound.on{background:#9dce91;border-color:#b7e0ad}.flag:focus-visible{outline:2px solid var(--volca-accent);outline-offset:1px}.motion-bars{display:flex;flex:1;height:160px;touch-action:none;cursor:pointer}.motion-bars.disabled{opacity:.55}.motion-col{display:flex;align-items:flex-end}.motion-col.off{opacity:.35}.motion-fill{position:absolute;inset:auto 0 0}.motion-fill.point{right:auto}.motion-value,.motion-value-input{position:absolute;top:6px;right:2px;left:2px;z-index:2;color:var(--volca-text);font-size:11px;font-weight:700;line-height:22px;text-align:center}.motion-value-input{height:24px;border:1px solid var(--volca-accent);border-radius:4px;background:#382b2d}.motion-step-row{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426}.motion-step-cell{height:18px;margin:3px;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer}.motion-step-cell.on{background:#ceb393;border-color:#e7bd76}.roll-header{touch-action:none}.header-cell{cursor:grab;user-select:none}.roll-header.is-copying,.roll-header.is-copying .header-cell{cursor:grabbing}.header-cell.copy-source{background:#6a5348;color:#f1e9e1}.header-cell.drop-target{background:var(--volca-accent);color:#33282a}
+.roll{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;border:1px solid #55454780;border-radius:4px;overflow:hidden}.roll-header,.roll-row{display:flex}.roll-body{flex:1;min-height:0;overflow-y:auto;touch-action:none;user-select:none}.roll-pitches{position:relative;min-height:100%}.motion-row{flex:0 0 auto;border-top:2px solid var(--volca-accent)}.pitch-gutter{position:sticky;left:0;display:flex;flex:0 0 180px;align-items:center;justify-content:flex-end;box-sizing:border-box;padding:0 10px;background:#382b2d;color:var(--volca-text);font-size:var(--volca-type-label);font-weight:700;letter-spacing:.02em;line-height:1.2;white-space:nowrap}.flag-gutter,.step-flags .pitch-gutter,.motion-step-row .pitch-gutter{justify-content:center;color:var(--volca-accent);text-align:center}.header-gutter{justify-content:center;gap:4px;padding:4px 4px}.header-tool{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.header-tool .marquee-icon{width:16px;height:16px;display:block}.header-tool:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.header-tool:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.header-tool.on{border-color:var(--volca-accent);background:rgba(206,179,147,.18);color:var(--volca-text)}.header-cell{min-height:40px;display:flex;align-items:center;justify-content:center}.motion-gutter{flex-direction:column;justify-content:center;align-items:stretch;gap:6px;padding:8px 6px;white-space:normal;color:var(--volca-accent);text-align:center}.motion-gutter__label{flex:0 0 auto;font-weight:700}.motion-target-select{flex:0 0 auto;min-width:0;width:100%;font-size:var(--volca-type-label)}.motion-gutter :deep(.v-field){border-radius:0!important;background:transparent!important;font-size:var(--volca-type-label);min-height:32px!important}.motion-gutter :deep(.v-field__input){min-height:28px;padding-top:2px;padding-bottom:2px;padding-inline:0;line-height:1.2}.motion-gutter :deep(.v-select__selection-text){white-space:nowrap;text-align:center}.motion-gutter__actions{display:flex;align-items:center;justify-content:center;gap:6px}.motion-gutter__clear{display:grid;place-items:center;width:50px;height:50px;min-width:50px;min-height:50px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:9px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.motion-gutter__clear:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.motion-gutter__clear:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.pitch-gutter.black-key{background:#2a2021;color:#9d8570}.step-cell{flex:1 1 0;width:0;min-width:28px;box-sizing:border-box;border-left:1px solid #55454740}.header-cell{position:relative;padding:4px 0;background:#4a3a3c;text-align:center;cursor:pointer}.header-cell.muted{opacity:.38}.header-cell.skipped{color:#8f8170;text-decoration:line-through}.note-cell{position:relative;display:flex;align-items:center;height:20px;border-top:1px solid #55454726;cursor:pointer;touch-action:none}.note-cell.muted,.note-cell.skipped{opacity:.42}.note-cell__label{z-index:2;overflow:hidden;padding-left:4px;color:#382b2d;font-size:var(--volca-type-label);font-weight:700;white-space:nowrap}.step-cell.cursor::after{content:'';position:absolute;inset:0;z-index:1;background:rgba(206,179,147,.2);pointer-events:none}.step-cell{position:relative}.step-cell.beat{border-left-color:#ceb39380}.note-cell.active,.motion-fill{background:var(--volca-accent)}.note-cell.active{cursor:grab}.note-cell.selected{box-shadow:inset 0 0 0 2px #f8eee4}.note-cell.full{cursor:not-allowed}.note-resize-handle{position:absolute;top:0;right:0;z-index:3;width:10px;height:100%;cursor:ew-resize}.roll-body.is-moving,.roll-body.is-moving .note-cell{cursor:grabbing}.roll-body.is-resizing,.roll-body.is-resizing .note-cell{cursor:ew-resize}.roll-body.is-marquee,.roll-body.is-marquee .note-cell,.roll-body.is-marquee .note-resize-handle{cursor:crosshair}.note-marquee{position:absolute;z-index:5;border:1px solid var(--volca-accent);background:rgba(206,179,147,.16);pointer-events:none}.step-flags{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426;touch-action:none}.step-flags .step-cell{border-left-color:transparent}.step-flags .step-cell.beat{border-left-color:transparent}.flag-cell{display:grid;min-height:22px;padding:0;cursor:pointer}.flag{min-height:0;margin:3px;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer;touch-action:none;pointer-events:none}.flag.on{background:#ceb393;border-color:#e7bd76}.flag.sound.on{background:#9dce91;border-color:#b7e0ad}.flag:focus-visible{outline:2px solid var(--volca-accent);outline-offset:1px}.motion-bars{display:flex;flex:1;height:160px;touch-action:none;cursor:pointer}.motion-bars.disabled{opacity:.55}.motion-col{display:flex;align-items:flex-end}.motion-col.off{opacity:.35}.motion-fill{position:absolute;inset:auto 0 0}.motion-fill.point{right:auto}.motion-value,.motion-value-input{position:absolute;top:6px;right:2px;left:2px;z-index:2;color:var(--volca-text);font-size:11px;font-weight:700;line-height:22px;text-align:center}.motion-value-input{height:24px;border:1px solid var(--volca-accent);border-radius:4px;background:#382b2d}.motion-step-row{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426}.motion-step-cell{height:18px;margin:3px;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer}.motion-step-cell.on{background:#ceb393;border-color:#e7bd76}.roll-header{touch-action:none}.header-cell{cursor:grab;user-select:none}.roll-header.is-copying,.roll-header.is-copying .header-cell{cursor:grabbing}.header-cell.copy-source{background:#6a5348;color:#f1e9e1}.header-cell.drop-target{background:var(--volca-accent);color:#33282a}
 .focus-help-copy { margin: 0; }
 .focus-help-skip { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 0; color: var(--volca-muted); font-size: var(--volca-type-body); line-height: 1.4; cursor: pointer; }
 .focus-help-skip input { width: 16px; height: 16px; margin-top: 2px; flex: 0 0 auto; accent-color: var(--volca-accent); }
+</style>
+
+<style>
+.euclid-menu-layer { position: fixed; inset: 0; z-index: 4000; }
+.euclid-menu {
+  position: fixed;
+  min-width: 200px;
+  padding: 4px;
+  border: 1px solid rgba(206, 179, 147, 0.28);
+  border-radius: 10px;
+  background: #2b2022;
+  box-shadow: 0 16px 40px rgba(10, 5, 6, 0.45);
+}
+.euclid-menu button {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--volca-text);
+  font: inherit;
+  font-size: var(--volca-type-body);
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+.euclid-menu button:hover { background: rgba(206, 179, 147, 0.14); }
+.euclid-menu button:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 1px; }
 </style>

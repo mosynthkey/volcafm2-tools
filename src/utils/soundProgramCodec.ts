@@ -17,6 +17,14 @@ export const normalizeSoundProgramName = (value: string): string => Array.from(v
     .slice(0, SOUND_PROGRAM_NAME_LENGTH)
     .trimEnd();
 
+export const writePackedVoiceName = (data: Uint8Array, name: string) => {
+    const padded = normalizeSoundProgramName(name).padEnd(SOUND_PROGRAM_NAME_LENGTH, ' ');
+    for (let index = 0; index < SOUND_PROGRAM_NAME_LENGTH; index++) {
+        data[118 + index] = padded.charCodeAt(index);
+    }
+    return data;
+};
+
 const decodeOperator = (data: Uint8Array, operatorIndex: number): SoundOperator => {
     const base = operatorBase(operatorIndex);
     return {
@@ -99,8 +107,8 @@ export const encodeSoundProgram = (program: SoundProgram): Uint8Array => {
     data[115] = clamp(program.ampModDepth, 0, 99);
     data[116] = (program.lfoSync ? 1 : 0) | (clamp(program.lfoWave, 0, 5) << 1) | (clamp(program.pitchModSensitivity, 0, 7) << 4);
     data[117] = clamp(program.transpose, 0, 48);
-    const name = normalizeSoundProgramName(program.name).padEnd(SOUND_PROGRAM_NAME_LENGTH, ' ');
-    for (let index = 0; index < SOUND_PROGRAM_NAME_LENGTH; index++) data[118 + index] = name.charCodeAt(index);
+    const name = normalizeSoundProgramName(program.name);
+    writePackedVoiceName(data, name);
     data[128] = clamp(program.modulatorAttack + 64, 1, 127);
     data[129] = clamp(program.modulatorDecay + 64, 1, 127);
     data[130] = clamp(program.carrierAttack + 64, 1, 127);
@@ -109,8 +117,44 @@ export const encodeSoundProgram = (program: SoundProgram): Uint8Array => {
     return data;
 };
 
-export const createInitialSoundProgram = (): SoundProgram => decodeSoundProgram(new Uint8Array([
-    ...Array.from({ length: 102 }, (_, index) => index % 17 === 14 ? 80 : index % 17 < 4 ? 80 : index % 17 < 8 ? (index % 17 === 4 ? 99 : 0) : 0),
-    50, 50, 50, 50, 50, 50, 50, 50, 31, 0, 35, 0, 0, 0, 8, 24,
-    ...Array.from('INIT VOICE', character => character.charCodeAt(0)), 64, 64, 64, 64, 4, 1, 1, 1, 1, 1, 1, 0,
-]));
+const initialOperator = (outputLevel: number): SoundOperator => ({
+    egRates: [99, 99, 99, 99],
+    egLevels: [99, 99, 99, 0],
+    breakPoint: 0,
+    leftDepth: 0,
+    rightDepth: 0,
+    leftCurve: 0,
+    rightCurve: 0,
+    rateScaling: 0,
+    ampModSensitivity: 0,
+    keyVelocitySensitivity: 0,
+    outputLevel,
+    oscillatorMode: 0,
+    coarse: 1,
+    fine: 0,
+    detune: 7,
+    enabled: true,
+});
+
+export const createInitialSoundProgram = (): SoundProgram => ({
+    operators: [99, 0, 0, 0, 0, 0].map(initialOperator),
+    pitchEgRates: [50, 50, 50, 50],
+    pitchEgLevels: [50, 50, 50, 50],
+    algorithm: 0,
+    feedback: 0,
+    oscillatorSync: false,
+    lfoSpeed: 35,
+    lfoDelay: 0,
+    pitchModDepth: 0,
+    ampModDepth: 0,
+    lfoSync: false,
+    lfoWave: 4,
+    pitchModSensitivity: 0,
+    transpose: 24,
+    name: 'INIT VOICE',
+    modulatorAttack: 0,
+    modulatorDecay: 0,
+    carrierAttack: 0,
+    carrierDecay: 0,
+    octave: 0,
+});

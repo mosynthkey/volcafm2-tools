@@ -15,6 +15,10 @@ export const useSoundSync = () => {
     watch(() => midiStore.connectionState, () => {
         if (midiStore.isLibraryReady && currentVoiceRequestPending.value) {
             currentVoiceRequestPending.value = false;
+            if (soundStore.skipNextDeviceLoad) {
+                soundStore.skipNextDeviceLoad = false;
+                return;
+            }
             midiStore.requestCurrentVoiceDump();
         }
     }, { immediate: true });

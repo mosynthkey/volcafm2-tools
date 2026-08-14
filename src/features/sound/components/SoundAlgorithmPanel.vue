@@ -53,7 +53,7 @@ const NumberControl = KnobControl;
 <style scoped>
 .operator-nav { padding-bottom: 10px; }
 .algorithm-control { display: grid; grid-template-columns: 1fr; justify-items: center; gap: 8px; margin: 8px 12px 10px; }
-.algorithm-control > :deep(.algorithm-diagram) { justify-self: stretch; }
+.algorithm-control > :deep(.algorithm-diagram) { width: min(100%, 248px); height: 148px; justify-self: center; }
 .algorithm-legend { display: flex; grid-column: 1 / -1; justify-content: center; gap: 10px; color: #ad9e96; font-size: var(--volca-type-label); }
 .algorithm-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .algorithm-legend i { width: 13px; height: 2px; display: inline-block; background: #f1e9e1; }

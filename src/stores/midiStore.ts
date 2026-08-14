@@ -1,14 +1,16 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 import { MIDIConnectionState, isDeviceReadyState, isIdleConnectedState } from '@/midi/connectionState';
-import { buildDx7Cartridge } from '@/midi/dx7Cartridge';
+import { buildDx7Cartridge, buildDx7SingleVoice, packedVoiceName } from '@/midi/dx7Cartridge';
+import { SOUND_LIST_SLOT_COUNT, mapImportedVoiceSlots, padPackedProgram, padProgramDump, remapSlotAfterReorder } from '@/utils/soundListBackup';
+import { writePackedVoiceName } from '@/utils/soundProgramCodec';
 import { createMidiMessageRouter } from '@/midi/midiMessageRouter';
 import { createSysexAssembler } from '@/midi/sysexAssembler';
 import { formatMidiBytes, MidiTransport } from '@/midi/midiTransport';
 import {
     createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry,
-    createProgramRequest, decodeCurrentVoice, isCurrentVoiceDump, isDeviceInquiryReply,
-    isProgramDump, isStatusReply, statusLabel, unpackProgramDump,
+    createProgramDump, createProgramRequest, decodeCurrentVoice, decodeProgramDump,
+    isCurrentVoiceDump, isDeviceInquiryReply, isProgramDump, isStatusReply, statusLabel,
 } from '@/midi/volcaFm2Protocol';
 import { loadProgramReferences, matchCurrentVoice } from '@/midi/programLoader';
 
@@ -18,6 +20,8 @@ type MIDIOutput = globalThis.MIDIOutput;
 type MIDIMessageEvent = globalThis.MIDIMessageEvent;
 
 const REPLY_TIMEOUT_MS = 4000;
+const PROGRAM_WRITE_RETRY_COUNT = 5;
+const PROGRAM_WRITE_RETRY_DELAY_MS = 800;
 
 export { MIDIConnectionState };
 
@@ -28,19 +32,24 @@ export const useMidiStore = defineStore('midi', () => {
     const midiOutputs = ref<string[]>([]);
     const selectedMidiIn = ref<string | null>(null);
     const selectedMidiOut = ref<string | null>(null);
-    const programNames = ref<{ name: string }[]>(Array.from({ length: 64 }, () => ({ name: '' })));
-    const programData = ref<Uint8Array[]>([]);
+    const emptyNames = () => Array.from({ length: SOUND_LIST_SLOT_COUNT }, () => ({ name: '' }));
+    const programNames = ref<{ name: string }[]>(emptyNames());
+    const programData = ref<(Uint8Array | undefined)[]>([]);
     const lastReceivedProgram = ref<{ programNo: number; name: string } | null>(null);
     const currentProgramFetchState = ref<'idle' | 'loading-programs' | 'requesting' | 'received' | 'error'>('idle');
     const currentProgramFetchProgress = ref(0);
     const matchedProgramNo = ref<number | null>(null);
     const sequenceWriteState = ref<'idle' | 'sending' | 'ok' | 'nak' | 'error'>('idle');
+    const programWriteState = ref<'idle' | 'sending' | 'ok' | 'nak' | 'error'>('idle');
+    const programWriteProgress = ref(0);
+    const programWriteSlot = ref<number | null>(null);
     const currentVoiceData = ref<Uint8Array | null>(null);
     const soundEditState = ref<'idle' | 'requesting' | 'received' | 'sending' | 'ok' | 'error'>('idle');
     const logs = ref<string[]>([]);
     let programLoadPromise: Promise<boolean> | null = null;
     let currentVoiceFetchPromise: Promise<boolean> | null = null;
     let currentVoiceWaiter: ((ok: boolean) => void) | null = null;
+    let programWriteWaiter: ((ok: boolean) => void) | null = null;
 
     const receivedProgramCount = computed(() => programData.value.filter(Boolean).length);
     const isDeviceReady = computed(() => isDeviceReadyState(connectionState.value));
@@ -129,8 +138,8 @@ export const useMidiStore = defineStore('midi', () => {
         } else if (isProgramDump(data)) {
             connectionState.value = MIDIConnectionState.RECEIVING;
             const programNo = data[7];
-            const programDataArray = unpackProgramDump(data.slice(8, -1));
-            const programName = String.fromCharCode(...programDataArray.slice(118, 127));
+            const programDataArray = decodeProgramDump(data);
+            const programName = packedVoiceName(programDataArray);
             programNames.value[programNo] = { name: programName };
             programData.value[programNo] = programDataArray;
             lastReceivedProgram.value = { programNo, name: programName.trim() };
@@ -163,6 +172,13 @@ export const useMidiStore = defineStore('midi', () => {
             }
         } else if (isStatusReply(data)) {
             log(`Status reply: 0x${data[6].toString(16)} (${statusLabel(data[6])})`);
+            if (programWriteState.value === 'sending') {
+                const ok = data[6] === 0x23;
+                programWriteState.value = ok ? 'ok' : 'nak';
+                programWriteWaiter?.(ok);
+                programWriteWaiter = null;
+                return;
+            }
             if (sequenceWriteState.value === 'sending') {
                 sequenceWriteState.value = data[6] === 0x23 ? 'ok' : 'nak';
             }
@@ -239,7 +255,7 @@ export const useMidiStore = defineStore('midi', () => {
 
     const reloadAllProgramDumps = () => {
         if (programLoadPromise) return programLoadPromise;
-        programNames.value = Array.from({ length: 64 }, () => ({ name: '' }));
+        programNames.value = emptyNames();
         programData.value = [];
         lastReceivedProgram.value = null;
         currentProgramFetchProgress.value = 0;
@@ -288,13 +304,133 @@ export const useMidiStore = defineStore('midi', () => {
         return currentVoiceFetchPromise;
     };
 
+    const namedProgram = (slot: number, data: Uint8Array) => {
+        const name = programNames.value[slot]?.name?.trim();
+        return name ? writePackedVoiceName(data, name) : data;
+    };
+    const packedAt = (slot: number) => namedProgram(slot, padPackedProgram(programData.value[slot]));
+    const programBytesAt = (slot: number) => namedProgram(slot, padProgramDump(programData.value[slot]));
+
     const dx7CartridgeBytes = (bank: 0 | 1) =>
-        buildDx7Cartridge(programData.value.slice(bank * 32, bank * 32 + 32));
+        buildDx7Cartridge(Array.from({ length: 32 }, (_, voiceIndex) => packedAt(bank * 32 + voiceIndex)));
+
+    const soundList = computed(() =>
+        Array.from({ length: SOUND_LIST_SLOT_COUNT }, (_, slot) => ({
+            slot,
+            name: programNames.value[slot]?.name ?? '',
+            loaded: Boolean(programData.value[slot]),
+        })),
+    );
+
+    const cloneSoundList = () =>
+        Array.from({ length: SOUND_LIST_SLOT_COUNT }, (_, slot) => ({
+            name: programNames.value[slot]?.name ?? '',
+            data: programBytesAt(slot),
+        }));
+
+    const reorderSoundList = (fromSlot: number, toSlot: number) => {
+        if (fromSlot === toSlot) return;
+        if (fromSlot < 0 || toSlot < 0 || fromSlot >= SOUND_LIST_SLOT_COUNT || toSlot >= SOUND_LIST_SLOT_COUNT) return;
+        const names = Array.from({ length: SOUND_LIST_SLOT_COUNT }, (_, slot) => programNames.value[slot] ?? { name: '' });
+        const data = Array.from({ length: SOUND_LIST_SLOT_COUNT }, (_, slot) => programData.value[slot]);
+        const [movedName] = names.splice(fromSlot, 1);
+        const [movedData] = data.splice(fromSlot, 1);
+        names.splice(toSlot, 0, movedName);
+        data.splice(toSlot, 0, movedData);
+        matchedProgramNo.value = remapSlotAfterReorder(matchedProgramNo.value, fromSlot, toSlot);
+        programNames.value = names;
+        programData.value = data;
+    };
+
+    const importPackedVoices = (voices: Uint8Array[], startSlot: number) => {
+        const destinations = mapImportedVoiceSlots(voices.length, startSlot);
+        const nextData = programData.value.slice();
+        const nextNames = Array.from({ length: SOUND_LIST_SLOT_COUNT }, (_, slot) => programNames.value[slot] ?? { name: '' });
+        voices.forEach((voice, voiceIndex) => {
+            const slot = destinations[voiceIndex];
+            const packed = padProgramDump(voice);
+            nextData[slot] = packed;
+            nextNames[slot] = { name: packedVoiceName(packed) };
+        });
+        programData.value = nextData;
+        programNames.value = nextNames;
+    };
+
+    const replaceSoundList = (programs: { name: string; data: Uint8Array }[]) => {
+        programNames.value = Array.from({ length: SOUND_LIST_SLOT_COUNT }, (_, slot) => ({
+            name: programs[slot]?.name || packedVoiceName(padProgramDump(programs[slot]?.data)),
+        }));
+        programData.value = Array.from({ length: SOUND_LIST_SLOT_COUNT }, (_, slot) =>
+            padProgramDump(programs[slot]?.data));
+    };
 
     const reset = () => {
-        programNames.value = Array.from({ length: 64 }, () => ({ name: '' }));
+        programNames.value = emptyNames();
         programData.value = [];
         lastReceivedProgram.value = null;
+    };
+
+    const updateSoundListSlot = (slot: number, data: Uint8Array) => {
+        if (slot < 0 || slot >= SOUND_LIST_SLOT_COUNT) return;
+        const dump = padProgramDump(data);
+        const nextData = programData.value.slice();
+        nextData[slot] = dump;
+        programData.value = nextData;
+        const nextNames = Array.from({ length: SOUND_LIST_SLOT_COUNT }, (_, index) =>
+            programNames.value[index] ?? { name: '' });
+        nextNames[slot] = { name: packedVoiceName(dump) };
+        programNames.value = nextNames;
+    };
+
+    const waitForProgramWriteAck = () => new Promise<boolean>(resolve => {
+        programWriteWaiter = resolve;
+        armTimeout(
+            () => programWriteState.value === 'sending',
+            () => {
+                programWriteState.value = 'error';
+                programWriteWaiter?.(false);
+                programWriteWaiter = null;
+            },
+        );
+    });
+
+    const writeProgramSlot = async (slot: number) => {
+        const attempts = PROGRAM_WRITE_RETRY_COUNT + 1;
+        for (let attempt = 1; attempt <= attempts; attempt++) {
+            programWriteState.value = 'sending';
+            const retryLabel = attempt > 1 ? ` (retry ${attempt - 1}/${PROGRAM_WRITE_RETRY_COUNT})` : '';
+            log(`Sending PROGRAM DATA DUMP (Func 0x4E) to program #${slot}${retryLabel}...`);
+            if (!sendSysEx(createProgramDump(slot, programBytesAt(slot)))) {
+                programWriteState.value = 'error';
+                log(`Failed to send program #${slot}: no MIDI output selected.`);
+                return false;
+            }
+            if (await waitForProgramWriteAck()) return true;
+            if (programWriteState.value === 'sending') programWriteState.value = 'error';
+            if (attempt === attempts) {
+                log(`Program #${slot} write failed after ${attempts} attempts (${programWriteState.value}).`);
+                return false;
+            }
+            log(`Program #${slot} write failed (${programWriteState.value}); retrying ${attempt}/${PROGRAM_WRITE_RETRY_COUNT}...`);
+            await new Promise(resolve => setTimeout(resolve, PROGRAM_WRITE_RETRY_DELAY_MS));
+        }
+        return false;
+    };
+
+    const writeSoundListToDevice = async () => {
+        if (programWriteState.value === 'sending') return false;
+        programWriteProgress.value = 0;
+        programWriteSlot.value = 0;
+        for (let slot = 0; slot < SOUND_LIST_SLOT_COUNT; slot++) {
+            programWriteSlot.value = slot;
+            if (!await writeProgramSlot(slot)) return false;
+            programWriteProgress.value = slot + 1;
+            await new Promise(resolve => setTimeout(resolve, 20));
+        }
+        programWriteSlot.value = null;
+        programWriteState.value = 'ok';
+        log('Wrote all 64 programs to internal memory.');
+        return true;
     };
 
     const sendCurrentSequenceDump = (bytes: Uint8Array) => {
@@ -330,7 +466,18 @@ export const useMidiStore = defineStore('midi', () => {
         );
     };
 
-    const sendCurrentVoiceDump = (programDataBytes: Uint8Array) => {
+    const sendDx7SingleVoiceDump = (programDataBytes: Uint8Array) => {
+        const packed = programDataBytes.length >= 128
+            ? programDataBytes.subarray(0, 128)
+            : padPackedProgram(programDataBytes);
+        return sendSysEx(buildDx7SingleVoice(packed));
+    };
+
+    const sendCurrentVoiceDump = (programDataBytes: Uint8Array, options?: { refreshNameDisplay?: boolean }) => {
+        if (options?.refreshNameDisplay) {
+            log('Sending DX7 1-voice dump so the unit display can pick up Voice Name...');
+            sendDx7SingleVoiceDump(programDataBytes);
+        }
         soundEditState.value = 'sending';
         const message = createCurrentVoiceDump(programDataBytes);
         log('Sending CURRENT PROGRAM DATA DUMP from Sound Edit (Func 0x42)...');
@@ -369,10 +516,14 @@ export const useMidiStore = defineStore('midi', () => {
         currentProgramFetchProgress,
         matchedProgramNo,
         sequenceWriteState,
+        programWriteState,
+        programWriteProgress,
+        programWriteSlot,
         currentVoiceData,
         soundEditState,
         logs,
         receivedProgramCount,
+        soundList,
         isDeviceReady,
         isIdleConnected,
         isLibraryReady,
@@ -381,13 +532,21 @@ export const useMidiStore = defineStore('midi', () => {
         initMIDI,
         detectVolcaFM2,
         requestProgramDump,
+        ensureAllProgramDumps,
         reloadAllProgramDumps,
+        cloneSoundList,
+        reorderSoundList,
+        importPackedVoices,
+        replaceSoundList,
+        updateSoundListSlot,
+        programBytesAt,
         dx7CartridgeBytes,
         sendSysEx,
         requestCurrentVoiceProgramNo,
         sendCurrentSequenceDump,
         requestCurrentVoiceDump,
         sendCurrentVoiceDump,
+        writeSoundListToDevice,
         addLog: log,
         clearLogs,
         onNoteEvent,

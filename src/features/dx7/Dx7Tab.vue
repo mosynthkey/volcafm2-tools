@@ -1,69 +1,373 @@
 <template>
-  <v-container>
-    <div v-if="midiStore.isDeviceReady">
-      <v-card v-for="(cartridge, index) in 2" :key="index" class="mb-4 pa-4" style="margin: 0 auto;">
-        <v-row align="center">
-          <v-col>
-            <v-card-title>{{ t('dx7.cartridge', { count: index + 1 }) }}</v-card-title>
-          </v-col>
-          <v-col class="text-right">
-            <v-btn @click="downloadCartridge(index)"
-              :disabled="!midiStore.isLibraryReady"
-              :class="{ dimmed: !midiStore.isLibraryReady }">
-              {{ t('dx7.download') }}
-              <Download :size="16" class="ml-1" />
-            </v-btn>
-          </v-col>
-        </v-row>
-        <v-divider class="my-4" />
-        <v-row v-for="row in 4" :key="row">
-          <v-col v-for="col in 8" :key="col" class="text-left"
-            :class="{ 'dimmed-text': !midiStore.programNames[(index * 32) + (row - 1) * 8 + (col - 1)]?.name }">
-            {{ (index * 32) + (row - 1) * 8 + (col - 1) }}:<br>
-            {{ midiStore.programNames[(index * 32) + (row - 1) * 8 + (col - 1)]?.name || '-' }}
-          </v-col>
-        </v-row>
-      </v-card>
-    </div>
+  <v-container class="sound-list-container">
+    <AppErrorDialog v-model="showError" :title="t('dx7.listTitle')" :message="errorMessage" />
+    <AppDialog v-model="showWriteConfirm" :title="t('dx7.writeTitle')" max-width="480">
+      <p>{{ t('dx7.writeDescription') }}</p>
+      <template #actions>
+        <v-btn variant="text" @click="showWriteConfirm = false">{{ t('common.cancel') }}</v-btn>
+        <v-btn @click="confirmWrite">{{ t('dx7.write') }}</v-btn>
+      </template>
+    </AppDialog>
+    <AppDialog :model-value="showWriteProgress" :title="t('dx7.writeTitle')" max-width="480" persistent :closable="false">
+      <p>{{ t('dx7.writeProgress', { count: midiStore.programWriteProgress, total: 64 }) }}</p>
+      <v-progress-linear :model-value="writePercent" color="amber-lighten-3" height="8" rounded />
+    </AppDialog>
+    <Dx7VoiceImportDialog v-model="showVoicePicker" :voices="parsedVoices" :initial-start-slot="firstEmptySlot"
+      @import="applyDx7Import" />
+
+    <v-card class="sound-list-card pa-4">
+      <header class="editor-toolbar">
+        <div class="editor-identity">
+          <span class="editor-identity__label volca-section-title">{{ t('dx7.listTitle') }}</span>
+          <v-btn class="reorder-btn" :class="{ 'is-on': reorderEnabled }" :aria-pressed="reorderEnabled"
+            @click="reorderEnabled = !reorderEnabled">
+            <ArrowUpDown :size="16" class="mr-1" />{{ t('dx7.reorder') }}
+          </v-btn>
+        </div>
+        <div class="editor-toolbar-section">
+          <v-btn :disabled="!midiStore.isDeviceReady" :loading="midiStore.connectionState === MIDIConnectionState.RECEIVING"
+            :title="t('dx7.reloadHint')" @click="midiStore.reloadAllProgramDumps()">
+            <HardDriveDownload :size="16" class="mr-1" />{{ t('dx7.receive') }}
+          </v-btn>
+          <v-btn :disabled="!canWrite" :loading="midiStore.programWriteState === 'sending'"
+            @click="showWriteConfirm = true">
+            <HardDriveUpload :size="16" class="mr-1" />{{ t('dx7.send') }}
+          </v-btn>
+        </div>
+        <div class="editor-toolbar-section">
+          <span class="editor-toolbar-section__label volca-section-title">{{ t('dx7.groupDx7') }}</span>
+          <v-btn @click="dx7FileInput?.click()">
+            <FileUp :size="16" class="mr-1" />{{ t('dx7.fileImport') }}
+          </v-btn>
+          <v-menu location="bottom start" offset="6">
+            <template #activator="{ props: menuProps }">
+              <v-btn v-bind="menuProps">
+                <Download :size="16" class="mr-1" />{{ t('dx7.fileExport') }}
+                <ChevronDown :size="16" class="ml-1" />
+              </v-btn>
+            </template>
+            <v-list class="sound-list-menu" density="compact">
+              <v-list-item :title="t('dx7.exportCartridge', { start: '00', end: '31' })" @click="downloadCartridge(0)" />
+              <v-list-item :title="t('dx7.exportCartridge', { start: '32', end: '63' })" @click="downloadCartridge(1)" />
+            </v-list>
+          </v-menu>
+        </div>
+        <div class="editor-toolbar-spacer"></div>
+        <div class="editor-toolbar-section editor-library">
+          <PageHintButton page="sound-list" />
+          <v-btn @click="ui.openLibrary('sound-list')">
+            <Library :size="16" class="mr-1" />{{ t('common.library') }}
+          </v-btn>
+        </div>
+        <input ref="dx7FileInput" type="file" accept=".syx,.SYX" hidden @change="selectDx7File" />
+      </header>
+
+      <p class="list-copy">{{ t('dx7.listDescription') }}</p>
+
+      <div class="sound-list-columns">
+        <div v-for="column in listColumns" :key="column" class="sound-list-column"
+          :class="{ 'is-dragging': dragActive, 'is-reorder': reorderEnabled }">
+          <template v-for="slot in columnSlots(column)" :key="slot.slot">
+            <div class="slot-gap" :data-insert-before="slot.slot"
+              :class="{ 'is-open': isOpenGap(slot.slot) }" />
+            <div class="slot-row"
+              :data-sound-slot="slot.slot"
+              :class="{
+                empty: !slot.name.trim(),
+                dragging: dragActive && draggingSlot === slot.slot,
+                active: midiStore.matchedProgramNo === slot.slot,
+              }"
+              role="button"
+              :tabindex="reorderEnabled ? -1 : 0"
+              :aria-label="slotAria(slot)"
+              @click="onSlotClick(slot.slot)"
+              @keydown.enter.prevent="onSlotClick(slot.slot)"
+              @pointerdown="onRowPointerDown($event, slot.slot)"
+              @pointermove="onHandlePointerMove"
+              @pointerup="onHandlePointerUp"
+              @pointercancel="onHandlePointerUp">
+              <span v-if="reorderEnabled" class="slot-handle" :aria-hidden="true">
+                <GripVertical :size="16" />
+              </span>
+              <span class="slot-number">{{ String(slot.slot).padStart(2, '0') }}</span>
+              <span class="slot-name">{{ slot.name.trim() || '—' }}</span>
+              <div v-if="reorderEnabled" class="slot-move">
+                <v-btn icon variant="text" size="small" :disabled="slot.slot === 0" :aria-label="t('dx7.moveUp')"
+                  @click.stop="midiStore.reorderSoundList(slot.slot, slot.slot - 1)">
+                  <ChevronUp :size="16" />
+                </v-btn>
+                <v-btn icon variant="text" size="small" :disabled="slot.slot === 63" :aria-label="t('dx7.moveDown')"
+                  @click.stop="midiStore.reorderSoundList(slot.slot, slot.slot + 1)">
+                  <ChevronDown :size="16" />
+                </v-btn>
+              </div>
+            </div>
+          </template>
+          <div class="slot-gap" :data-insert-before="(column + 1) * 32"
+            :class="{ 'is-open': isOpenGap((column + 1) * 32) }" />
+        </div>
+      </div>
+      <Teleport to="body">
+        <div v-if="dragActive && draggingMeta" class="slot-ghost"
+          :style="{ left: `${ghostPos.x}px`, top: `${ghostPos.y}px` }">
+          <span class="slot-number">{{ String(draggingMeta.slot).padStart(2, '0') }}</span>
+          <span class="slot-name">{{ draggingMeta.name }}</span>
+        </div>
+      </Teleport>
+    </v-card>
   </v-container>
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue';
-import { useMidiStore } from '@/stores/midiStore';
+import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { ArrowUpDown, ChevronDown, ChevronUp, Download, FileUp, GripVertical, HardDriveDownload, HardDriveUpload, Library } from '@lucide/vue';
+import AppDialog from '@/components/dialogs/AppDialog.vue';
+import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue';
+import PageHintButton from '@/components/PageHintButton.vue';
+import Dx7VoiceImportDialog from '@/features/dx7/Dx7VoiceImportDialog.vue';
+import { parseDx7Sysex, type Dx7PackedVoice } from '@/midi/dx7Cartridge';
+import { MIDIConnectionState, useMidiStore } from '@/stores/midiStore';
+import { useSoundStore } from '@/stores/soundStore';
 import { useUiStore } from '@/stores/uiStore';
 import { downloadBinary } from '@/utils/downloadBinary';
-import { Download } from '@lucide/vue';
-import { useI18n } from 'vue-i18n';
 
 const midiStore = useMidiStore();
+const soundStore = useSoundStore();
 const ui = useUiStore();
 const { t } = useI18n();
 
+const listColumns = [0, 1];
+const reorderEnabled = ref(false);
+const draggingSlot = ref<number | null>(null);
+const dropInsertBefore = ref<number | null>(null);
+const dragActive = ref(false);
+const ghostPos = ref({ x: 0, y: 0 });
+const dragOrigin = { x: 0, y: 0 };
+const dx7FileInput = ref<HTMLInputElement | null>(null);
+const showError = ref(false);
+const errorMessage = ref('');
+const showVoicePicker = ref(false);
+const parsedVoices = ref<Dx7PackedVoice[]>([]);
+const showWriteConfirm = ref(false);
+const showWriteProgress = ref(false);
+
 watch([() => ui.activeTab, () => midiStore.isDeviceReady], ([tab, ready]) => {
-  if (tab === 'dx7' && ready) void midiStore.reloadAllProgramDumps();
+  if (tab === 'dx7' && ready) void midiStore.ensureAllProgramDumps();
 }, { immediate: true });
+
+const firstEmptySlot = computed(() => {
+  const emptySlot = midiStore.soundList.findIndex(slot => !slot.name.trim());
+  return emptySlot === -1 ? 0 : emptySlot;
+});
+
+const canWrite = computed(() =>
+  midiStore.isIdleConnected && midiStore.programWriteState !== 'sending');
+
+const writePercent = computed(() => (midiStore.programWriteProgress / 64) * 100);
+
+const columnSlots = (column: number) => midiStore.soundList.slice(column * 32, column * 32 + 32);
+
+const slotAria = (slot: { slot: number; name: string }) => {
+  const name = slot.name.trim() || t('dx7.unnamedVoice');
+  return `${String(slot.slot).padStart(2, '0')} ${name}`;
+};
+
+const fail = (message: string) => {
+  errorMessage.value = message;
+  showError.value = true;
+};
+
 const downloadCartridge = (index: number) => {
   const bank = index === 0 ? 0 : 1;
   downloadBinary(midiStore.dx7CartridgeBytes(bank), `volca_fm2_dx7_cartridge_${index + 1}.syx`);
 };
+
+const selectDx7File = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  try {
+    const voices = parseDx7Sysex(new Uint8Array(await file.arrayBuffer()));
+    if (voices.length === 0) {
+      fail(t('dx7.parseError'));
+      return;
+    }
+    parsedVoices.value = voices;
+    showVoicePicker.value = true;
+  } catch {
+    fail(t('dx7.parseError'));
+  }
+};
+
+const applyDx7Import = (payload: { selectedIndexes: number[]; startSlot: number }) => {
+  const voices = payload.selectedIndexes
+    .map(voiceIndex => parsedVoices.value[voiceIndex]?.packed)
+    .filter((voice): voice is Uint8Array => Boolean(voice));
+  midiStore.importPackedVoices(voices, payload.startSlot);
+};
+
+const confirmWrite = async () => {
+  showWriteConfirm.value = false;
+  showWriteProgress.value = true;
+  const ok = await midiStore.writeSoundListToDevice();
+  showWriteProgress.value = false;
+  if (!ok) {
+    const slot = midiStore.programWriteSlot;
+    fail(slot === null ? t('dx7.writeErrorUnknown') : t('dx7.writeError', { slot: String(slot).padStart(2, '0') }));
+  }
+};
+
+const draggingMeta = computed(() => {
+  if (draggingSlot.value === null) return null;
+  const slot = midiStore.soundList[draggingSlot.value];
+  return slot ? { slot: slot.slot, name: slot.name.trim() || '—' } : null;
+});
+
+const onSlotClick = (slot: number) => {
+  if (reorderEnabled.value) return;
+  soundStore.loadLibrarianSlot(slot);
+  ui.activeTab = 'sound-edit';
+};
+
+const destinationFromInsert = (fromSlot: number, insertBefore: number) =>
+  fromSlot < insertBefore ? insertBefore - 1 : insertBefore;
+
+const canDropAt = (insertBefore: number) => {
+  if (draggingSlot.value === null) return false;
+  return destinationFromInsert(draggingSlot.value, insertBefore) !== draggingSlot.value;
+};
+
+const isOpenGap = (insertBefore: number) =>
+  dragActive.value && dropInsertBefore.value === insertBefore && canDropAt(insertBefore);
+
+const insertBeforeFromPoint = (clientX: number, clientY: number) => {
+  const element = document.elementFromPoint(clientX, clientY);
+  const gap = element?.closest('[data-insert-before]') as HTMLElement | null;
+  if (gap) return Number(gap.dataset.insertBefore);
+  const row = element?.closest('[data-sound-slot]') as HTMLElement | null;
+  if (row) {
+    const slot = Number(row.dataset.soundSlot);
+    const rect = row.getBoundingClientRect();
+    return clientY < rect.top + rect.height / 2 ? slot : slot + 1;
+  }
+  const column = element?.closest('.sound-list-column') as HTMLElement | null;
+  if (!column) return dropInsertBefore.value;
+  const rows = column.querySelectorAll<HTMLElement>('[data-sound-slot]');
+  const last = rows[rows.length - 1];
+  if (!last) return dropInsertBefore.value;
+  const lastSlot = Number(last.dataset.soundSlot);
+  return clientY >= last.getBoundingClientRect().bottom ? lastSlot + 1 : lastSlot;
+};
+
+const clearDrag = () => {
+  draggingSlot.value = null;
+  dropInsertBefore.value = null;
+  dragActive.value = false;
+};
+
+const onRowPointerDown = (event: PointerEvent, slot: number) => {
+  if (!reorderEnabled.value) return;
+  if ((event.target as HTMLElement | null)?.closest('.slot-move')) return;
+  draggingSlot.value = slot;
+  dropInsertBefore.value = slot;
+  dragActive.value = false;
+  dragOrigin.x = event.clientX;
+  dragOrigin.y = event.clientY;
+  ghostPos.value = { x: event.clientX, y: event.clientY };
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+};
+
+const onHandlePointerMove = (event: PointerEvent) => {
+  if (draggingSlot.value === null) return;
+  ghostPos.value = { x: event.clientX, y: event.clientY };
+  if (!dragActive.value) {
+    const dx = event.clientX - dragOrigin.x;
+    const dy = event.clientY - dragOrigin.y;
+    if (dx * dx + dy * dy < 36) return;
+    dragActive.value = true;
+  }
+  dropInsertBefore.value = insertBeforeFromPoint(event.clientX, event.clientY);
+};
+
+const onHandlePointerUp = () => {
+  if (dragActive.value && draggingSlot.value !== null && dropInsertBefore.value !== null) {
+    midiStore.reorderSoundList(
+      draggingSlot.value,
+      destinationFromInsert(draggingSlot.value, dropInsertBefore.value),
+    );
+  }
+  clearDrag();
+};
 </script>
 
 <style scoped>
-.v-btn.dimmed {
-  opacity: 0.5;
-  pointer-events: none;
+.sound-list-container { height: 100%; box-sizing: border-box; }
+.sound-list-card { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.list-copy { margin: 10px 0 14px; color: var(--volca-muted); line-height: 1.55; }
+.sound-list-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
-
-.mb-4 {
-  margin-bottom: 16px;
+.sound-list-column {
+  overflow: auto;
+  border: 1px solid rgba(206,179,147,.18);
+  border-radius: 11px;
+  background: rgba(48,36,38,.72);
 }
-
-.pa-4 {
-  padding: 16px;
+.slot-gap {
+  height: 1px;
+  margin: 0 10px;
+  background: rgba(206,179,147,.14);
+  flex: 0 0 auto;
 }
-
-.dimmed-text {
-  opacity: 0.5;
+.slot-gap.is-open {
+  height: 40px;
+  margin: 4px 8px;
+  border-radius: 8px;
+  background: rgba(206,179,147,.22);
+  box-shadow: inset 0 0 0 1px rgba(206,179,147,.45);
 }
+.slot-row {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; min-width: 0; padding: 6px 10px;
+  border: 0; background: transparent; color: inherit; text-align: left; width: 100%;
+  cursor: pointer;
+}
+.slot-row.empty .slot-name { color: #8f8180; }
+.slot-row.dragging {
+  height: 0; min-height: 0; padding: 0; overflow: hidden; opacity: 0; pointer-events: none;
+}
+.slot-row.active { background: rgba(206,179,147,.14); box-shadow: inset 3px 0 0 var(--volca-accent); }
+.sound-list-column.is-reorder .slot-row { cursor: grab; touch-action: none; }
+.sound-list-column.is-reorder .slot-row:active { cursor: grabbing; }
+.slot-ghost {
+  position: fixed; z-index: 40; display: flex; align-items: center; gap: 8px;
+  width: min(320px, calc(50vw - 48px)); min-height: 44px; padding: 6px 10px;
+  border: 1px solid rgba(206,179,147,.4); border-radius: 9px;
+  background: #352628; color: var(--volca-text);
+  box-shadow: 0 10px 24px rgba(0,0,0,.35);
+  pointer-events: none; transform: translate(12px, 8px);
+}
+.slot-handle {
+  display: grid; place-items: center; width: 28px; height: 28px; color: var(--volca-muted);
+}
+.slot-number {
+  width: 2rem; color: var(--volca-muted); font-variant-numeric: tabular-nums; font-weight: 650;
+}
+.slot-name {
+  min-width: 0; flex: 1; overflow: hidden; color: var(--volca-accent-bright);
+  font-weight: 650; text-overflow: ellipsis; white-space: nowrap;
+}
+.slot-move { display: flex; align-items: center; }
+.sound-list-menu { min-width: 200px; border: 1px solid rgba(206,179,147,.28); border-radius: 10px; background: #2b2022; color: var(--volca-text); }
+:deep(.reorder-btn.is-on) { box-shadow: inset 0 0 0 1px #ceb393, 0 3px 10px rgba(0,0,0,.16) !important; }
+:deep(.slot-move .v-btn) {
+  width: 28px; min-width: 28px; height: 28px; min-height: 28px; border: 0;
+  background: transparent !important; color: var(--volca-muted) !important; box-shadow: none !important;
+}
+:deep(.slot-move .v-btn:hover) { background: rgba(255,255,255,.07) !important; color: var(--volca-text) !important; }
 </style>

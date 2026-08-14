@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { createMidiMessageRouter } from '../src/midi/midiMessageRouter'
 import { createSysexAssembler } from '../src/midi/sysexAssembler'
 import { buildDx7Cartridge } from '../src/midi/dx7Cartridge'
-import { createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry, createProgramRequest,
-  decodeCurrentVoice, isCurrentVoiceDump, unpackProgramDump } from '../src/midi/volcaFm2Protocol'
+import { createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry, createProgramDump, createProgramRequest,
+  decodeCurrentVoice, decodeProgramDump, isCurrentVoiceDump, isProgramDump, unpackProgramDump } from '../src/midi/volcaFm2Protocol'
 import { loadProgramReferences, matchCurrentVoice } from '../src/midi/programLoader'
 
 assert.deepEqual([...createDeviceInquiry()], [0xf0, 0x7e, 0x7f, 0x06, 0x01, 0xf7])
@@ -14,6 +14,11 @@ const voice = Uint8Array.from({ length: 140 }, (_, index) => (index * 37) & 0xff
 const dump = createCurrentVoiceDump(voice)
 assert.equal(isCurrentVoiceDump(dump), true)
 assert.deepEqual(decodeCurrentVoice(dump), voice)
+
+const programDump = createProgramDump(65, voice)
+assert.equal(isProgramDump(programDump), true)
+assert.equal(programDump[7], 1)
+assert.deepEqual(decodeProgramDump(programDump), voice)
 
 const packedProgram: number[] = []
 for (let offset = 0; offset < 128; offset += 7) {

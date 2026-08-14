@@ -30,22 +30,31 @@ const duration = (rate: number, fromLevel: number, toLevel: number) => {
 };
 
 // Port of Dexed EnvDisplay::paint() geometry from DXComponents.cpp.
-export const dx7EnvelopeGeometry = (rates: number[], levels: number[], width: number, height: number): EnvelopePoint[] => {
+export const dx7EnvelopeGeometry = (
+  rates: number[],
+  levels: number[],
+  width: number,
+  height: number,
+  padding = 8,
+): EnvelopePoint[] => {
+  const innerWidth = Math.max(1, width - padding * 2);
+  const innerHeight = Math.max(1, height - padding * 2);
   const d = [duration(rates[0], levels[3], levels[0]), duration(rates[1], levels[0], levels[1]),
     duration(rates[2], levels[1], levels[2]), duration(rates[3], levels[2], levels[3])];
   const attackDecay = d[0] + d[1] + d[2];
   const keyoff = attackDecay + 10;
-  const scale = width / (keyoff + d[3]);
-  const y = (level: number) => height - (height / 99) * clampIndex(level);
+  const scale = innerWidth / (keyoff + d[3]);
+  const x = (value: number) => padding + value;
+  const y = (level: number) => padding + innerHeight - (innerHeight / 99) * clampIndex(level);
   return [
-    { x: 0, y: y(levels[3]) },
-    { x: d[0] * scale, y: y(levels[0]) },
-    { x: (d[0] + d[1]) * scale, y: y(levels[1]) },
-    { x: attackDecay * scale, y: y(levels[2]) },
-    { x: keyoff * scale, y: y(levels[2]) },
-    { x: Math.min(width, (attackDecay + keyoff + d[3]) * scale), y: y(levels[3]) },
+    { x: x(0), y: y(levels[3]) },
+    { x: x(d[0] * scale), y: y(levels[0]) },
+    { x: x((d[0] + d[1]) * scale), y: y(levels[1]) },
+    { x: x(attackDecay * scale), y: y(levels[2]) },
+    { x: x(keyoff * scale), y: y(levels[2]) },
+    { x: x(Math.min(innerWidth, (attackDecay + keyoff + d[3]) * scale)), y: y(levels[3]) },
   ];
 };
 
-export const dx7EnvelopePoints = (rates: number[], levels: number[], width: number, height: number) =>
-  dx7EnvelopeGeometry(rates, levels, width, height).map(point => `${point.x},${point.y}`).join(' ');
+export const dx7EnvelopePoints = (rates: number[], levels: number[], width: number, height: number, padding = 8) =>
+  dx7EnvelopeGeometry(rates, levels, width, height, padding).map(point => `${point.x},${point.y}`).join(' ');

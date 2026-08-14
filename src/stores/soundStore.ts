@@ -12,8 +12,9 @@ export const useSoundStore = defineStore('sound', () => {
     const loadedSignature = ref<string | null>(null);
     const selectedOperator = ref(-1);
     const showAlgorithmPicker = ref(false);
-    const showLibrary = ref(false);
     const showError = ref(false);
+    const skipNextDeviceLoad = ref(false);
+    let skipLibrarianSync = false;
 
     const encodedBytes = () => encodeSoundProgram(program.value);
     const signature = () => Array.from(encodedBytes()).join(',');
@@ -95,15 +96,26 @@ export const useSoundStore = defineStore('sound', () => {
     };
 
     watch(program, () => {
-        if (applyingHistory) return;
-        if (historyTimer !== null) clearTimeout(historyTimer);
-        historyTimer = setTimeout(commitHistory, HISTORY_COMMIT_MS);
+        if (!applyingHistory) {
+            if (historyTimer !== null) clearTimeout(historyTimer);
+            historyTimer = setTimeout(commitHistory, HISTORY_COMMIT_MS);
+        }
         refreshHistoryFlags();
+        syncLibrarian();
     }, { deep: true });
 
+    const syncLibrarian = (bytes?: Uint8Array) => {
+        if (skipLibrarianSync) return;
+        const midi = useMidiStore();
+        if (midi.matchedProgramNo === null) return;
+        midi.updateSoundListSlot(midi.matchedProgramNo, bytes ?? encodeSoundProgram(program.value));
+    };
+
     const loadFromVoiceData = (data: Uint8Array) => {
+        skipLibrarianSync = true;
         program.value = decodeSoundProgram(data);
         loadedSignature.value = signature();
+        nextTick(() => { skipLibrarianSync = false; });
     };
 
     const loadPreset = (data: SoundProgram) => {
@@ -124,7 +136,21 @@ export const useSoundStore = defineStore('sound', () => {
     };
 
     const sendToDevice = () => {
-        useMidiStore().sendCurrentVoiceDump(encodedForSend());
+        const bytes = encodedForSend();
+        skipLibrarianSync = false;
+        syncLibrarian(bytes);
+        useMidiStore().sendCurrentVoiceDump(bytes);
+    };
+
+    const loadLibrarianSlot = (slot: number) => {
+        const midi = useMidiStore();
+        skipNextDeviceLoad.value = true;
+        midi.matchedProgramNo = slot;
+        const dump = midi.programBytesAt(slot);
+        loadFromVoiceData(dump);
+        const listName = midi.programNames[slot]?.name?.trim();
+        if (listName) program.value.name = normalizeSoundProgramName(listName);
+        if (midi.isIdleConnected) midi.sendCurrentVoiceDump(encodedForSend(), { refreshNameDisplay: true });
     };
 
     const updateOperator = (payload: { operatorIndex: number; field: keyof SoundOperator; value: number; arrayIndex?: number }) => {
@@ -153,14 +179,20 @@ export const useSoundStore = defineStore('sound', () => {
         showAlgorithmPicker.value = false;
     };
 
+    const envelopeClipboard = ref<{ rates: number[]; levels: number[] } | null>(null);
+    const copyEnvelope = (rates: number[], levels: number[]) => {
+        envelopeClipboard.value = { rates: [...rates], levels: [...levels] };
+    };
+
     return {
         program,
         hasUnsavedChanges,
         selectedOperator,
         showAlgorithmPicker,
-        showLibrary,
         showError,
+        skipNextDeviceLoad,
         loadFromVoiceData,
+        loadLibrarianSlot,
         loadPreset,
         markSaved,
         reset,
@@ -172,6 +204,8 @@ export const useSoundStore = defineStore('sound', () => {
         toggleOperator,
         clearOperatorSelection,
         pickAlgorithm,
+        envelopeClipboard,
+        copyEnvelope,
         canUndo,
         canRedo,
         undo,

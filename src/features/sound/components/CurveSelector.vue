@@ -69,7 +69,7 @@ const CurveGlyph = defineComponent({
 <style scoped>
 .curve-control { display: grid; min-width: 0; justify-items: center; align-content: start; gap: 5px; }
 .curve-control > label { width: 100%; min-height: 18px; color: #ad9e96; font-size: var(--volca-type-label); line-height: 1.25; text-align: center; }
-.curve-trigger { width: 112px; height: 64px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 5px; padding: 7px 9px; border: 1px solid rgba(206,179,147,.3); border-radius: 9px; background: #251c1e; color: #d8ccc4; cursor: pointer; }
+.curve-trigger { width: 100%; max-width: 112px; height: 64px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 5px; padding: 7px 9px; border: 1px solid rgba(206,179,147,.3); border-radius: 9px; background: #251c1e; color: #d8ccc4; cursor: pointer; }
 .curve-trigger:hover { border-color: rgba(206,179,147,.62); background: #2d2224; }
 .curve-trigger:focus-visible, .curve-option:focus-visible { outline: 2px solid #e1cab0; outline-offset: 2px; }
 .curve-trigger svg { width: 58px; height: 36px; color: #ceb393; }

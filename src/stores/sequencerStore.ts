@@ -7,8 +7,9 @@ import {
     normalizeSequenceState, type SequenceNote, type SequenceState,
 } from '../types/sequence';
 import { encodeCurrentSequenceDump } from '../utils/sequenceCodec';
-import { createRandomStepOrder, createShiftedStepOrder, reorderSequenceSteps } from '../utils/sequenceRandomizer';
-import { clearSequenceStep, copySequenceStep, tieSequenceStep } from '../utils/sequenceStepEditing';
+import { createRandomStepOrder, createReversedStepOrder, createShiftedStepOrder, reorderSequenceSteps, type SequenceReorderScope } from '../utils/sequenceRandomizer';
+import { clearSequenceStep, copySequenceNoteEuclid, copySequenceStep, copySequenceStepsEuclid, tieSequenceStep } from '../utils/sequenceStepEditing';
+import { moveSequenceNotes, resizeSequenceNote, sameNoteKey, clampedNoteMove, type NoteKey } from '../utils/sequenceNoteEditing';
 import { extractStepNotes, parseSmf } from '../utils/smfImport';
 import { getPref, setPref } from '../utils/appPrefs';
 import { displayToMidi } from '../utils/motionValue';
@@ -36,12 +37,12 @@ export const useSequencerStore = defineStore('sequencer', () => {
     const transposeFuncOn = ref<boolean[]>(initial.transposeFuncOn);
     const func = ref(initial.func);
     const selectedNoteKey = ref<{ pitch: number; startStep: number } | null>(null);
+    const selectedNoteKeys = ref<NoteKey[]>([]);
     const motionIndex = ref(0);
     const stepInputActive = ref(false);
     const stepCursor = ref(0);
     const chordBuffer = ref(new Set<number>());
     const heldNotes = ref(new Set<number>());
-    const showLibrary = ref(false);
     const showRandomizeDialog = ref(false);
     const skipRandomizeDialog = ref(false);
     getPref<boolean>(SKIP_RANDOMIZE_PREF).then(value => {
@@ -83,8 +84,33 @@ export const useSequencerStore = defineStore('sequencer', () => {
         return notes.value.find(note => note.pitch === key.pitch && note.startStep === key.startStep) ?? null;
     };
 
-    const selectNote = (note: SequenceNote | null) => {
-        selectedNoteKey.value = note ? { pitch: note.pitch, startStep: note.startStep } : null;
+    const clearNoteSelection = () => {
+        selectedNoteKey.value = null;
+        selectedNoteKeys.value = [];
+    };
+
+    const setNoteSelection = (keys: NoteKey[]) => {
+        selectedNoteKeys.value = keys.map(key => ({ pitch: key.pitch, startStep: key.startStep }));
+        selectedNoteKey.value = selectedNoteKeys.value[selectedNoteKeys.value.length - 1] ?? null;
+    };
+
+    const isNoteSelected = (note: Pick<SequenceNote, 'pitch' | 'startStep'>) =>
+        selectedNoteKeys.value.some(key => sameNoteKey(key, note));
+
+    const selectNote = (note: SequenceNote | null, additive = false) => {
+        if (!note) {
+            clearNoteSelection();
+            return;
+        }
+        const key = { pitch: note.pitch, startStep: note.startStep };
+        if (additive) {
+            const exists = selectedNoteKeys.value.some(item => sameNoteKey(item, key));
+            setNoteSelection(exists
+                ? selectedNoteKeys.value.filter(item => !sameNoteKey(item, key))
+                : [...selectedNoteKeys.value, key]);
+            return;
+        }
+        setNoteSelection([key]);
     };
 
     const stepNoteCount = (step: number) =>
@@ -93,8 +119,9 @@ export const useSequencerStore = defineStore('sequencer', () => {
     const removeNote = (target: SequenceNote) => {
         const idx = notes.value.indexOf(target);
         if (idx >= 0) notes.value.splice(idx, 1);
-        if (selectedNoteKey.value?.pitch === target.pitch && selectedNoteKey.value.startStep === target.startStep) {
-            selectedNoteKey.value = null;
+        if (selectedNoteKeys.value.some(key => sameNoteKey(key, target))) {
+            selectedNoteKeys.value = selectedNoteKeys.value.filter(key => !sameNoteKey(key, target));
+            selectedNoteKey.value = selectedNoteKeys.value[selectedNoteKeys.value.length - 1] ?? null;
         }
     };
 
@@ -170,7 +197,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
 
     const clearAll = () => {
         notes.value = [];
-        selectedNoteKey.value = null;
+        clearNoteSelection();
         motionEnabled.value = Array.from({ length: MOTION_PARAM_COUNT }, () => false);
         motionStepEnabled.value = createMotionStepEnabled(true);
         motionValues.value = createMotionGrid(64);
@@ -182,7 +209,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
 
     const insertRest = (step: number) => {
         notes.value = clearSequenceStep(notes.value, step);
-        selectedNoteKey.value = null;
+        clearNoteSelection();
     };
 
     const insertTie = (step: number): boolean => {
@@ -198,7 +225,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
 
     const importNotes = (next: SequenceNote[], defaultVelocity: number) => {
         notes.value = [];
-        selectedNoteKey.value = null;
+        clearNoteSelection();
         velocity.value = defaultVelocity;
         for (const note of next) {
             addNote(note.pitch, note.startStep, note.length, note.velocity, note.gatePercent);
@@ -218,11 +245,46 @@ export const useSequencerStore = defineStore('sequencer', () => {
         activeStep.value = normalized.activeStep;
         transposeFuncOn.value = normalized.transposeFuncOn;
         func.value = normalized.func;
-        selectedNoteKey.value = null;
+        clearNoteSelection();
     };
 
-    const randomizeSteps = (random: () => number = Math.random) => {
-        loadFromDecoded(reorderSequenceSteps(toState(), createRandomStepOrder(random)));
+    const applyNotes = (next: SequenceNote[] | null, nextKeys?: NoteKey[]) => {
+        if (!next) return false;
+        notes.value = next;
+        if (nextKeys) setNoteSelection(nextKeys);
+        return true;
+    };
+
+    const resizeNote = (key: NoteKey, newLength: number) => {
+        const next = resizeSequenceNote(notes.value, key, newLength);
+        if (!next) return false;
+        const keys = selectedNoteKeys.value.some(item => sameNoteKey(item, key))
+            ? selectedNoteKeys.value
+            : [key];
+        return applyNotes(next, keys);
+    };
+
+    const moveSelectedNotes = (pitchDelta: number, stepDelta: number, pitchMin: number, pitchMax: number) => {
+        const keys = selectedNoteKeys.value;
+        const next = moveSequenceNotes(notes.value, keys, pitchDelta, stepDelta, pitchMin, pitchMax);
+        if (!next) return false;
+        const { dPitch, dStep } = clampedNoteMove(notes.value, keys, pitchDelta, stepDelta, pitchMin, pitchMax);
+        return applyNotes(next, keys.map(key => ({ pitch: key.pitch + dPitch, startStep: key.startStep + dStep })));
+    };
+
+    const removeSelectedNotes = () => {
+        if (!selectedNoteKeys.value.length) return;
+        const keySet = new Set(selectedNoteKeys.value.map(key => `${key.pitch}:${key.startStep}`));
+        notes.value = notes.value.filter(note => !keySet.has(`${note.pitch}:${note.startStep}`));
+        clearNoteSelection();
+    };
+
+    const randomizeSteps = (random: () => number = Math.random, scope: SequenceReorderScope = 'all') => {
+        loadFromDecoded(reorderSequenceSteps(toState(), createRandomStepOrder(random), scope));
+    };
+
+    const reverseSteps = () => {
+        loadFromDecoded(reorderSequenceSteps(toState(), createReversedStepOrder()));
     };
 
     const shiftSteps = (delta: number) => {
@@ -233,6 +295,14 @@ export const useSequencerStore = defineStore('sequencer', () => {
     const copyStep = (from: number, to: number) => {
         if (from === to) return;
         loadFromDecoded(copySequenceStep(toState(), from, to));
+    };
+
+    const copyStepEuclid = (from: number, pulses: number, rotation: number) => {
+        loadFromDecoded(copySequenceStepsEuclid(toState(), from, pulses, rotation));
+    };
+
+    const copyNoteEuclid = (note: SequenceNote, pulses: number, rotation: number) => {
+        loadFromDecoded(copySequenceNoteEuclid(toState(), note, pulses, rotation));
     };
 
     const historyPast: SequenceState[] = [];
@@ -488,11 +558,11 @@ export const useSequencerStore = defineStore('sequencer', () => {
         transposeFuncOn,
         func,
         selectedNoteKey,
+        selectedNoteKeys,
         motionIndex,
         stepInputActive,
         stepCursor,
         chordBuffer,
-        showLibrary,
         showRandomizeDialog,
         showCaptureDialog,
         showImportDialog,
@@ -511,6 +581,12 @@ export const useSequencerStore = defineStore('sequencer', () => {
         noteAt,
         selectedNote,
         selectNote,
+        isNoteSelected,
+        clearNoteSelection,
+        setNoteSelection,
+        resizeNote,
+        moveSelectedNotes,
+        removeSelectedNotes,
         stepNoteCount,
         setProgramNo,
         importNotes,
@@ -530,8 +606,11 @@ export const useSequencerStore = defineStore('sequencer', () => {
         insertTie,
         loadFromDecoded,
         randomizeSteps,
+        reverseSteps,
         shiftSteps,
         copyStep,
+        copyStepEuclid,
+        copyNoteEuclid,
         buildSysEx,
         sendToDevice,
         handleStepNote,

@@ -1,11 +1,11 @@
 <template>
   <main class="sound-panel operator-editor">
-    <div class="panel-title operator-heading">
+    <header class="operator-heading">
       <h3>{{ soundStore.selectedOperator < 0 ? t('sound.allOperators') : t('sound.operator', { count: soundStore.selectedOperator + 1 }) }}</h3>
       <button v-if="soundStore.selectedOperator >= 0" type="button" class="show-all-operators" @click="soundStore.clearOperatorSelection()">
         {{ t('sound.showAllOperators') }}
       </button>
-    </div>
+    </header>
 
     <div class="operator-body">
     <OperatorOverview v-if="soundStore.selectedOperator < 0" />
@@ -37,17 +37,24 @@
 
     <section class="edit-section">
       <div class="section-heading"><h4>{{ t('sound.amplitudeEnvelope') }}</h4><span>{{ t('sound.rateLevel') }}</span></div>
+      <EgShapePicker :rates="selected.egRates" :levels="selected.egLevels" @apply="applyEgShape" />
       <div class="envelope-layout">
-        <svg class="envelope-graph" viewBox="0 0 420 170" role="img" :aria-label="t('sound.amplitudeEnvelope')">
-          <path class="envelope-grid" d="M0 35H420M0 85H420M0 135H420M105 0V170M210 0V170M315 0V170" />
-          <polyline class="envelope-line" :points="envelopePoints(selected.egRates, selected.egLevels)" />
-          <circle v-for="(point, index) in envelopeCircles(selected.egRates, selected.egLevels)" :key="index" :cx="point.x" :cy="point.y" r="5" />
-        </svg>
-        <div class="envelope-values">
-          <NumberControl v-for="index in 4" :key="`l${index}`" v-model="selected.egLevels[index - 1]"
-            :label="t('sound.level', { count: index })" :min="0" :max="99" compact />
-          <NumberControl v-for="index in 4" :key="`r${index}`" v-model="selected.egRates[index - 1]"
-            :label="t('sound.rate', { count: index })" :min="0" :max="99" compact />
+        <EnvelopeCopyMenu :rates="selected.egRates" :levels="selected.egLevels" @apply="applyEnvelope">
+          <svg class="envelope-graph" viewBox="0 0 420 170" role="img" :aria-label="t('sound.amplitudeEnvelope')">
+            <path class="envelope-grid" d="M0 35H420M0 85H420M0 135H420M105 0V170M210 0V170M315 0V170" />
+            <polyline class="envelope-line" :points="envelopePoints(selected.egRates, selected.egLevels)" />
+            <circle v-for="(point, index) in envelopeCircles(selected.egRates, selected.egLevels)" :key="index" :cx="point.x" :cy="point.y" r="5" />
+          </svg>
+        </EnvelopeCopyMenu>
+        <div class="envelope-side">
+          <div class="envelope-values">
+            <NumberControl v-for="index in 4" :key="`l${index}`" v-model="selected.egLevels[index - 1]"
+              :label="t('sound.level', { count: index })" :min="0" :max="99" compact />
+            <NumberControl v-for="index in 4" :key="`r${index}`" v-model="selected.egRates[index - 1]"
+              :label="t('sound.rate', { count: index })" :min="0" :max="99" compact />
+          </div>
+          <EgAdsrControls :operator-index="soundStore.selectedOperator" :rates="selected.egRates"
+            :levels="selected.egLevels" @apply="applyEnvelope" />
         </div>
       </div>
     </section>
@@ -55,11 +62,11 @@
     <section class="edit-section keyboard-scaling">
       <div class="section-heading"><h4>{{ t('sound.keyboardScaling') }}</h4><span>{{ t('sound.keyResponse') }}</span></div>
       <div class="control-grid scaling-grid">
+        <CurveSelector v-model="selected.leftCurve" :label="t('sound.leftCurve')" direction="right" />
         <NumberControl v-model="selected.leftDepth" :label="t('sound.leftDepth')" :min="0" :max="99" />
         <NumberControl v-model="selected.breakPoint" :label="t('sound.breakPoint')" :min="0" :max="99" />
-        <NumberControl v-model="selected.rightDepth" :label="t('sound.rightDepth')" :min="0" :max="99" />
-        <CurveSelector v-model="selected.leftCurve" :label="t('sound.leftCurve')" direction="right" />
         <NumberControl v-model="selected.rateScaling" :label="t('sound.rateScaling')" :min="0" :max="7" />
+        <NumberControl v-model="selected.rightDepth" :label="t('sound.rightDepth')" :min="0" :max="99" />
         <CurveSelector v-model="selected.rightCurve" :label="t('sound.rightCurve')" direction="left" />
       </div>
     </section>
@@ -75,7 +82,11 @@ import { useI18n } from 'vue-i18n';
 import AppToggle from '@/components/AppToggle.vue';
 import KnobControl from '@/components/KnobControl.vue';
 import CurveSelector from '@/features/sound/components/CurveSelector.vue';
+import EnvelopeCopyMenu from '@/features/sound/components/EnvelopeCopyMenu.vue';
+import EgAdsrControls from '@/features/sound/components/EgAdsrControls.vue';
+import EgShapePicker from '@/features/sound/components/EgShapePicker.vue';
 import OperatorOverview from '@/features/sound/components/OperatorOverview.vue';
+import { type EgShapePreset } from '@/features/sound/egShapePresets';
 import { operatorFrequencyControls, type OperatorNumberKey } from '@/features/sound/soundControlDefinitions';
 import { useSoundStore } from '@/stores/soundStore';
 import { dx7EnvelopeGeometry, dx7EnvelopePoints } from '@/utils/dx7Envelope';
@@ -88,17 +99,24 @@ const selected = computed(() => program.value.operators[Math.max(0, selectedOper
 const operatorNumber = (key: OperatorNumberKey) => selected.value[key] as number;
 const setOperatorNumber = (key: OperatorNumberKey, value: number) => { (selected.value[key] as number) = value; };
 const frequencyLabel = formatOperatorFrequency;
-const envelopeCircles = (rates: number[], levels: number[]) => dx7EnvelopeGeometry(rates, levels, 420, 170).slice(1, 5);
-const envelopePoints = (rates: number[], levels: number[]) => dx7EnvelopePoints(rates, levels, 420, 170);
+const envelopeCircles = (rates: number[], levels: number[]) => dx7EnvelopeGeometry(rates, levels, 420, 170, 10).slice(1, 5);
+const envelopePoints = (rates: number[], levels: number[]) => dx7EnvelopePoints(rates, levels, 420, 170, 10);
+const applyEgShape = (shape: EgShapePreset) => {
+  selected.value.egRates = [...shape.rates];
+  selected.value.egLevels = [...shape.levels];
+};
+const applyEnvelope = (rates: number[], levels: number[]) => {
+  selected.value.egRates = [...rates];
+  selected.value.egLevels = [...levels];
+};
 const NumberControl = KnobControl;
 </script>
 
 <style scoped>
-.operator-editor { display: flex; flex-direction: column; overflow: hidden; }
-.panel-title { display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; flex: 0 0 42px; height: 42px; padding: 0 12px; border-bottom: 1px solid rgba(206,179,147,.16); }
-.panel-title h3 { margin: 0; font-size: var(--volca-type-heading); line-height: 1; }
-.operator-heading { z-index: 3; background: #302426; }
-.operator-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.operator-editor { display: grid; grid-template-rows: 42px minmax(0, 1fr); min-height: 0; overflow: hidden; }
+.operator-heading { display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; height: 42px; min-height: 42px; max-height: 42px; overflow: hidden; padding: 0 12px; border-bottom: 1px solid rgba(206,179,147,.16); background: #302426; }
+.operator-heading h3 { margin: 0; overflow: hidden; font-size: var(--volca-type-heading); line-height: 1; white-space: nowrap; text-overflow: ellipsis; }
+.operator-body { min-height: 0; overflow: auto; }
 .show-all-operators { box-sizing: border-box; height: 28px; padding: 0 8px; border: 1px solid rgba(206,179,147,.28); border-radius: 7px; background: transparent; color: #c7b9b0; font: inherit; font-size: var(--volca-type-label); line-height: 1; cursor: pointer; }
 .show-all-operators:hover { border-color: rgba(206,179,147,.58); background: rgba(206,179,147,.08); color: #f1e9e1; }
 .show-all-operators:focus-visible { outline: 2px solid #e1cab0; outline-offset: 2px; }
@@ -109,7 +127,7 @@ const NumberControl = KnobControl;
 .frequency-heading { align-items: center; }
 .frequency-heading-controls { display: flex; align-items: center; gap: 12px; }
 .control-grid { display: grid; gap: 8px; }
-.control-grid.scaling-grid { grid-template-columns: repeat(3, minmax(120px,1fr)); }
+.control-grid.scaling-grid { grid-template-columns: repeat(6, minmax(72px,1fr)); }
 .control-grid.four { grid-template-columns: repeat(4, minmax(92px,1fr)); }
 .mode-control { display: grid; align-content: start; gap: 5px; }
 .mode-control > label { color: #ad9e96; font-size: var(--volca-type-label); }
@@ -121,10 +139,11 @@ const NumberControl = KnobControl;
 .mode-segment button:hover { background: rgba(206,179,147,.1); color: #f1e9e1; }
 .mode-segment button.active { background: #ceb393; color: #33282a; }
 .mode-segment button:focus-visible { position: relative; z-index: 1; outline: 2px solid #e1cab0; outline-offset: -2px; }
-.envelope-layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; }
-.envelope-graph { width: 100%; border: 1px solid rgba(206,179,147,.15); border-radius: 8px; background: #251c1e; }
+.envelope-layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; align-items: start; }
+.envelope-side { display: grid; align-content: start; }
+.envelope-graph { width: 100%; display: block; border: 1px solid rgba(206,179,147,.15); border-radius: 8px; background: #251c1e; }
 .envelope-grid { fill: none; stroke: rgba(206,179,147,.1); }
-.envelope-line { fill: none; stroke: #ceb393; stroke-width: 2.5; }
+.envelope-line { fill: none; stroke: #ceb393; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .envelope-graph circle { fill: #302426; stroke: #ceb393; stroke-width: 2; }
 .envelope-values { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; align-content: start; }
 .keyboard-scaling { border-bottom: 0; }

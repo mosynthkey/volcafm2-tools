@@ -1,4 +1,8 @@
-import { NUM_OF_STEPS, createSequenceNote, type SequenceNote, type SequenceState } from '../types/sequence';
+import {
+    NUM_OF_STEPS, NUM_OF_VOICES_PER_STEP, createSequenceNote,
+    type SequenceNote, type SequenceState,
+} from '../types/sequence';
+import { euclideanHits } from './euclidean';
 
 const isActiveAt = (note: SequenceNote, step: number) =>
     note.startStep <= step && note.startStep + note.length > step;
@@ -80,4 +84,53 @@ export const copySequenceStep = (state: SequenceState, from: number, to: number)
         transposeFuncOn: copyFlag(state.transposeFuncOn),
         func: { ...state.func },
     };
+};
+
+export const copySequenceStepsEuclid = (
+    state: SequenceState,
+    from: number,
+    pulses: number,
+    rotation: number,
+): SequenceState => {
+    let next = state;
+    for (const to of euclideanHits(NUM_OF_STEPS, pulses, rotation)) {
+        next = copySequenceStep(next, from, to);
+    }
+    return next;
+};
+
+const occupies = (note: SequenceNote, start: number, end: number) =>
+    note.startStep <= end && note.startStep + note.length - 1 >= start;
+
+const voicesAt = (notes: SequenceNote[], step: number) =>
+    notes.filter(note => isActiveAt(note, step)).length;
+
+export const copySequenceNoteEuclid = (
+    state: SequenceState,
+    source: SequenceNote,
+    pulses: number,
+    rotation: number,
+): SequenceState => {
+    let notes = [...state.notes];
+    for (const target of euclideanHits(NUM_OF_STEPS, pulses, rotation)) {
+        if (target === source.startStep) continue;
+        const start = target;
+        const length = Math.max(1, Math.min(source.length, NUM_OF_STEPS - start));
+        const end = start + length - 1;
+        const withoutOverlap = notes.filter(note =>
+            !(note.pitch === source.pitch && occupies(note, start, end)));
+        let canPlace = true;
+        for (let step = start; step <= end; step++) {
+            if (voicesAt(withoutOverlap, step) >= NUM_OF_VOICES_PER_STEP) {
+                canPlace = false;
+                break;
+            }
+        }
+        if (!canPlace) continue;
+        notes = [
+            ...withoutOverlap,
+            createSequenceNote(source.pitch, start, length, source.velocity, source.gatePercent),
+        ];
+    }
+    return { ...state, notes };
 };

@@ -43,14 +43,17 @@
         </template>
     </AppDialog>
 
+    <UnifiedLibraryDialog />
+    <PageHintDialog />
+
     <v-main>
       <div class="app-layout">
         <AppSidebar />
         <main class="workspace">
           <v-window v-model="ui.activeTab" class="tool-window">
+            <v-window-item value="sound-edit"><SoundEditTab /></v-window-item>
             <v-window-item value="dx7"><Dx7Tab /></v-window-item>
             <v-window-item value="sequencer"><SequencerTab /></v-window-item>
-            <v-window-item value="sound-edit"><SoundEditTab /></v-window-item>
           </v-window>
         </main>
       </div>
@@ -63,6 +66,8 @@
 import { useI18n } from 'vue-i18n';
 import AppToggle from './components/AppToggle.vue';
 import AppSidebar from './components/AppSidebar.vue';
+import UnifiedLibraryDialog from './components/UnifiedLibraryDialog.vue';
+import PageHintDialog from './components/PageHintDialog.vue';
 import AppDialog from './components/dialogs/AppDialog.vue';
 import AppProgressDialog from './components/dialogs/AppProgressDialog.vue';
 import LogPanel from './components/LogPanel.vue';

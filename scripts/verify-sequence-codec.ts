@@ -17,8 +17,9 @@ import {
     unpack7to8,
 } from '../src/utils/sequenceCodec';
 import { MOTION_PARAM_COUNT, NUM_OF_STEPS, createEmptySequenceState, createMotionPoints, createSequenceNote, type SequenceNote, type SequenceState } from '../src/types/sequence';
-import { createShiftedStepOrder, reorderSequenceSteps } from '../src/utils/sequenceRandomizer';
+import { createReversedStepOrder, createShiftedStepOrder, reorderSequenceSteps } from '../src/utils/sequenceRandomizer';
 import { clearSequenceStep, copySequenceStep, tieSequenceStep } from '../src/utils/sequenceStepEditing';
+import { moveSequenceNotes, notesIntersectingRect, resizeSequenceNote } from '../src/utils/sequenceNoteEditing';
 import { createMotionPattern } from '../src/utils/motionPatterns';
 
 let failCount = 0;
@@ -163,7 +164,7 @@ check('FUNC fields round-trip', JSON.stringify(decodedState.func) === JSON.strin
 // 5) ステップ並べ替え: ノート/タイとモーションが同じ順列で移動すること
 // ---------------------------------------------------------------------------
 console.log('[5] Step reorder');
-const reversedOrder = Array.from({ length: NUM_OF_STEPS }, (_, step) => NUM_OF_STEPS - 1 - step);
+const reversedOrder = createReversedStepOrder();
 const reordered = reorderSequenceSteps(sampleState, reversedOrder);
 const activePitches = (state: SequenceState, step: number) => state.notes
     .filter(note => note.startStep <= step && note.startStep + note.length > step)
@@ -189,6 +190,15 @@ check('left shift moves step 2 to step 1', JSON.stringify(activePitches(shiftedL
 const shiftedRight = reorderSequenceSteps(sampleState, createShiftedStepOrder(1));
 check('right shift moves step 16 to step 1', JSON.stringify(activePitches(shiftedRight, 0)) === JSON.stringify(activePitches(sampleState, 15)));
 check('right shift moves step 1 to step 2', JSON.stringify(activePitches(shiftedRight, 1)) === JSON.stringify(activePitches(sampleState, 0)));
+const notesOnly = reorderSequenceSteps(sampleState, reversedOrder, 'notes');
+check('notes-only reverse moves notes', JSON.stringify(activePitches(notesOnly, 0)) === JSON.stringify(activePitches(sampleState, 15)));
+check('notes-only reverse keeps motion', notesOnly.motionValues.every((values, parameter) =>
+    values.every((points, step) => points.every((value, point) => value === sampleState.motionValues[parameter][step][point]))));
+check('notes-only reverse keeps step flags', notesOnly.stepOn.every((on, step) => on === sampleState.stepOn[step]));
+const motionOnly = reorderSequenceSteps(sampleState, reversedOrder, 'motion');
+check('motion-only reverse keeps notes', JSON.stringify(activePitches(motionOnly, 0)) === JSON.stringify(activePitches(sampleState, 0)));
+check('motion-only reverse moves motion', motionOnly.motionValues.every((values, parameter) =>
+    values.every((points, step) => points.every((value, point) => value === sampleState.motionValues[parameter][reversedOrder[step]][point]))));
 
 console.log('[5b] Automatic motion patterns');
 const sine = createMotionPattern('sine', { min: 24, max: 104, cycles: 1 });
@@ -244,6 +254,35 @@ check('Copy duplicates step flags', copied.stepOn[7] === copySource.stepOn[4]
 check('Copy keeps at least one active step', copied.activeStep.some(Boolean));
 const sameStep = copySequenceStep(copySource, 4, 4);
 check('Copy onto the same step is a no-op', sameStep === copySource);
+
+console.log('[7] Note resize / move / marquee');
+const editNotes = [
+    createSequenceNote(60, 0, 2, 100, 80),
+    createSequenceNote(64, 4, 1, 90, 70),
+    createSequenceNote(67, 4, 2, 80, 60),
+];
+const stretched = resizeSequenceNote(editNotes, { pitch: 60, startStep: 0 }, 4);
+check('resize extends length', !!stretched && stretched.some(note => note.pitch === 60 && note.startStep === 0 && note.length === 4));
+const moved = moveSequenceNotes(editNotes, [{ pitch: 64, startStep: 4 }], 0, 2, 36, 96);
+check('move shifts start step', !!moved && moved.some(note => note.pitch === 64 && note.startStep === 6 && note.length === 1));
+const chordMove = moveSequenceNotes(editNotes, [{ pitch: 64, startStep: 4 }, { pitch: 67, startStep: 4 }], 12, -1, 36, 96);
+check('move keeps relative chord', !!chordMove
+    && chordMove.some(note => note.pitch === 76 && note.startStep === 3)
+    && chordMove.some(note => note.pitch === 79 && note.startStep === 3));
+const boxed = notesIntersectingRect(editNotes, 3, 60, 5, 67);
+check('marquee selects intersecting notes', boxed.length === 2 && boxed.every(note => note.startStep === 4));
+const clampedResize = resizeSequenceNote(editNotes, { pitch: 60, startStep: 0 }, 99);
+check('resize clamps to remaining steps', !!clampedResize && clampedResize.some(note => note.pitch === 60 && note.length === 16));
+const blocked = Array.from({ length: 6 }, (_, index) => createSequenceNote(50 + index, 8, 1, 100, 80));
+const blockedMove = moveSequenceNotes(
+    [...blocked, createSequenceNote(70, 0, 1, 100, 80)],
+    [{ pitch: 70, startStep: 0 }],
+    0,
+    8,
+    36,
+    96,
+);
+check('move rejects a full destination step', blockedMove === null);
 
 // ---------------------------------------------------------------------------
 console.log('');

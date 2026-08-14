@@ -22,7 +22,10 @@
     "verify:sound": "tsx scripts/verify-sound-program.ts",
     "verify:midi": "tsx scripts/verify-midi-protocol.ts",
     "verify:motion": "tsx scripts/verify-motion-value.ts",
-    "verify": "run-s verify:sequence verify:smf verify:sound verify:midi verify:motion",
+    "verify:dx7": "tsx scripts/verify-dx7-json-backup.ts",
+    "verify:library": "tsx scripts/verify-library-format.ts",
+    "verify:euclidean": "tsx scripts/verify-euclidean.ts",
+    "verify": "run-s verify:sequence verify:smf verify:sound verify:midi verify:motion verify:euclidean verify:dx7 verify:library",
     "midi:tool": "tsx scripts/midi-sequence-tool.ts"
   },
   "dependencies": {

@@ -21,9 +21,11 @@ export async function loadProgramReferences(options: {
   return missing
 }
 
-export function matchCurrentVoice(voiceData: Uint8Array, programs: Uint8Array[], names: { name: string }[]) {
+export function matchCurrentVoice(voiceData: Uint8Array, programs: (Uint8Array | undefined)[], names: { name: string }[]) {
   const currentName = decodeVoiceName(voiceData)
-  const ranked = programs.map((stored, programNo) => ({ programNo, name: names[programNo]?.name.trim() ?? '', differences: countVoiceDifferences(voiceData, stored) }))
+  const ranked = programs.flatMap((stored, programNo) => stored
+    ? [{ programNo, name: names[programNo]?.name.trim() ?? '', differences: countVoiceDifferences(voiceData, stored) }]
+    : [])
   const sameName = ranked.filter(candidate => candidate.name === currentName)
   const match = (sameName.length ? sameName : ranked).sort((a, b) => a.differences - b.differences)[0]
   if (!match) throw new Error('No stored program data is available for comparison.')
