@@ -10,10 +10,9 @@ const STEP_DATA_OFFSET = 80;
 const TIE = 0x7f;
 
 /**
- * KORG 7bit/8bit変換 (MIDI Implementation NOTE 1)。
- * 7バイトごとに1バイトのヘッダ (各データのbit7を集約) を先頭に付与する。
- * volca fm2ファームウェア側 (MidiMsg_TxExcl_SendData) と同一のグルーピングで、
- * 末尾が7バイト未満の端数グループにも自動的に対応する。
+ * 7-bit / 8-bit packing from the public MIDI implementation (NOTE 1).
+ * Every 7 data bytes get a leading header that collects their bit7 values.
+ * A short final group is packed the same way.
  */
 export const pack8to7 = (data: Uint8Array | number[]): number[] => {
     const out: number[] = [];

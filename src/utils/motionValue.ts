@@ -8,14 +8,14 @@ const ARP_DIV_LABELS = ['1/12', '1/8', '1/4', '1/3', '1/2', '2/3', '1/1', '3/2',
 const clampMidi = (value: number) => Math.max(0, Math.min(127, Math.round(value)))
 const clampInt = (value: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(value)))
 
-/** Firmware numericUtility::fastMap(in, 7, outMax) */
-const fastMap7 = (midi: number, outMax: number) => (clampMidi(midi) * (outMax + 1)) >> 7
+/** Scale a 0–127 MIDI value onto 0…outMax. */
+const scaleMidi7 = (midi: number, outMax: number) => (clampMidi(midi) * (outMax + 1)) >> 7
 
-const invertFastMap7 = (display: number, outMax: number) => {
+const invertScaleMidi7 = (display: number, outMax: number) => {
   const target = clampInt(display, 0, outMax)
   const matches: number[] = []
   for (let midi = 0; midi <= 127; midi++) {
-    if (fastMap7(midi, outMax) === target) matches.push(midi)
+    if (scaleMidi7(midi, outMax) === target) matches.push(midi)
   }
   return matches[Math.floor((matches.length - 1) / 2)] ?? 0
 }
@@ -36,7 +36,7 @@ const invertLookup = (read: (midi: number) => number, display: number) => {
   return matches.length ? matches[Math.floor((matches.length - 1) / 2)] : best
 }
 
-/** Firmware getTranposeNote() when FUNC Trnsps Note is on, in semitones. */
+/** Transpose motion display in semitones when Transpose Note is on. */
 export const transposeNoteFromMidi = (midi: number) => {
   let trans = clampMidi(midi)
   if (trans < 61) {
@@ -51,7 +51,7 @@ export const transposeNoteFromMidi = (midi: number) => {
   return trans + 1
 }
 
-/** Firmware getTranposeNote() when FUNC Trnsps Note is off, in octaves. */
+/** Transpose motion display in octaves when Transpose Note is off. */
 export const transposeOctaveFromMidi = (midi: number) => {
   let trans = clampMidi(midi)
   if (trans < 55) {
@@ -87,15 +87,15 @@ export const midiToDisplay = (paramIndex: number, midi: number, transposeNote: b
   switch (paramKey(paramIndex)) {
     case 'transpose': return transposeNote ? transposeNoteFromMidi(value) : transposeOctaveFromMidi(value)
     case 'velocity': return Math.max(1, value)
-    case 'algorithm': return fastMap7(value, 31) + 1
+    case 'algorithm': return scaleMidi7(value, 31) + 1
     case 'modulatorAttack':
     case 'modulatorDecay':
     case 'carrierAttack':
     case 'carrierDecay': return value - 64
     case 'lfoRate':
-    case 'lfoPitchDepth': return fastMap7(value, 99)
-    case 'arpType': return fastMap7(value, 9)
-    case 'arpDivision': return fastMap7(value, 10)
+    case 'lfoPitchDepth': return scaleMidi7(value, 99)
+    case 'arpType': return scaleMidi7(value, 9)
+    case 'arpDivision': return scaleMidi7(value, 10)
     default: return value
   }
 }
@@ -109,15 +109,15 @@ export const displayToMidi = (paramIndex: number, display: number, transposeNote
       value,
     )
     case 'velocity': return clampInt(value, 1, 127)
-    case 'algorithm': return invertFastMap7(value - 1, 31)
+    case 'algorithm': return invertScaleMidi7(value - 1, 31)
     case 'modulatorAttack':
     case 'modulatorDecay':
     case 'carrierAttack':
     case 'carrierDecay': return clampMidi(value + 64)
     case 'lfoRate':
-    case 'lfoPitchDepth': return invertFastMap7(value, 99)
-    case 'arpType': return invertFastMap7(value, 9)
-    case 'arpDivision': return invertFastMap7(value, 10)
+    case 'lfoPitchDepth': return invertScaleMidi7(value, 99)
+    case 'arpType': return invertScaleMidi7(value, 9)
+    case 'arpDivision': return invertScaleMidi7(value, 10)
     default: return clampMidi(value)
   }
 }

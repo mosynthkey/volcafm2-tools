@@ -1,10 +1,10 @@
-// volca fm2 SEQUENCE DATA (TABLE 3)
+// Sequence dump layout from the public MIDI implementation (TABLE 3).
 export const NUM_OF_STEPS = 16;
 export const NUM_OF_VOICES_PER_STEP = 6;
 export const MOTION_PARAM_COUNT = 13;
 export const MOTION_POINT_COUNT = 5;
 
-// SysEx MOTION Parameter / MOTION Data のオフセット順 (volca fm2 ファームウェア MOPARAM enum と一致)
+// MOTION Parameter / MOTION Data order in the sequence dump.
 export const MOTION_PARAM_KEYS = ['transpose', 'velocity', 'algorithm', 'modulatorAttack', 'modulatorDecay',
     'carrierAttack', 'carrierDecay', 'lfoRate', 'lfoPitchDepth', 'arpType', 'arpDivision', 'chorusDepth', 'reverbDepth'] as const;
 
