@@ -21,6 +21,8 @@ export const useMidiConnectionView = () => {
         step2: t(isDesktopApp ? 'app.connection.step2Desktop' : 'app.connection.step2'),
         step3: t('app.connection.step3'),
         reconnect: t('app.connection.reconnect'),
+        retry: t('app.connection.retry'),
+        troubleshoot: t('app.connection.troubleshoot'),
     }));
     const showConnectionModal = computed(() =>
         !ui.connectionModalDismissed

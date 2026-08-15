@@ -31,14 +31,19 @@
             <li>{{ connectionTexts.step3 }}</li>
           </ol>
         <template #actions>
+          <v-btn variant="text" @click="showTroubleshoot = true">
+            {{ connectionTexts.troubleshoot }}
+          </v-btn>
           <v-btn
             :loading="midiStore.isSearching"
             @click="midiStore.reconnectMIDI"
           >
-            {{ connectionTexts.reconnect }}
+            {{ connectionTexts.retry }}
           </v-btn>
         </template>
     </AppDialog>
+
+    <MidiTroubleshootDialog v-model="showTroubleshoot" />
 
     <PageHintDialog />
 
@@ -60,6 +65,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AppToggle from './components/AppToggle.vue';
 import AppSidebar from './components/AppSidebar.vue';
@@ -72,8 +78,10 @@ import SequencerTab from './features/sequence/components/SequencerTab.vue';
 import SoundEditTab from './features/sound/components/SoundEditTab.vue';
 import Dx7Tab from './features/dx7/Dx7Tab.vue';
 import { useAppShell } from './composables/useAppShell';
+import MidiTroubleshootDialog from './components/MidiTroubleshootDialog.vue';
 
 const { t } = useI18n();
+const showTroubleshoot = ref(false);
 const {
   ui, midiStore, connectionTexts, showConnectionModal, onConnectionModalUpdate,
   showProgramLoadModal, programLoadProgress, currentProgramLoadName,

@@ -114,7 +114,7 @@ export const decodeSoundListBackup = (json: string): SoundListProgram[] => {
     if (!isRecord(parsed)) throw new Error('Backup JSON must be an object.');
     if (parsed.version !== SOUND_LIST_BACKUP_VERSION) throw new Error('Unsupported backup version.');
     if (parsed.kind !== undefined && parsed.kind !== SOUND_LIST_BACKUP_KIND) {
-        throw new Error('This JSON is not a volca fm2 sound list backup.');
+        throw new Error('This JSON is not a volca fm2 program list backup.');
     }
     if (!Array.isArray(parsed.programs) || parsed.programs.length !== SOUND_LIST_SLOT_COUNT) {
         throw new Error('Backup must contain 64 programs.');

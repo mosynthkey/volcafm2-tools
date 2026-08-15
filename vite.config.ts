@@ -6,6 +6,9 @@ import { fileURLToPath, URL } from 'node:url'
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   base: mode === 'desktop' ? './' : process.env.NODE_ENV === 'production' ? '/volcafm2-tools/' : '/',
+  define: {
+    'import.meta.env.VITE_APP_RUNTIME': JSON.stringify(mode === 'desktop' ? 'desktop' : 'web'),
+  },
   plugins: [
     vue(),
     vuetify({ autoImport: true }),

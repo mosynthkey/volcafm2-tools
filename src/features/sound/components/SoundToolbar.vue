@@ -13,11 +13,13 @@
     </div>
     <div class="editor-toolbar-section">
       <span class="editor-toolbar-section__label volca-section-title">{{ t('sound.sectionLabel') }}</span>
-      <v-btn class="send-button" :class="{ 'needs-send': soundStore.hasUnsavedChanges }" @click="soundStore.sendToDevice"
-        :disabled="!midiStore.isDeviceReady" :loading="midiStore.soundEditState === 'sending'">
-        <HardDriveDownload :size="16" class="mr-1" />{{ t('common.send') }}
-      </v-btn>
-      <AutoSendToggle />
+      <div class="send-auto-split">
+        <v-btn class="send-button" :class="{ 'needs-send': soundStore.hasUnsavedChanges }" @click="soundStore.sendToDevice"
+          :disabled="!midiStore.isDeviceReady" :loading="midiStore.soundEditState === 'sending'">
+          <HardDriveDownload :size="16" class="mr-1" />{{ t('common.send') }}
+        </v-btn>
+        <AutoSendToggle />
+      </div>
       <v-btn @click="soundStore.reset"><RotateCcw :size="16" class="mr-1" />{{ t('sound.initialize') }}</v-btn>
     </div>
     <div class="editor-toolbar-spacer"></div>

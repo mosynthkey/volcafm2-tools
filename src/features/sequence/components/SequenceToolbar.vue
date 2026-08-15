@@ -18,8 +18,10 @@
       <v-col cols="auto" class="editor-toolbar-section">
         <span class="editor-toolbar-section__label volca-section-title">{{ t('sequence.sectionLabel') }}</span>
         <v-btn :disabled="!canSend" @click="sequence.showCaptureDialog = true"><HardDriveUpload :size="16" class="mr-1" />{{ t('sequence.captureButton') }}</v-btn>
-        <v-btn :disabled="!canSend" @click="sequence.sendToDevice()"><HardDriveDownload :size="16" class="mr-1" />{{ t('common.send') }}</v-btn>
-        <AutoSendToggle />
+        <div class="send-auto-split">
+          <v-btn :disabled="!canSend" @click="sequence.sendToDevice()"><HardDriveDownload :size="16" class="mr-1" />{{ t('common.send') }}</v-btn>
+          <AutoSendToggle />
+        </div>
         <v-btn @click="sequence.clearAll"><Trash2 :size="16" class="mr-1" />{{ t('sequence.clear') }}</v-btn>
         <v-btn @click="sequence.toggleStepInput()"><Piano :size="16" class="mr-1" />{{ t('sequence.stepInput') }}</v-btn>
         <div class="randomize-split">

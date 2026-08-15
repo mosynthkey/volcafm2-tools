@@ -72,6 +72,29 @@ input, textarea, [contenteditable="true"] { user-select: text; -webkit-user-sele
 .editor-auto-send.on { color: var(--volca-text); border-color: var(--volca-accent); background: rgba(206,179,147,.18); }
 .editor-auto-send.on .editor-auto-send__track { background: var(--volca-accent); }
 .editor-auto-send.on .editor-auto-send__thumb { transform: translateX(12px); background: #211a1b; }
+.send-auto-split {
+  display: inline-flex; align-items: stretch; flex-shrink: 0; overflow: hidden;
+  border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.16);
+}
+.send-auto-split .v-btn {
+  border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important;
+  border-right-width: 0 !important; box-shadow: inset 0 1px rgba(255,255,255,.28) !important;
+}
+.send-auto-split .v-btn:active { transform: none; }
+.send-auto-split .editor-auto-send {
+  height: 36px; min-height: 36px; padding: 0 10px 0 9px; gap: 6px;
+  border: 1px solid rgba(255,255,255,.08); border-left: 0; border-radius: 0 8px 8px 0;
+  background: var(--volca-accent); color: var(--volca-ink);
+  box-shadow: inset 1px 0 rgba(51,40,42,.28), inset 0 1px rgba(255,255,255,.28);
+}
+.send-auto-split .editor-auto-send:hover { background: var(--volca-accent-bright); border-color: rgba(255,255,255,.08); }
+.send-auto-split .editor-auto-send:focus-visible { outline-offset: -2px; }
+.send-auto-split .editor-auto-send__label { font-weight: 700; letter-spacing: .005em; }
+.send-auto-split .editor-auto-send:not(.on) { filter: saturate(.62) brightness(.9); }
+.send-auto-split .editor-auto-send.on { background: var(--volca-accent-bright); color: var(--volca-ink); border-color: rgba(255,255,255,.08); }
+.send-auto-split .editor-auto-send__track { background: rgba(51,40,42,.38); }
+.send-auto-split .editor-auto-send.on .editor-auto-send__track { background: var(--volca-ink); }
+.send-auto-split .editor-auto-send.on .editor-auto-send__thumb { background: var(--volca-accent-bright); }
 body { overflow: hidden; }
 .volca-app { background: radial-gradient(circle at 72% -20%, #594447 0, transparent 38%), var(--volca-bg) !important; color: var(--volca-text); }
 .brand-mark { width: 40px; height: 40px; display: block; flex: 0 0 40px; object-fit: contain; }

@@ -95,7 +95,7 @@ export const serializeSoundList = (programs: SoundListProgram[]): LibrarySoundLi
 
 export const deserializeSoundList = (programs: LibrarySoundList): SoundListProgram[] => {
     if (!Array.isArray(programs) || programs.length !== SOUND_LIST_SLOT_COUNT) {
-        throw new Error('Sound list must contain 64 programs.');
+        throw new Error('Program list must contain 64 programs.');
     }
     return programs.map((program, slot) => {
         if (!program || typeof program.data !== 'string') {
@@ -180,7 +180,7 @@ export const catalogItemsFromPayload = (payload: LibraryPayload): LibraryItemSna
         items.push({ id: crypto.randomUUID(), kind: 'sequence', name: 'Sequence', createdAt: now, updatedAt: now, payload: { sequence: payload.sequence } });
     }
     if (payload.soundList) {
-        items.push({ id: crypto.randomUUID(), kind: 'sound-list', name: 'Sound list', createdAt: now, updatedAt: now, payload: { soundList: payload.soundList } });
+        items.push({ id: crypto.randomUUID(), kind: 'sound-list', name: 'Program list', createdAt: now, updatedAt: now, payload: { soundList: payload.soundList } });
     }
     return items;
 };
