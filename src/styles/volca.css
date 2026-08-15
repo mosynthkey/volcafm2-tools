@@ -61,6 +61,7 @@ input, textarea, [contenteditable="true"] { user-select: text; -webkit-user-sele
 .editor-toolbar-section { display: flex; align-items: center; gap: 8px; margin-left: 12px; }
 .editor-toolbar-section::before { content: ''; align-self: stretch; width: 2px; min-height: 34px; margin-right: 10px; border-radius: 1px; background: rgba(206,179,147,.58); }
 .editor-toolbar-section__label { white-space: nowrap; }
+.editor-library-cluster { display: flex; align-items: center; flex-shrink: 0; }
 .editor-library { margin-left: 20px; }
 .editor-auto-send { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px 0 10px; border: 1px solid rgba(206,179,147,.3); border-radius: 9px; background: #251c1e; color: var(--volca-muted); cursor: pointer; }
 .editor-auto-send:hover { border-color: rgba(206,179,147,.65); }

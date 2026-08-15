@@ -1,13 +1,18 @@
 <template>
-  <div class="editor-toolbar-section editor-library">
-    <span class="editor-toolbar-section__label volca-section-title">{{ t('library.sectionLabel') }}</span>
-    <v-btn :loading="saving" @click="openSave">
-      <Save :size="16" class="mr-1" />{{ t('library.saveToLibrary') }}
-    </v-btn>
-    <v-btn @click="ui.openLibrary(kind)">
-      <FolderOpen :size="16" class="mr-1" />{{ t('library.openLibrary') }}
-    </v-btn>
-    <PageHintButton v-if="page" :page="page" />
+  <div class="editor-library-cluster">
+    <div class="editor-toolbar-section editor-library">
+      <span class="editor-toolbar-section__label volca-section-title">{{ t('library.sectionLabel') }}</span>
+      <v-btn :loading="saving" @click="openSave">
+        <Save :size="16" class="mr-1" />{{ t('library.save') }}
+      </v-btn>
+      <v-btn @click="ui.openLibrary(kind)">
+        <FolderOpen :size="16" class="mr-1" />{{ t('library.open') }}
+      </v-btn>
+    </div>
+    <div v-if="page" class="editor-toolbar-section editor-hint">
+      <span class="editor-toolbar-section__label volca-section-title">{{ t('hint.title') }}</span>
+      <PageHintButton :page="page" />
+    </div>
   </div>
 
   <AppDialog v-model="showSave" :title="t('library.saveToLibrary')" max-width="440">

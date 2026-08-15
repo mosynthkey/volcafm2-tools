@@ -201,8 +201,8 @@ const scalingParameters = (operator: SoundOperator) => [
 </script>
 
 <style scoped>
-.operator-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 8px; }
-.operator-summary { min-width: 0; overflow: hidden; border: 1px solid rgba(206,179,147,.18); border-radius: 9px; background: #2b2022; }
+.operator-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(min-content, 1fr); align-content: stretch; gap: 8px; padding: 8px; min-height: 0; box-sizing: border-box; }
+.operator-summary { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; border: 1px solid rgba(206,179,147,.18); border-radius: 9px; background: #2b2022; }
 .operator-summary.off { opacity: .58; }
 .operator-summary-heading { height: 38px; min-height: 38px; max-height: 38px; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 6px; padding: 3px 6px 3px 4px; border-bottom: 1px solid rgba(206,179,147,.14); color: #d8ccc4; }
 .operator-select { min-width: 0; height: 32px; display: grid; grid-template-columns: 27px minmax(0, 1fr); align-items: center; gap: 6px; padding: 0 4px; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; text-align: left; }
@@ -218,9 +218,11 @@ const scalingParameters = (operator: SoundOperator) => [
 .operator-enable.enabled { border-color: var(--volca-teal); color: var(--volca-teal); }
 .curve-value { display: grid; place-items: center; width: 100%; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: pointer; }
 .curve-value:hover { background: rgba(206,179,147,.12); }
-.mini-graphs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 6px 7px 3px; }
-.mini-graphs > div { min-width: 0; }.mini-graphs span { display: block; margin-bottom: 2px; color: #ad9e96; font-size: 11px; }
-.mini-graphs svg { width: 100%; height: 54px; display: block; border-radius: 5px; background: #21191a; }
+.mini-graphs { display: grid; grid-template-columns: 1fr 1fr; flex: 1 1 auto; gap: 5px; padding: 6px 7px 3px; min-height: 0; }
+.mini-graphs > div { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.mini-graphs span { display: block; margin-bottom: 2px; color: #ad9e96; font-size: 11px; }
+.mini-graphs :deep(.envelope-frame) { min-height: 0; height: 100%; }
+.mini-graphs svg { width: 100%; height: 100%; min-height: 54px; display: block; border-radius: 5px; background: #21191a; }
 .graph-grid { fill: none; stroke: rgba(206,179,147,.09); }.graph-line { fill: none; stroke: #ceb393; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .parameter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 3px 7px 6px; overflow: hidden; border-radius: 5px; background: rgba(206,179,147,.1); }
 .parameter-grid div, .scaling-row div { min-width: 0; padding: 4px 5px; background: #271d1f; }

@@ -3,11 +3,14 @@ import { useMidiStore } from '@/stores/midiStore'
 import { useSequencerStore } from '@/stores/sequencerStore'
 import { useSoundStore } from '@/stores/soundStore'
 import {
+  isCatalogKind,
   serializeSoundList,
+  type CatalogKind,
+  type LibraryItemSnapshot,
   type LibraryKind,
   type LibraryPayload,
 } from '@/utils/libraryFormat'
-import { saveLibrary } from '@/utils/presetLibrary'
+import { listLibrary, saveLibrary } from '@/utils/presetLibrary'
 
 const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 
@@ -24,15 +27,26 @@ export const useLibraryCurrent = () => {
     return t('library.suggestedBundle')
   }
 
-  const currentPayload = (kind: LibraryKind): LibraryPayload => {
+  const catalogSnapshot = async (): Promise<LibraryItemSnapshot[]> => {
+    const records = await listLibrary()
+    return records.flatMap(record => {
+      if (!isCatalogKind(record.kind)) return []
+      return [{
+        id: record.id,
+        kind: record.kind as CatalogKind,
+        name: record.name,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
+        payload: cloneJson(record.payload),
+      }]
+    })
+  }
+
+  const currentPayload = async (kind: LibraryKind): Promise<LibraryPayload> => {
     if (kind === 'sound') return { sound: soundStore.snapshot() }
     if (kind === 'sequence') return { sequence: cloneJson(seqStore.toState()) }
     if (kind === 'sound-list') return { soundList: serializeSoundList(midiStore.cloneSoundList()) }
-    return {
-      sound: soundStore.snapshot(),
-      sequence: cloneJson(seqStore.toState()),
-      soundList: serializeSoundList(midiStore.cloneSoundList()),
-    }
+    return { items: await catalogSnapshot() }
   }
 
   const stampSoundName = (payload: LibraryPayload, name: string) => {
@@ -44,7 +58,7 @@ export const useLibraryCurrent = () => {
   const saveCurrent = async (kind: LibraryKind, name: string) => {
     const trimmed = name.trim()
     if (!trimmed) return
-    const payload = currentPayload(kind)
+    const payload = await currentPayload(kind)
     if (kind === 'sound') stampSoundName(payload, trimmed)
     await saveLibrary(kind, trimmed, payload)
   }

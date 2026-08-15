@@ -79,6 +79,11 @@ export const listLibrary = async (kind?: LibraryKind): Promise<LibraryRecord[]> 
     return records.map(normalizeRecord).sort((a, b) => b.updatedAt - a.updatedAt);
 };
 
+export const getLibrary = async (id: string): Promise<LibraryRecord | null> => {
+    const raw = await runRequest('readonly', store => store.get(id)) as StoredRecord | undefined;
+    return raw ? normalizeRecord(raw) : null;
+};
+
 export const saveLibrary = async (kind: LibraryKind, name: string, payload: LibraryPayload): Promise<LibraryRecord> => {
     const now = Date.now();
     const record: LibraryRecord = {
@@ -91,6 +96,21 @@ export const saveLibrary = async (kind: LibraryKind, name: string, payload: Libr
     };
     await runRequest('readwrite', store => store.put(record));
     return record;
+};
+
+export const importLibraryRecords = async (records: LibraryRecord[]): Promise<{ added: number; skipped: number }> => {
+    let added = 0;
+    let skipped = 0;
+    for (const record of records) {
+        if (record.kind === 'bundle' || !record.id) continue;
+        if (await getLibrary(record.id)) {
+            skipped += 1;
+            continue;
+        }
+        await runRequest('readwrite', store => store.put(cloneJson(record)));
+        added += 1;
+    }
+    return { added, skipped };
 };
 
 export const deleteLibrary = async (id: string) => {

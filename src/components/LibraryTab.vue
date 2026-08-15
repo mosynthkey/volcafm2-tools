@@ -7,6 +7,13 @@
         <v-btn @click="confirmReplace">{{ t('library.replaceList') }}</v-btn>
       </template>
     </AppDialog>
+    <AppDialog v-model="showImportResult" :title="t('library.importResultTitle')" max-width="480">
+      <p>{{ t('library.importSkipPolicy') }}</p>
+      <p>{{ t('library.importResult', { added: importResult.added, skipped: importResult.skipped }) }}</p>
+      <template #actions>
+        <v-btn @click="showImportResult = false">{{ t('common.ok') }}</v-btn>
+      </template>
+    </AppDialog>
 
     <v-card class="library-card pa-4">
       <header class="editor-toolbar">
@@ -87,14 +94,15 @@ import type { SoundProgram } from '@/types/soundProgram';
 import {
     LIBRARY_FILE_ACCEPT,
     LIBRARY_KINDS,
+    catalogItemsFromPayload,
     decodeLibraryFile,
     encodeLibraryFile,
     libraryFilename,
     deserializeSoundList,
+    type DecodedLibraryFile,
     type LibraryKind,
-    type LibraryPayload,
 } from '@/utils/libraryFormat';
-import { deleteLibrary, listLibrary, saveLibrary, type LibraryRecord } from '@/utils/presetLibrary';
+import { deleteLibrary, importLibraryRecords, listLibrary, type LibraryRecord } from '@/utils/presetLibrary';
 import { downloadText } from '@/utils/downloadBinary';
 
 const ui = useUiStore();
@@ -114,6 +122,8 @@ const deleteTarget = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const showReplaceConfirm = ref(false);
 const pendingLoad = ref<LibraryRecord | null>(null);
+const showImportResult = ref(false);
+const importResult = ref({ added: 0, skipped: 0 });
 
 const kindLabel = (kind: LibraryKind) => t(
   kind === 'sound-list' ? 'library.kinds.soundList' : `library.kinds.${kind}`,
@@ -121,8 +131,7 @@ const kindLabel = (kind: LibraryKind) => t(
 
 const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
-const needsListConfirm = (kind: LibraryKind, payload: LibraryPayload) =>
-  kind === 'sound-list' || (kind === 'bundle' && Boolean(payload.soundList));
+const needsListConfirm = (kind: LibraryKind) => kind === 'sound-list';
 
 const destinationTab = (kind: LibraryKind) => {
   if (kind === 'sequence') return 'sequencer';
@@ -130,17 +139,46 @@ const destinationTab = (kind: LibraryKind) => {
   return 'sound-edit';
 };
 
+const recordsFromDecoded = (decoded: DecodedLibraryFile): LibraryRecord[] => {
+  if (decoded.kind === 'bundle') {
+    return catalogItemsFromPayload(decoded.payload).map(item => ({
+      id: item.id,
+      kind: item.kind,
+      name: item.name,
+      payload: item.payload,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    }));
+  }
+  const now = Date.now();
+  return [{
+    id: decoded.id ?? crypto.randomUUID(),
+    kind: decoded.kind,
+    name: decoded.name,
+    payload: decoded.payload,
+    createdAt: now,
+    updatedAt: decoded.savedAt || now,
+  }];
+};
+
+const mergeRecords = async (incoming: LibraryRecord[]) => {
+  const result = await importLibraryRecords(incoming);
+  importResult.value = result;
+  showImportResult.value = true;
+  return result;
+};
+
 const applyRecord = (record: LibraryRecord) => {
   const payload = cloneJson(record.payload);
-  if ((record.kind === 'sound' || record.kind === 'bundle') && payload.sound) {
-    if (record.kind === 'sound') stampSoundName(payload, record.name);
+  if (record.kind === 'sound' && payload.sound) {
+    stampSoundName(payload, record.name);
     soundStore.loadPreset(payload.sound as SoundProgram);
     soundStore.sendToDevice();
   }
-  if ((record.kind === 'sequence' || record.kind === 'bundle') && payload.sequence) {
+  if (record.kind === 'sequence' && payload.sequence) {
     seqStore.loadPreset(payload.sequence);
   }
-  if ((record.kind === 'sound-list' || record.kind === 'bundle') && payload.soundList) {
+  if (record.kind === 'sound-list' && payload.soundList) {
     midiStore.replaceSoundList(deserializeSoundList(payload.soundList));
   }
   ui.activeTab = destinationTab(record.kind);
@@ -200,10 +238,21 @@ const saveCurrent = async () => {
   }
 };
 
-const loadRecord = (record: LibraryRecord) => {
+const loadRecord = async (record: LibraryRecord) => {
   errorMessage.value = '';
   try {
-    if (needsListConfirm(record.kind, record.payload)) {
+    if (record.kind === 'bundle') {
+      busy.value = 'import';
+      await mergeRecords(recordsFromDecoded({
+        kind: 'bundle',
+        name: record.name,
+        savedAt: record.updatedAt,
+        payload: record.payload,
+      }));
+      await refresh();
+      return;
+    }
+    if (needsListConfirm(record.kind)) {
       pendingLoad.value = record;
       showReplaceConfirm.value = true;
       return;
@@ -211,6 +260,8 @@ const loadRecord = (record: LibraryRecord) => {
     applyRecord(record);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t('library.loadError');
+  } finally {
+    if (busy.value === 'import') busy.value = null;
   }
 };
 
@@ -235,7 +286,13 @@ const exportRecord = (record: LibraryRecord) => {
   errorMessage.value = '';
   try {
     downloadText(
-      encodeLibraryFile(record.kind, record.name, record.payload, record.updatedAt),
+      encodeLibraryFile(
+        record.kind,
+        record.name,
+        record.payload,
+        record.updatedAt,
+        record.kind === 'bundle' ? undefined : record.id,
+      ),
       libraryFilename(record.name, record.kind),
     );
   } catch (error) {
@@ -252,8 +309,12 @@ const importFile = async (event: Event) => {
   errorMessage.value = '';
   try {
     const decoded = decodeLibraryFile(await file.text(), file.name);
-    await saveLibrary(decoded.kind, decoded.name, decoded.payload);
-    selectKind(decoded.kind);
+    await mergeRecords(recordsFromDecoded(decoded));
+    if (decoded.kind === 'bundle') {
+      await refresh();
+    } else {
+      selectKind(decoded.kind);
+    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t('library.importError');
   } finally {

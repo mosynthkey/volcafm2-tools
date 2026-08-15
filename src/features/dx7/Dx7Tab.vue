@@ -96,8 +96,8 @@
               </div>
             </div>
           </template>
-          <div class="slot-gap" :data-insert-before="(column + 1) * 32"
-            :class="{ 'is-open': isOpenGap((column + 1) * 32) }" />
+          <div class="slot-gap" :data-insert-before="(column + 1) * LIST_COLUMN_SIZE"
+            :class="{ 'is-open': isOpenGap((column + 1) * LIST_COLUMN_SIZE) }" />
         </div>
       </div>
       <Teleport to="body">
@@ -130,7 +130,9 @@ const soundStore = useSoundStore();
 const ui = useUiStore();
 const { t } = useI18n();
 
-const listColumns = [0, 1];
+const LIST_COLUMN_COUNT = 4;
+const LIST_COLUMN_SIZE = 16;
+const listColumns = Array.from({ length: LIST_COLUMN_COUNT }, (_, index) => index);
 const reorderEnabled = ref(false);
 const draggingSlot = ref<number | null>(null);
 const dropInsertBefore = ref<number | null>(null);
@@ -159,7 +161,7 @@ const canWrite = computed(() =>
 
 const writePercent = computed(() => (midiStore.programWriteProgress / 64) * 100);
 
-const columnSlots = (column: number) => midiStore.soundList.slice(column * 32, column * 32 + 32);
+const columnSlots = (column: number) => midiStore.soundList.slice(column * LIST_COLUMN_SIZE, column * LIST_COLUMN_SIZE + LIST_COLUMN_SIZE);
 
 const slotAria = (slot: { slot: number; name: string }) => {
   const name = slot.name.trim() || t('dx7.unnamedVoice');
@@ -300,7 +302,7 @@ const onHandlePointerUp = () => {
 .sound-list-card { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .sound-list-columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   flex: 1 1 auto;
   min-height: 0;
@@ -338,7 +340,7 @@ const onHandlePointerUp = () => {
 .sound-list-column.is-reorder .slot-row:active { cursor: grabbing; }
 .slot-ghost {
   position: fixed; z-index: 40; display: flex; align-items: center; gap: 8px;
-  width: min(320px, calc(50vw - 48px)); min-height: 44px; padding: 6px 10px;
+  width: min(240px, calc(25vw - 24px)); min-height: 44px; padding: 6px 10px;
   border: 1px solid rgba(206,179,147,.4); border-radius: 9px;
   background: #352628; color: var(--volca-text);
   box-shadow: 0 10px 24px rgba(0,0,0,.35);

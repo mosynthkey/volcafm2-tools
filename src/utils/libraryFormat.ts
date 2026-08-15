@@ -8,10 +8,12 @@ import {
     type SoundListProgram,
 } from './soundListBackup';
 
-export const LIBRARY_FILE_VERSION = 1;
+export const LIBRARY_FILE_VERSION = 2;
 
 export const LIBRARY_KINDS = ['sound', 'sound-list', 'sequence', 'bundle'] as const;
 export type LibraryKind = (typeof LIBRARY_KINDS)[number];
+export const CATALOG_KINDS = ['sound', 'sound-list', 'sequence'] as const;
+export type CatalogKind = (typeof CATALOG_KINDS)[number];
 
 export const LIBRARY_EXTENSIONS: Record<LibraryKind, string> = {
     sound: 'vfm2_sound',
@@ -34,10 +36,20 @@ export type LibrarySoundList = {
     data: string;
 }[];
 
+export type LibraryItemSnapshot = {
+    id: string;
+    kind: CatalogKind;
+    name: string;
+    createdAt: number;
+    updatedAt: number;
+    payload: LibraryPayload;
+};
+
 export type LibraryPayload = {
     sound?: unknown;
     sequence?: unknown;
     soundList?: LibrarySoundList;
+    items?: LibraryItemSnapshot[];
 };
 
 export type LibraryFile = {
@@ -45,12 +57,14 @@ export type LibraryFile = {
     kind: string;
     name: string;
     savedAt: number;
+    id?: string;
 } & LibraryPayload;
 
 export type DecodedLibraryFile = {
     kind: LibraryKind;
     name: string;
     savedAt: number;
+    id?: string;
     payload: LibraryPayload;
 };
 
@@ -116,15 +130,59 @@ const kindFromFileKind = (kind: string): LibraryKind | null => {
 
 const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
-export const encodeLibraryFile = (kind: LibraryKind, name: string, payload: LibraryPayload, savedAt = Date.now()): string => {
+export const encodeLibraryFile = (
+    kind: LibraryKind,
+    name: string,
+    payload: LibraryPayload,
+    savedAt = Date.now(),
+    id?: string,
+): string => {
     const file: LibraryFile = {
         version: LIBRARY_FILE_VERSION,
         kind: LIBRARY_FILE_KIND[kind],
         name: name.trim(),
         savedAt,
+        ...(id ? { id } : {}),
         ...cloneJson(payload),
     };
     return `${JSON.stringify(file, null, 2)}\n`;
+};
+
+export const isCatalogKind = (kind: unknown): kind is CatalogKind =>
+    kind === 'sound' || kind === 'sound-list' || kind === 'sequence';
+
+const snapshotFromUnknown = (value: unknown): LibraryItemSnapshot | null => {
+    if (!isRecord(value) || !isCatalogKind(value.kind) || typeof value.id !== 'string' || !value.id.trim()) return null;
+    const payload = isRecord(value.payload) ? value.payload as LibraryPayload : {};
+    return {
+        id: value.id.trim(),
+        kind: value.kind,
+        name: typeof value.name === 'string' && value.name.trim() ? value.name.trim() : 'untitled',
+        createdAt: typeof value.createdAt === 'number' ? value.createdAt : Date.now(),
+        updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now(),
+        payload,
+    };
+};
+
+export const catalogItemsFromPayload = (payload: LibraryPayload): LibraryItemSnapshot[] => {
+    if (Array.isArray(payload.items)) {
+        return payload.items.flatMap(item => {
+            const snapshot = snapshotFromUnknown(item);
+            return snapshot ? [snapshot] : [];
+        });
+    }
+    const now = Date.now();
+    const items: LibraryItemSnapshot[] = [];
+    if (payload.sound !== undefined) {
+        items.push({ id: crypto.randomUUID(), kind: 'sound', name: 'Program', createdAt: now, updatedAt: now, payload: { sound: payload.sound } });
+    }
+    if (payload.sequence !== undefined) {
+        items.push({ id: crypto.randomUUID(), kind: 'sequence', name: 'Sequence', createdAt: now, updatedAt: now, payload: { sequence: payload.sequence } });
+    }
+    if (payload.soundList) {
+        items.push({ id: crypto.randomUUID(), kind: 'sound-list', name: 'Sound list', createdAt: now, updatedAt: now, payload: { soundList: payload.soundList } });
+    }
+    return items;
 };
 
 const payloadFromFile = (parsed: Record<string, unknown>, kind: LibraryKind): LibraryPayload => {
@@ -135,6 +193,12 @@ const payloadFromFile = (parsed: Record<string, unknown>, kind: LibraryKind): Li
     if (parsed.sound !== undefined) payload.sound = parsed.sound;
     if (parsed.sequence !== undefined) payload.sequence = parsed.sequence;
     if (Array.isArray(parsed.soundList)) payload.soundList = parsed.soundList as LibrarySoundList;
+    if (Array.isArray(parsed.items)) {
+        payload.items = parsed.items.flatMap(item => {
+            const snapshot = snapshotFromUnknown(item);
+            return snapshot ? [snapshot] : [];
+        });
+    }
     if (kind === 'sound' && payload.sound === undefined && parsed.data !== undefined) payload.sound = parsed.data;
     if (kind === 'sequence' && payload.sequence === undefined && parsed.data !== undefined) payload.sequence = parsed.data;
     return payload;
@@ -157,12 +221,10 @@ export const decodeLibraryFile = (json: string, filename = ''): DecodedLibraryFi
         ? parsed.name.trim()
         : filename.replace(/\.[^.]+$/, '') || 'untitled';
     const savedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : Date.now();
+    const id = typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id.trim() : undefined;
     const payload = payloadFromFile(parsed, kind);
     if (kind === 'sound' && payload.sound === undefined) throw new Error('Sound file is missing sound data.');
     if (kind === 'sequence' && payload.sequence === undefined) throw new Error('Sequence file is missing sequence data.');
     if (kind === 'sound-list') deserializeSoundList(payload.soundList ?? []);
-    if (kind === 'bundle' && !payload.sound && !payload.sequence && !payload.soundList) {
-        throw new Error('Bundle file is empty.');
-    }
-    return { kind, name, savedAt, payload };
+    return { kind, name, savedAt, id, payload };
 };

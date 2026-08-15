@@ -7,6 +7,7 @@ import {
     padProgramDump,
 } from '../src/utils/soundListBackup'
 import {
+    catalogItemsFromPayload,
     decodeLibraryFile,
     encodeLibraryFile,
     extensionForKind,
@@ -28,12 +29,17 @@ assert.equal(libraryFilename('My Voice', 'sound'), 'My Voice.vfm2_sound')
 
 const sound = createInitialSoundProgram()
 sound.name = 'BRASS 1'
-const soundFile = encodeLibraryFile('sound', 'Brass', { sound })
+const soundId = '11111111-1111-4111-8111-111111111111'
+const soundFile = encodeLibraryFile('sound', 'Brass', { sound }, 1_700_000_000_000, soundId)
 const decodedSound = decodeLibraryFile(soundFile, 'Brass.vfm2_sound')
 assert.equal(decodedSound.kind, 'sound')
 assert.equal(decodedSound.name, 'Brass')
+assert.equal(decodedSound.id, soundId)
 assert.equal((decodedSound.payload.sound as { name: string }).name, 'BRASS 1')
 assert.equal(encodeSoundProgram(decodedSound.payload.sound as Parameters<typeof encodeSoundProgram>[0]).length, 140)
+
+const soundFileWithoutId = encodeLibraryFile('sound', 'Brass', { sound })
+assert.equal(decodeLibraryFile(soundFileWithoutId, 'Brass.vfm2_sound').id, undefined)
 
 const sequence = { programNo: 3, notes: [], velocity: 100 }
 const seqFile = encodeLibraryFile('sequence', 'Groove', { sequence })
@@ -66,15 +72,59 @@ const decodedOld = decodeLibraryFile(oldBackup, 'volca_fm2_sound_list.json')
 assert.equal(decodedOld.kind, 'sound-list')
 assert.equal(deserializeSoundList(decodedOld.payload.soundList ?? [])[1].name, 'BRASS 1')
 
-const bundleFile = encodeLibraryFile('bundle', 'Session', {
+const catalogItems = [
+    {
+        id: soundId,
+        kind: 'sound' as const,
+        name: 'Brass',
+        createdAt: 1_700_000_000_000,
+        updatedAt: 1_700_000_000_100,
+        payload: { sound },
+    },
+    {
+        id: '22222222-2222-4222-8222-222222222222',
+        kind: 'sequence' as const,
+        name: 'Groove',
+        createdAt: 1_700_000_000_200,
+        updatedAt: 1_700_000_000_300,
+        payload: { sequence },
+    },
+    {
+        id: '33333333-3333-4333-8333-333333333333',
+        kind: 'sound-list' as const,
+        name: 'Bank A',
+        createdAt: 1_700_000_000_400,
+        updatedAt: 1_700_000_000_500,
+        payload: listPayload,
+    },
+]
+const bundleFile = encodeLibraryFile('bundle', 'Session', { items: catalogItems })
+const decodedBundle = decodeLibraryFile(bundleFile, 'Session.vfm2_bundle')
+assert.equal(decodedBundle.kind, 'bundle')
+assert.equal(decodedBundle.payload.items?.length, 3)
+assert.equal(decodedBundle.payload.items?.[0]?.id, soundId)
+assert.equal(decodedBundle.payload.items?.[1]?.kind, 'sequence')
+assert.equal(decodedBundle.payload.sound, undefined)
+assert.equal(decodedBundle.payload.sequence, undefined)
+assert.equal(decodedBundle.payload.soundList, undefined)
+
+const emptyBundle = decodeLibraryFile(encodeLibraryFile('bundle', 'Empty', { items: [] }), 'Empty.vfm2_bundle')
+assert.equal(catalogItemsFromPayload(emptyBundle.payload).length, 0)
+
+const legacyBundleFile = encodeLibraryFile('bundle', 'Legacy', {
     sound,
     sequence,
     soundList: serializeSoundList(programs),
 })
-const decodedBundle = decodeLibraryFile(bundleFile, 'Session.vfm2_bundle')
-assert.equal(decodedBundle.kind, 'bundle')
-assert.ok(decodedBundle.payload.sound)
-assert.ok(decodedBundle.payload.sequence)
-assert.equal(decodedBundle.payload.soundList?.length, 64)
+const decodedLegacyBundle = decodeLibraryFile(legacyBundleFile, 'Legacy.vfm2_bundle')
+assert.ok(decodedLegacyBundle.payload.sound)
+assert.ok(decodedLegacyBundle.payload.sequence)
+assert.equal(decodedLegacyBundle.payload.soundList?.length, 64)
+const legacyItems = catalogItemsFromPayload(decodedLegacyBundle.payload)
+assert.equal(legacyItems.length, 3)
+assert.equal(legacyItems[0]?.kind, 'sound')
+assert.equal(legacyItems[1]?.kind, 'sequence')
+assert.equal(legacyItems[2]?.kind, 'sound-list')
+assert.match(legacyItems[0]?.id ?? '', /^[0-9a-f-]{36}$/i)
 
 console.log('Library file format verification passed.')

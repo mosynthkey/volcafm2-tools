@@ -7,7 +7,7 @@
       </button>
     </header>
 
-    <div class="operator-body">
+    <div class="operator-body" :class="{ 'is-overview': soundStore.selectedOperator < 0 }">
     <OperatorOverview v-if="soundStore.selectedOperator < 0" />
 
     <template v-else>
@@ -117,6 +117,7 @@ const NumberControl = KnobControl;
 .operator-heading { display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; height: 42px; min-height: 42px; max-height: 42px; overflow: hidden; padding: 0 12px; border-bottom: 1px solid rgba(206,179,147,.16); background: #302426; }
 .operator-heading h3 { margin: 0; overflow: hidden; font-size: var(--volca-type-heading); line-height: 1; white-space: nowrap; text-overflow: ellipsis; }
 .operator-body { min-height: 0; overflow: auto; }
+.operator-body.is-overview { display: grid; grid-template-rows: minmax(0, 1fr); }
 .show-all-operators { box-sizing: border-box; height: 28px; padding: 0 8px; border: 1px solid rgba(206,179,147,.28); border-radius: 7px; background: transparent; color: #c7b9b0; font: inherit; font-size: var(--volca-type-label); line-height: 1; cursor: pointer; }
 .show-all-operators:hover { border-color: rgba(206,179,147,.58); background: rgba(206,179,147,.08); color: #f1e9e1; }
 .show-all-operators:focus-visible { outline: 2px solid #e1cab0; outline-offset: 2px; }

@@ -1,5 +1,13 @@
 import { strict as assert } from 'node:assert';
 import { EG_SHAPE_PRESETS } from '../src/features/sound/egShapePresets';
+import { LFO_WAVE_KEYS, lfoWaveformPoints } from '../src/features/sound/lfoWaveforms';
+import {
+    DX7_LFO_RATE_HZ,
+    noteBeats,
+    speedFromBpmAndNote,
+    speedFromFrequencyHz,
+    targetFrequencyHz,
+} from '../src/features/sound/lfoSpeedFromTime';
 import { buildDx7SingleVoice, parseDx7Sysex } from '../src/midi/dx7Cartridge';
 import { adsrToEg, egToAdsr, isAdsrEnvelope } from '../src/utils/adsrEnvelope';
 import { createInitialSoundProgram, decodeSoundProgram, encodeSoundProgram, normalizeSoundProgramName } from '../src/utils/soundProgramCodec';
@@ -73,6 +81,30 @@ assert.equal(isAdsrEnvelope([...adsrEg.rates], [...adsrEg.levels]), true);
 assert.equal(isAdsrEnvelope([99, 99, 99, 99], [80, 70, 70, 0]), false);
 for (const shape of EG_SHAPE_PRESETS) {
   assert.equal(isAdsrEnvelope([...shape.rates], [...shape.levels]), true, shape.id);
+}
+
+assert.equal(DX7_LFO_RATE_HZ.length, 100);
+assert.equal(DX7_LFO_RATE_HZ[0], 0.062541);
+assert.equal(DX7_LFO_RATE_HZ[99], 49.261084);
+assert.equal(noteBeats('1/4', 'straight'), 1);
+assert.equal(noteBeats('1/8', 'dotted'), 0.75);
+assert.equal(noteBeats('1/8', 'triplet'), 1 / 3);
+assert.equal(targetFrequencyHz(120, '1/4', 'straight'), 2);
+assert.equal(targetFrequencyHz(120, '1/8', 'straight'), 4);
+assert.equal(speedFromBpmAndNote(120, '1/4', 'straight').speed, 13);
+assert.equal(speedFromBpmAndNote(120, '1/8', 'straight').speed, 25);
+assert.equal(speedFromBpmAndNote(120, '1/4', 'dotted').speed, 8);
+assert.equal(speedFromBpmAndNote(120, '1/8', 'triplet').speed, 37);
+assert.equal(speedFromFrequencyHz(0.01).speed, 0);
+assert.equal(speedFromFrequencyHz(0.01).clamped, 'low');
+assert.equal(speedFromFrequencyHz(80).speed, 99);
+assert.equal(speedFromFrequencyHz(80).clamped, 'high');
+
+assert.deepEqual([...LFO_WAVE_KEYS], ['triangle', 'sawDown', 'sawUp', 'square', 'sine', 'sampleHold']);
+for (const wave of LFO_WAVE_KEYS.keys()) {
+  const points = lfoWaveformPoints(wave);
+  assert.match(points, /^\d+\.\d+,\d+\.\d+( \d+\.\d+,\d+\.\d+)+$/);
+  assert.notEqual(lfoWaveformPoints(wave, 80, 32), points);
 }
 
 console.log('Sound program codec verification passed (140-byte Current Program Data).');
