@@ -29,7 +29,11 @@ const duration = (rate: number, fromLevel: number, toLevel: number) => {
   return table[clampIndex(rate)] * Math.abs(LEVEL_PERCENT[to] - LEVEL_PERCENT[from]);
 };
 
-// Port of Dexed EnvDisplay::paint() geometry from DXComponents.cpp.
+/** Display hold after L3. DX7 has no sustain time; level stays until key off. */
+const SUSTAIN_TIME = 10;
+/** Fixed time window for the graph. Scale never depends on the current rates. */
+const VIEW_TIME = 32;
+
 export const dx7EnvelopeGeometry = (
   rates: number[],
   levels: number[],
@@ -41,20 +45,82 @@ export const dx7EnvelopeGeometry = (
   const innerHeight = Math.max(1, height - padding * 2);
   const d = [duration(rates[0], levels[3], levels[0]), duration(rates[1], levels[0], levels[1]),
     duration(rates[2], levels[1], levels[2]), duration(rates[3], levels[2], levels[3])];
-  const attackDecay = d[0] + d[1] + d[2];
-  const keyoff = attackDecay + 10;
-  const scale = innerWidth / (keyoff + d[3]);
-  const x = (value: number) => padding + value;
-  const y = (level: number) => padding + innerHeight - (innerHeight / 99) * clampIndex(level);
-  return [
-    { x: x(0), y: y(levels[3]) },
-    { x: x(d[0] * scale), y: y(levels[0]) },
-    { x: x((d[0] + d[1]) * scale), y: y(levels[1]) },
-    { x: x(attackDecay * scale), y: y(levels[2]) },
-    { x: x(keyoff * scale), y: y(levels[2]) },
-    { x: x(Math.min(innerWidth, (attackDecay + keyoff + d[3]) * scale)), y: y(levels[3]) },
-  ];
+  const scale = innerWidth / VIEW_TIME;
+  const times = [0, d[0], d[0] + d[1], d[0] + d[1] + d[2], d[0] + d[1] + d[2] + SUSTAIN_TIME];
+  times.push(times[4] + d[3]);
+  const vertexLevels = [levels[3], levels[0], levels[1], levels[2], levels[2], levels[3]];
+  const yAt = (level: number) => padding + innerHeight - (innerHeight / 99) * clampIndex(level);
+  const xAt = (time: number) => padding + time * scale;
+  const points: EnvelopePoint[] = [{ x: xAt(0), y: yAt(vertexLevels[0]) }];
+  for (let index = 0; index < 5; index += 1) {
+    const start = times[index];
+    const end = times[index + 1];
+    const from = vertexLevels[index];
+    const to = vertexLevels[index + 1];
+    if (start >= VIEW_TIME) break;
+    if (end <= VIEW_TIME) {
+      points.push({ x: xAt(end), y: yAt(to) });
+      continue;
+    }
+    const u = (VIEW_TIME - start) / Math.max(end - start, 1e-9);
+    points.push({ x: padding + innerWidth, y: yAt(from + (to - from) * u) });
+    break;
+  }
+  while (points.length < 6) points.push(points[points.length - 1]);
+  return points;
 };
 
 export const dx7EnvelopePoints = (rates: number[], levels: number[], width: number, height: number, padding = 8) =>
   dx7EnvelopeGeometry(rates, levels, width, height, padding).map(point => `${point.x},${point.y}`).join(' ');
+
+export const dx7EnvelopeMarks = (
+  rates: number[],
+  levels: number[],
+  width: number,
+  height: number,
+  padding = 8,
+) => {
+  const points = dx7EnvelopeGeometry(rates, levels, width, height, padding);
+  const innerHeight = Math.max(1, height - padding * 2);
+  const yAt = (level: number) => padding + innerHeight - (innerHeight / 99) * clampIndex(level);
+  const levelMarks = [0, 1, 2, 3].map(index => ({
+    label: `L${index + 1}`,
+    y: yAt(levels[index] ?? 0),
+    labelY: yAt(levels[index] ?? 0),
+  }));
+  const placed = [...levelMarks].sort((a, b) => a.y - b.y);
+  let lastY = -Infinity;
+  for (const mark of placed) {
+    mark.labelY = Math.max(mark.y, lastY + 10);
+    lastY = mark.labelY;
+  }
+  const ratePairs = [[0, 1], [1, 2], [2, 3], [4, 5]] as const;
+  const rateMarks = ratePairs.map(([fromIndex, toIndex], index) => {
+    const from = points[fromIndex];
+    const to = points[toIndex];
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy);
+    let nx = 0;
+    let ny = -1;
+    let angle = 0;
+    if (len > 0.5) {
+      nx = -dy / len;
+      ny = dx / len;
+      if (ny > 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      if (angle > 90) angle -= 180;
+      if (angle < -90) angle += 180;
+    }
+    return {
+      label: `R${index + 1}`,
+      x: Math.min(width - 12, Math.max(12, (from.x + to.x) / 2 + nx * 10)),
+      y: Math.min(height - 8, Math.max(8, (from.y + to.y) / 2 + ny * 10)),
+      angle,
+    };
+  });
+  return { points, levelMarks: placed, rateMarks };
+};

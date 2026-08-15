@@ -42,8 +42,18 @@
         <EnvelopeCopyMenu :rates="selected.egRates" :levels="selected.egLevels" @apply="applyEnvelope">
           <svg class="envelope-graph" viewBox="0 0 420 170" role="img" :aria-label="t('sound.amplitudeEnvelope')">
             <path class="envelope-grid" d="M0 35H420M0 85H420M0 135H420M105 0V170M210 0V170M315 0V170" />
-            <polyline class="envelope-line" :points="envelopePoints(selected.egRates, selected.egLevels)" />
-            <circle v-for="(point, index) in envelopeCircles(selected.egRates, selected.egLevels)" :key="index" :cx="point.x" :cy="point.y" r="5" />
+            <g class="envelope-levels">
+              <g v-for="mark in envelopeView.levelMarks" :key="mark.label">
+                <line x1="28" x2="410" :y1="mark.y" :y2="mark.y" />
+                <text x="4" :y="mark.labelY">{{ mark.label }}</text>
+              </g>
+            </g>
+            <polyline class="envelope-line" :points="envelopePoints" />
+            <g class="envelope-rates">
+              <text v-for="mark in envelopeView.rateMarks" :key="mark.label"
+                :x="mark.x" :y="mark.y" :transform="`rotate(${mark.angle} ${mark.x} ${mark.y})`">{{ mark.label }}</text>
+            </g>
+            <circle v-for="(point, index) in envelopeView.points" :key="index" :cx="point.x" :cy="point.y" r="5" />
           </svg>
         </EnvelopeCopyMenu>
         <div class="envelope-side">
@@ -89,7 +99,7 @@ import OperatorOverview from '@/features/sound/components/OperatorOverview.vue';
 import { type EgShapePreset } from '@/features/sound/egShapePresets';
 import { operatorFrequencyControls, type OperatorNumberKey } from '@/features/sound/soundControlDefinitions';
 import { useSoundStore } from '@/stores/soundStore';
-import { dx7EnvelopeGeometry, dx7EnvelopePoints } from '@/utils/dx7Envelope';
+import { dx7EnvelopeMarks } from '@/utils/dx7Envelope';
 import { formatOperatorFrequency } from '@/utils/operatorFrequency';
 
 const { t } = useI18n();
@@ -99,8 +109,8 @@ const selected = computed(() => program.value.operators[Math.max(0, selectedOper
 const operatorNumber = (key: OperatorNumberKey) => selected.value[key] as number;
 const setOperatorNumber = (key: OperatorNumberKey, value: number) => { (selected.value[key] as number) = value; };
 const frequencyLabel = formatOperatorFrequency;
-const envelopeCircles = (rates: number[], levels: number[]) => dx7EnvelopeGeometry(rates, levels, 420, 170, 10).slice(1, 5);
-const envelopePoints = (rates: number[], levels: number[]) => dx7EnvelopePoints(rates, levels, 420, 170, 10);
+const envelopeView = computed(() => dx7EnvelopeMarks(selected.value.egRates, selected.value.egLevels, 420, 170, 18));
+const envelopePoints = computed(() => envelopeView.value.points.map(point => `${point.x},${point.y}`).join(' '));
 const applyEgShape = (shape: EgShapePreset) => {
   selected.value.egRates = [...shape.rates];
   selected.value.egLevels = [...shape.levels];
@@ -144,6 +154,9 @@ const NumberControl = KnobControl;
 .envelope-side { display: grid; align-content: start; }
 .envelope-graph { width: 100%; display: block; border: 1px solid rgba(206,179,147,.15); border-radius: 8px; background: #251c1e; }
 .envelope-grid { fill: none; stroke: rgba(206,179,147,.1); }
+.envelope-levels line { stroke: rgba(80,221,213,.28); stroke-dasharray: 3 4; }
+.envelope-levels text { fill: #50ddd5; font-size: 9px; font-weight: 700; dominant-baseline: middle; }
+.envelope-rates text { fill: #e1cab0; font-size: 9px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
 .envelope-line { fill: none; stroke: #ceb393; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .envelope-graph circle { fill: #302426; stroke: #ceb393; stroke-width: 2; }
 .envelope-values { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; align-content: start; }
