@@ -5,7 +5,12 @@ import {
   nextDetectGeneration,
   portNamesFrom,
   selectedPortDisconnected,
-  shouldWarnBeforeDocumentReload,
+  desktopMidiBootAction,
+  shouldAutoReloadMidiDocument,
+  readDidAutoReloadMidi,
+  markAutoReloadMidi,
+  clearAutoReloadMidi,
+  MIDI_AUTO_RELOAD_KEY,
 } from '../src/midi/midiAccessSession'
 
 const first = nextDetectGeneration(0)
@@ -56,8 +61,37 @@ assert.equal(midiStateChangeAction({
   selectedDisconnected: false,
 }), 'refresh')
 
-assert.equal(shouldWarnBeforeDocumentReload({ hasUnsavedProgram: false, hasSequenceNotes: false }), false)
-assert.equal(shouldWarnBeforeDocumentReload({ hasUnsavedProgram: true, hasSequenceNotes: false }), true)
-assert.equal(shouldWarnBeforeDocumentReload({ hasUnsavedProgram: false, hasSequenceNotes: true }), true)
+assert.equal(desktopMidiBootAction({ isDesktop: false, didAutoReload: true }), 'init')
+assert.equal(desktopMidiBootAction({ isDesktop: true, didAutoReload: false }), 'init')
+assert.equal(desktopMidiBootAction({ isDesktop: true, didAutoReload: true }), 'reconnect')
+
+assert.equal(shouldAutoReloadMidiDocument({
+  isDesktop: true, didAutoReload: false, midiAccessFailed: true, deviceNotFound: false, hasNoPorts: false,
+}), true)
+assert.equal(shouldAutoReloadMidiDocument({
+  isDesktop: true, didAutoReload: false, midiAccessFailed: false, deviceNotFound: true, hasNoPorts: true,
+}), true)
+assert.equal(shouldAutoReloadMidiDocument({
+  isDesktop: true, didAutoReload: false, midiAccessFailed: false, deviceNotFound: true, hasNoPorts: false,
+}), false)
+assert.equal(shouldAutoReloadMidiDocument({
+  isDesktop: true, didAutoReload: true, midiAccessFailed: true, deviceNotFound: false, hasNoPorts: false,
+}), false)
+assert.equal(shouldAutoReloadMidiDocument({
+  isDesktop: false, didAutoReload: false, midiAccessFailed: true, deviceNotFound: false, hasNoPorts: false,
+}), false)
+
+const memory = new Map<string, string>()
+const storage = {
+  getItem: (key: string) => memory.get(key) ?? null,
+  setItem: (key: string, value: string) => { memory.set(key, value) },
+  removeItem: (key: string) => { memory.delete(key) },
+}
+assert.equal(readDidAutoReloadMidi(storage), false)
+markAutoReloadMidi(storage)
+assert.equal(memory.get(MIDI_AUTO_RELOAD_KEY), '1')
+assert.equal(readDidAutoReloadMidi(storage), true)
+clearAutoReloadMidi(storage)
+assert.equal(readDidAutoReloadMidi(storage), false)
 
 console.log('verify-midi-reconnect: ok')

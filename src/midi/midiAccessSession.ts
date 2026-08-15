@@ -29,7 +29,30 @@ export const midiStateChangeAction = (input: {
   return 'refresh'
 }
 
-export const shouldWarnBeforeDocumentReload = (input: {
-  hasUnsavedProgram: boolean
-  hasSequenceNotes: boolean
-}) => input.hasUnsavedProgram || input.hasSequenceNotes
+export const MIDI_AUTO_RELOAD_KEY = 'volca-fm2-midi-auto-reload'
+
+export const readDidAutoReloadMidi = (storage: { getItem(key: string): string | null } | null) =>
+  storage?.getItem(MIDI_AUTO_RELOAD_KEY) === '1'
+
+export const markAutoReloadMidi = (storage: { setItem(key: string, value: string): void } | null) => {
+  storage?.setItem(MIDI_AUTO_RELOAD_KEY, '1')
+}
+
+export const clearAutoReloadMidi = (storage: { removeItem(key: string): void } | null) => {
+  storage?.removeItem(MIDI_AUTO_RELOAD_KEY)
+}
+
+export const desktopMidiBootAction = (input: { isDesktop: boolean; didAutoReload: boolean }) =>
+  input.isDesktop && input.didAutoReload ? 'reconnect' : 'init'
+
+export const shouldAutoReloadMidiDocument = (input: {
+  isDesktop: boolean
+  didAutoReload: boolean
+  midiAccessFailed: boolean
+  deviceNotFound: boolean
+  hasNoPorts: boolean
+}) => {
+  if (!input.isDesktop || input.didAutoReload) return false
+  if (input.midiAccessFailed) return true
+  return input.deviceNotFound && input.hasNoPorts
+}

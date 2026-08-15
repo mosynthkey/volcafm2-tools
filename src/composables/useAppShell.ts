@@ -18,7 +18,7 @@ export const useAppShell = () => {
         unsubscribeProgramChange = midiStore.onProgramChange(programNo => {
             sequencerStore.setProgramNo(programNo);
         });
-        void midiStore.initMIDI();
+        void midiStore.bootMIDI();
     });
     onUnmounted(() => unsubscribeProgramChange?.());
 

@@ -7,11 +7,17 @@ import { writePackedVoiceName } from '@/utils/soundProgramCodec';
 import { createMidiMessageRouter } from '@/midi/midiMessageRouter';
 import { createSysexAssembler } from '@/midi/sysexAssembler';
 import {
+    clearAutoReloadMidi,
     isStaleDetectGeneration,
+    markAutoReloadMidi,
     midiStateChangeAction,
     nextDetectGeneration,
+    readDidAutoReloadMidi,
     selectedPortDisconnected,
+    shouldAutoReloadMidiDocument,
+    desktopMidiBootAction,
 } from '@/midi/midiAccessSession';
+import { isDesktopApp } from '@/utils/runtime';
 import { formatMidiBytes, MidiTransport } from '@/midi/midiTransport';
 import {
     createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry,
@@ -53,6 +59,7 @@ export const useMidiStore = defineStore('midi', () => {
     const soundEditState = ref<'idle' | 'requesting' | 'received' | 'sending' | 'ok' | 'error'>('idle');
     const logs = ref<string[]>([]);
     const needsDocumentReload = ref(false);
+    const autoReloading = ref(false);
     let programLoadPromise: Promise<boolean> | null = null;
     let currentVoiceFetchPromise: Promise<boolean> | null = null;
     let currentVoiceWaiter: ((ok: boolean) => void) | null = null;
@@ -163,6 +170,24 @@ export const useMidiStore = defineStore('midi', () => {
         if (action === 'rescan') scheduleRescan();
     };
 
+    const midiStorage = () => (typeof sessionStorage === 'undefined' ? null : sessionStorage);
+
+    const maybeAutoReloadMidiDocument = () => {
+        const shouldReload = shouldAutoReloadMidiDocument({
+            isDesktop: isDesktopApp,
+            didAutoReload: readDidAutoReloadMidi(midiStorage()),
+            midiAccessFailed: needsDocumentReload.value
+                || connectionState.value === MIDIConnectionState.ERROR,
+            deviceNotFound: connectionState.value === MIDIConnectionState.NOT_FOUND,
+            hasNoPorts: midiInputs.value.length === 0 && midiOutputs.value.length === 0,
+        });
+        if (!shouldReload) return;
+        markAutoReloadMidi(midiStorage());
+        autoReloading.value = true;
+        log('Desktop MIDI: reloading this window, then reconnecting MIDIAccess.');
+        window.location.reload();
+    };
+
     const attachAccess = (access: MIDIAccess) => {
         midiAccess.value = access;
         needsDocumentReload.value = false;
@@ -181,6 +206,7 @@ export const useMidiStore = defineStore('midi', () => {
             log(`MIDI init error: ${err}`);
             needsDocumentReload.value = true;
             connectionState.value = MIDIConnectionState.ERROR;
+            maybeAutoReloadMidiDocument();
         }
     });
 
@@ -196,8 +222,21 @@ export const useMidiStore = defineStore('midi', () => {
             log(`MIDI reconnect error: ${err}`);
             needsDocumentReload.value = true;
             connectionState.value = MIDIConnectionState.ERROR;
+            maybeAutoReloadMidiDocument();
         }
     });
+
+    const bootMIDI = () => {
+        const action = desktopMidiBootAction({
+            isDesktop: isDesktopApp,
+            didAutoReload: readDidAutoReloadMidi(midiStorage()),
+        });
+        if (action === 'reconnect') {
+            log('Desktop MIDI: window reloaded; reconnecting MIDIAccess.');
+            return reconnectMIDI();
+        }
+        return initMIDI();
+    };
 
     const reloadMidiDocument = () => {
         log('Reloading this window to recreate MIDIAccess (same as a browser refresh).');
@@ -217,6 +256,7 @@ export const useMidiStore = defineStore('midi', () => {
                 selectedMidiIn.value = input.name;
                 selectedMidiOut.value = midiAccess.outputs.get(outputId)?.name ?? null;
                 connectionState.value = MIDIConnectionState.DETECTED;
+                clearAutoReloadMidi(midiStorage());
                 log(`Device Inquiry Reply matched. in="${selectedMidiIn.value}" out="${selectedMidiOut.value}"`);
                 void ensureAllProgramDumps();
             }
@@ -290,6 +330,7 @@ export const useMidiStore = defineStore('midi', () => {
             if (connectionState.value === MIDIConnectionState.SEARCHING) {
                 connectionState.value = MIDIConnectionState.NOT_FOUND;
                 log('volca fm2 not found (timeout).');
+                maybeAutoReloadMidiDocument();
             }
         }, 2000);
     };
@@ -611,6 +652,7 @@ export const useMidiStore = defineStore('midi', () => {
         soundEditState,
         logs,
         needsDocumentReload,
+        autoReloading,
         receivedProgramCount,
         soundList,
         isDeviceReady,
@@ -619,6 +661,7 @@ export const useMidiStore = defineStore('midi', () => {
         isSearching,
         isFetchingCurrentProgram,
         initMIDI,
+        bootMIDI,
         reconnectMIDI,
         reloadMidiDocument,
         detectVolcaFM2,

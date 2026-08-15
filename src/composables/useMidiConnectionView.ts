@@ -1,42 +1,31 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { MIDIConnectionState } from '@/midi/connectionState';
-import { shouldWarnBeforeDocumentReload } from '@/midi/midiAccessSession';
 import { useMidiStore } from '@/stores/midiStore';
-import { useSequencerStore } from '@/stores/sequencerStore';
-import { useSoundStore } from '@/stores/soundStore';
 import { useUiStore } from '@/stores/uiStore';
+import { isDesktopApp } from '@/utils/runtime';
 
 export const useMidiConnectionView = () => {
     const midiStore = useMidiStore();
-    const soundStore = useSoundStore();
-    const sequencerStore = useSequencerStore();
     const ui = useUiStore();
     const { t } = useI18n();
 
     const sidebarToggleLabel = computed(() => ui.sidebarCollapsed
         ? t('app.expandSidebar')
         : t('app.collapseSidebar'));
-    const warnBeforeReload = computed(() => shouldWarnBeforeDocumentReload({
-        hasUnsavedProgram: soundStore.hasUnsavedChanges,
-        hasSequenceNotes: sequencerStore.notes.length > 0,
-    }));
     const connectionTexts = computed(() => ({
         title: midiStore.connectionState === MIDIConnectionState.ERROR
             ? t('app.connection.errorTitle')
             : t('app.connection.title'),
         step1: t('app.connection.step1'),
-        step2: t('app.connection.step2'),
+        step2: t(isDesktopApp ? 'app.connection.step2Desktop' : 'app.connection.step2'),
         step3: t('app.connection.step3'),
-        step4: t('app.connection.step4'),
         reconnect: t('app.connection.reconnect'),
-        reloadMidi: t('app.connection.reloadMidi'),
-        reloadHint: warnBeforeReload.value
-            ? t('app.connection.reloadWarn')
-            : t('app.connection.reloadHint'),
-        reloadWarn: warnBeforeReload.value,
     }));
-    const showConnectionModal = computed(() => !ui.connectionModalDismissed && !midiStore.isDeviceReady);
+    const showConnectionModal = computed(() =>
+        !ui.connectionModalDismissed
+        && !midiStore.isDeviceReady
+        && !midiStore.autoReloading);
     const onConnectionModalUpdate = (open: boolean) => {
         if (!open) ui.connectionModalDismissed = true;
     };

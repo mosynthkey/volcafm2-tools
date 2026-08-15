@@ -62,7 +62,7 @@
   "build": {
     "appId": "com.melissa-audio.volcafm2tools",
     "productName": "volca fm2 tools",
-    "copyright": "Copyright © Masaki Ono",
+    "copyright": "Copyright (C) 2026 Masaki Ono / Melissa Audio",
     "directories": {
       "output": "dist-desktop",
       "buildResources": "build"

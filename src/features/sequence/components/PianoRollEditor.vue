@@ -154,7 +154,7 @@ const motionItems = computed(() => MOTION_PARAM_KEYS.map((key, index) => ({ labe
 const ALL_PITCHES = Array.from({ length: 61 }, (_, index) => 96 - index)
 const PITCH_MIN = 36
 const PITCH_MAX = 96
-const focusUsedPitches = usePersistedFlag('volca-fm2-focus-used-pitches')
+const focusUsedPitches = usePersistedFlag('volca-fm2-show-used-notes', false)
 const skipFocusHelp = ref(false)
 const showFocusHelp = ref(false)
 const dontShowFocusHelpAgain = ref(false)
