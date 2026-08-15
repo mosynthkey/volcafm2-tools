@@ -25,9 +25,6 @@
 
     <AppDialog :model-value="showConnectionModal" :title="connectionTexts.title" max-width="560" persistent
       @update:model-value="onConnectionModalUpdate">
-        <div class="connection-card__icon" aria-hidden="true">
-          <img src="/app-icon.png" alt="" />
-        </div>
           <ol class="connection-steps">
             <li>{{ connectionTexts.step1 }}</li>
             <li>{{ connectionTexts.step2 }}</li>
@@ -43,7 +40,6 @@
         </template>
     </AppDialog>
 
-    <UnifiedLibraryDialog />
     <PageHintDialog />
 
     <v-main>
@@ -54,6 +50,7 @@
             <v-window-item value="sound-edit"><SoundEditTab /></v-window-item>
             <v-window-item value="dx7"><Dx7Tab /></v-window-item>
             <v-window-item value="sequencer"><SequencerTab /></v-window-item>
+            <v-window-item value="library"><LibraryTab /></v-window-item>
           </v-window>
         </main>
       </div>
@@ -66,7 +63,7 @@
 import { useI18n } from 'vue-i18n';
 import AppToggle from './components/AppToggle.vue';
 import AppSidebar from './components/AppSidebar.vue';
-import UnifiedLibraryDialog from './components/UnifiedLibraryDialog.vue';
+import LibraryTab from './components/LibraryTab.vue';
 import PageHintDialog from './components/PageHintDialog.vue';
 import AppDialog from './components/dialogs/AppDialog.vue';
 import AppProgressDialog from './components/dialogs/AppProgressDialog.vue';

@@ -124,14 +124,14 @@ const confirm = () => {
 .euclid-pad:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
 .euclid-pad.hit {
   background: var(--volca-accent);
-  border-color: #e7bd76;
-  color: #33282a;
+  border-color: var(--volca-accent-bright);
+  color: var(--volca-ink);
 }
 .euclid-pad.source {
   box-shadow: 0 0 0 3px rgba(225, 202, 176, 0.55);
   color: var(--volca-text);
 }
-.euclid-pad.hit.source { color: #33282a; }
+.euclid-pad.hit.source { color: var(--volca-ink); }
 .euclid-control {
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr) 28px;

@@ -62,7 +62,7 @@ watch(logText, () => {
   box-sizing: border-box;
   resize: vertical;
   background: rgba(18, 13, 14, 0.88);
-  color: #9fd18c;
+  color: var(--volca-teal);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: var(--volca-type-body);
   line-height: 1.5;

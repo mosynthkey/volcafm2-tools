@@ -9,14 +9,13 @@ export const useUiStore = defineStore('ui', () => {
     const showInfo = ref(false);
     const showLog = ref(false);
     const connectionModalDismissed = ref(false);
-    const showLibrary = ref(false);
     const libraryFocus = ref<LibraryKind>('sound');
     const showPageHint = ref(false);
     const pageHintId = ref<PageHintId>('sound');
 
     const openLibrary = (kind: LibraryKind) => {
         libraryFocus.value = kind;
-        showLibrary.value = true;
+        activeTab.value = 'library';
     };
 
     const openPageHint = (id?: PageHintId) => {
@@ -35,7 +34,6 @@ export const useUiStore = defineStore('ui', () => {
         showInfo,
         showLog,
         connectionModalDismissed,
-        showLibrary,
         libraryFocus,
         openLibrary,
         showPageHint,

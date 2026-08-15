@@ -10,7 +10,7 @@
     </AppDialog>
     <AppDialog :model-value="showWriteProgress" :title="t('dx7.writeTitle')" max-width="480" persistent :closable="false">
       <p>{{ t('dx7.writeProgress', { count: midiStore.programWriteProgress, total: 64 }) }}</p>
-      <v-progress-linear :model-value="writePercent" color="amber-lighten-3" height="8" rounded />
+      <v-progress-linear :model-value="writePercent" height="8" rounded />
     </AppDialog>
     <Dx7VoiceImportDialog v-model="showVoicePicker" :voices="parsedVoices" :initial-start-slot="firstEmptySlot"
       @import="applyDx7Import" />
@@ -27,11 +27,11 @@
         <div class="editor-toolbar-section">
           <v-btn :disabled="!midiStore.isDeviceReady" :loading="midiStore.connectionState === MIDIConnectionState.RECEIVING"
             :title="t('dx7.reloadHint')" @click="midiStore.reloadAllProgramDumps()">
-            <HardDriveDownload :size="16" class="mr-1" />{{ t('dx7.receive') }}
+            <HardDriveUpload :size="16" class="mr-1" />{{ t('dx7.receive') }}
           </v-btn>
           <v-btn :disabled="!canWrite" :loading="midiStore.programWriteState === 'sending'"
             @click="showWriteConfirm = true">
-            <HardDriveUpload :size="16" class="mr-1" />{{ t('dx7.send') }}
+            <HardDriveDownload :size="16" class="mr-1" />{{ t('dx7.send') }}
           </v-btn>
         </div>
         <div class="editor-toolbar-section">
@@ -53,16 +53,9 @@
           </v-menu>
         </div>
         <div class="editor-toolbar-spacer"></div>
-        <div class="editor-toolbar-section editor-library">
-          <PageHintButton page="sound-list" />
-          <v-btn @click="ui.openLibrary('sound-list')">
-            <Library :size="16" class="mr-1" />{{ t('common.library') }}
-          </v-btn>
-        </div>
+        <LibrarySection kind="sound-list" page="sound-list" />
         <input ref="dx7FileInput" type="file" accept=".syx,.SYX" hidden @change="selectDx7File" />
       </header>
-
-      <p class="list-copy">{{ t('dx7.listDescription') }}</p>
 
       <div class="sound-list-columns">
         <div v-for="column in listColumns" :key="column" class="sound-list-column"
@@ -121,10 +114,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ArrowUpDown, ChevronDown, ChevronUp, Download, FileUp, GripVertical, HardDriveDownload, HardDriveUpload, Library } from '@lucide/vue';
+import { ArrowUpDown, ChevronDown, ChevronUp, Download, FileUp, GripVertical, HardDriveDownload, HardDriveUpload } from '@lucide/vue';
 import AppDialog from '@/components/dialogs/AppDialog.vue';
 import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue';
-import PageHintButton from '@/components/PageHintButton.vue';
+import LibrarySection from '@/components/LibrarySection.vue';
 import Dx7VoiceImportDialog from '@/features/dx7/Dx7VoiceImportDialog.vue';
 import { parseDx7Sysex, type Dx7PackedVoice } from '@/midi/dx7Cartridge';
 import { MIDIConnectionState, useMidiStore } from '@/stores/midiStore';
@@ -305,7 +298,6 @@ const onHandlePointerUp = () => {
 <style scoped>
 .sound-list-container { height: 100%; box-sizing: border-box; }
 .sound-list-card { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.list-copy { margin: 10px 0 14px; color: var(--volca-muted); line-height: 1.55; }
 .sound-list-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;

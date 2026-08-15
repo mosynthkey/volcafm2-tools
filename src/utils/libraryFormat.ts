@@ -158,7 +158,7 @@ export const decodeLibraryFile = (json: string, filename = ''): DecodedLibraryFi
         : filename.replace(/\.[^.]+$/, '') || 'untitled';
     const savedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : Date.now();
     const payload = payloadFromFile(parsed, kind);
-    if (kind === 'sound' && payload.sound === undefined) throw new Error('Sound file is missing voice data.');
+    if (kind === 'sound' && payload.sound === undefined) throw new Error('Sound file is missing sound data.');
     if (kind === 'sequence' && payload.sequence === undefined) throw new Error('Sequence file is missing sequence data.');
     if (kind === 'sound-list') deserializeSoundList(payload.soundList ?? []);
     if (kind === 'bundle' && !payload.sound && !payload.sequence && !payload.soundList) {

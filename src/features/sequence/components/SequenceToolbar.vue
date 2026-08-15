@@ -12,13 +12,13 @@
         <v-text-field v-model.number="sequence.programNo" type="number" :aria-label="t('sequence.program')" min="0" max="63" density="compact" hide-details class="program-no-input" />
         <span class="editor-identity__name" :class="{ 'is-empty': !currentProgramName }" :title="currentProgramName || t('sequence.programNameUnknown')">{{ currentProgramName || '—' }}</span>
         <v-btn :disabled="!canSend" :loading="midi.currentProgramFetchState === 'loading-programs' || midi.currentProgramFetchState === 'requesting'" @click="midi.requestCurrentVoiceProgramNo">
-          <HardDriveDownload :size="16" class="mr-1" />{{ t('sequence.getCurrentProgram') }}
+          <HardDriveUpload :size="16" class="mr-1" />{{ t('sequence.getCurrentProgram') }}
         </v-btn>
       </v-col>
       <v-col cols="auto" class="editor-toolbar-section">
         <span class="editor-toolbar-section__label volca-section-title">{{ t('sequence.sectionLabel') }}</span>
-        <v-btn :disabled="!canSend" @click="sequence.showCaptureDialog = true"><HardDriveDownload :size="16" class="mr-1" />{{ t('sequence.captureButton') }}</v-btn>
-        <v-btn :disabled="!canSend" @click="sequence.sendToDevice()"><HardDriveUpload :size="16" class="mr-1" />{{ t('common.send') }}</v-btn>
+        <v-btn :disabled="!canSend" @click="sequence.showCaptureDialog = true"><HardDriveUpload :size="16" class="mr-1" />{{ t('sequence.captureButton') }}</v-btn>
+        <v-btn :disabled="!canSend" @click="sequence.sendToDevice()"><HardDriveDownload :size="16" class="mr-1" />{{ t('common.send') }}</v-btn>
         <AutoSendToggle />
         <v-btn @click="sequence.clearAll"><Trash2 :size="16" class="mr-1" />{{ t('sequence.clear') }}</v-btn>
         <v-btn @click="sequence.toggleStepInput()"><Piano :size="16" class="mr-1" />{{ t('sequence.stepInput') }}</v-btn>
@@ -51,11 +51,8 @@
         <input ref="fileInput" type="file" accept=".mid,.midi" hidden @change="selectFile" />
       </v-col>
       <v-spacer />
-      <v-col cols="auto" class="editor-toolbar-section editor-library">
-        <PageHintButton page="sequence" />
-        <v-btn @click="ui.openLibrary('sequence')">
-          <Library :size="16" class="mr-1" />{{ t('common.library') }}
-        </v-btn>
+      <v-col cols="auto">
+        <LibrarySection kind="sequence" page="sequence" />
       </v-col>
     </template>
   </v-row>
@@ -64,14 +61,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, Dices, FileUp, HardDriveDownload, HardDriveUpload, Library, MoreHorizontal, Piano, Trash2, X } from '@lucide/vue'
+import { ChevronDown, Dices, FileUp, HardDriveDownload, HardDriveUpload, MoreHorizontal, Piano, Trash2, X } from '@lucide/vue'
 import AutoSendToggle from '@/components/AutoSendToggle.vue'
-import PageHintButton from '@/components/PageHintButton.vue'
+import LibrarySection from '@/components/LibrarySection.vue'
 import { useMidiStore } from '@/stores/midiStore'
 import { useSequencerStore } from '@/stores/sequencerStore'
-import { useUiStore } from '@/stores/uiStore'
 
-const { t } = useI18n(); const midi = useMidiStore(); const sequence = useSequencerStore(); const ui = useUiStore(); const fileInput = ref<HTMLInputElement | null>(null)
+const { t } = useI18n(); const midi = useMidiStore(); const sequence = useSequencerStore(); const fileInput = ref<HTMLInputElement | null>(null)
 const canSend = computed(() => midi.isIdleConnected)
 const currentProgramName = computed(() => midi.programNames[Number(sequence.programNo)]?.name.trim() ?? '')
 const selectFile = (event: Event) => { const input = event.target as HTMLInputElement; const file = input.files?.[0]; if (file) sequence.queueSmfImport(file); input.value = '' }

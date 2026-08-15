@@ -26,7 +26,7 @@
       <p class="capture-progress">{{ t('sequence.captureProgress', { count: stepCount }) }}</p>
     </template>
     <p v-else-if="phase === 'done'">{{ t('sequence.captureDone', { count: noteCount }) }}</p>
-    <p v-else>{{ errorMessage }}</p>
+    <p v-else class="dialog-error">{{ errorMessage }}</p>
     <template #actions>
       <template v-if="phase === 'ready'"><v-btn variant="text" @click="open = false">{{ t('common.cancel') }}</v-btn><v-btn @click="start()">{{ t('sequence.captureStart') }}</v-btn></template>
       <v-btn v-else-if="phase === 'capturing' || phase === 'fetching-program'" variant="text" @click="cancel()">{{ t('sequence.captureCancel') }}</v-btn>

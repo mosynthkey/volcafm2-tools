@@ -21,6 +21,10 @@
       <span class="nav-icon"><Piano :size="18" /></span>
       <span><b>{{ t('app.nav.sequenceLabel') }}</b><small>{{ t('app.nav.sequence') }}</small></span>
     </button>
+    <button class="nav-item" :class="{ active: ui.activeTab === 'library' }" type="button" @click="ui.openLibrary(ui.libraryFocus)">
+      <span class="nav-icon"><Archive :size="18" /></span>
+      <span><b>{{ t('app.nav.libraryLabel') }}</b><small>{{ t('app.nav.library') }}</small></span>
+    </button>
     <div class="sidebar-fill" />
     <div class="sidebar-footer">
       <LanguageSwitch />
@@ -37,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { Library, PanelLeftClose, PanelLeftOpen, Piano, SlidersHorizontal } from '@lucide/vue';
+import { Archive, Library, PanelLeftClose, PanelLeftOpen, Piano, SlidersHorizontal } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import LanguageSwitch from '@/components/LanguageSwitch.vue';
 import { useMidiConnectionView } from '@/composables/useMidiConnectionView';

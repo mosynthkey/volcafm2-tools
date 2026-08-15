@@ -151,7 +151,7 @@ export const createInitialSoundProgram = (): SoundProgram => ({
     lfoWave: 4,
     pitchModSensitivity: 0,
     transpose: 24,
-    name: 'INIT VOICE',
+    name: 'INIT SOUND',
     modulatorAttack: 0,
     modulatorDecay: 0,
     carrierAttack: 0,

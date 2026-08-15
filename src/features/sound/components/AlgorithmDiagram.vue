@@ -71,11 +71,11 @@ const feedbackPath = (operator: DexedAlgorithmOperator) => {
 .algorithm-diagram.pickable:focus-visible { outline: 2px solid #ceb393; outline-offset: 2px; }
 .routing-line,.feedback-line,.output-line { fill: none; stroke-width: 1.5; stroke-linecap: butt; stroke-linejoin: round; }
 .routing-line { stroke: #f1e9e1; }
-.feedback-line { stroke: #72d5ca; }
-.output-line { stroke: #e7bd76; }
+.feedback-line { stroke: var(--volca-teal); }
+.output-line { stroke: var(--volca-accent-bright); }
 .operator-node { cursor: pointer; }
 .operator-block { fill: #514044; stroke: #f1e9e1; stroke-width: 1.25; outline: none; }
-.operator-node.carrier .operator-block { fill: #725f45; stroke: #e7bd76; }
+.operator-node.carrier .operator-block { fill: #725f45; stroke: var(--volca-accent-bright); }
 .operator-node text { fill: #f8eee4; font-size: 9px; font-weight: 800; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
 .operator-node.selected .operator-block,.operator-block:focus-visible { fill: #d8bea0; stroke: #f8eee4; }
 .operator-node.selected text,.operator-block:focus-visible ~ text { fill: #2b2022; }

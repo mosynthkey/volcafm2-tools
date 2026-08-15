@@ -162,12 +162,16 @@ export const useSequencerStore = defineStore('sequencer', () => {
         motionValues.value[paramIndex] = Array.from({ length: NUM_OF_STEPS }, () => createMotionPoints(midi));
     };
 
-    const toggleMotionStep = (paramIndex: number, step: number) => {
-        motionStepEnabled.value[paramIndex][step] = !motionStepEnabled.value[paramIndex][step];
-        if (motionStepEnabled.value[paramIndex][step]) {
+    const setMotionStep = (paramIndex: number, step: number, value: boolean) => {
+        motionStepEnabled.value[paramIndex][step] = value;
+        if (value) {
             motionEnabled.value[paramIndex] = true;
             func.value.motionOn = true;
         }
+    };
+
+    const toggleMotionStep = (paramIndex: number, step: number) => {
+        setMotionStep(paramIndex, step, !motionStepEnabled.value[paramIndex][step]);
     };
 
     const toggleStepOn = (step: number) => {
@@ -598,6 +602,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
         toggleStepOn,
         toggleActiveStep,
         toggleTransposeFunc,
+        setMotionStep,
         setStepOn,
         setActiveStep,
         setTransposeFunc,

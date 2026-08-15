@@ -40,9 +40,9 @@
 
     <v-card class="pa-4 sequencer-card">
       <SequenceToolbar />
-      <v-alert v-if="seqStore.importError" type="error" density="compact" class="mt-3" variant="tonal">
+      <p v-if="seqStore.importError" class="dialog-error">
         {{ t('sequence.importError') }}: {{ seqStore.importError }}
-      </v-alert>
+      </p>
       <v-divider class="my-4" />
       <PianoRollEditor />
       <SequenceFuncPanel />

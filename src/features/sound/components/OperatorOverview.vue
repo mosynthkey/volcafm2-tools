@@ -215,7 +215,7 @@ const scalingParameters = (operator: SoundOperator) => [
 .mode-segment button + button { border-left: 1px solid rgba(206,179,147,.32); }
 .mode-segment button.active { background: #ceb393; color: #33282a; }
 .operator-enable { height: 26px; padding: 0 7px; border: 1px solid rgba(206,179,147,.28); border-radius: 6px; background: transparent; color: #8f817a; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
-.operator-enable.enabled { border-color: rgba(157,206,145,.42); color: #9dce91; }
+.operator-enable.enabled { border-color: var(--volca-teal); color: var(--volca-teal); }
 .curve-value { display: grid; place-items: center; width: 100%; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: pointer; }
 .curve-value:hover { background: rgba(206,179,147,.12); }
 .mini-graphs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 6px 7px 3px; }

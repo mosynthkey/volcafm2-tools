@@ -1,33 +1,41 @@
 <template>
-  <v-dialog :model-value="ui.showLibrary" max-width="720" @update:model-value="ui.showLibrary = $event">
-    <v-card class="unified-library pa-4">
-      <div class="library-header">
-        <v-card-title>{{ t('library.title') }}</v-card-title>
-        <DialogCloseButton @click="ui.showLibrary = false" />
-      </div>
+  <v-container class="library-container">
+    <AppDialog v-model="showReplaceConfirm" :title="t('library.replaceListTitle')" max-width="480">
+      <p>{{ t('library.replaceListDescription') }}</p>
+      <template #actions>
+        <v-btn variant="text" @click="cancelReplace">{{ t('common.cancel') }}</v-btn>
+        <v-btn @click="confirmReplace">{{ t('library.replaceList') }}</v-btn>
+      </template>
+    </AppDialog>
 
-      <div class="kind-tabs">
-        <v-btn v-for="kind in kindTabs" :key="kind" class="kind-tab" :class="{ 'is-on': activeKind === kind }"
+    <v-card class="library-card pa-4">
+      <header class="editor-toolbar">
+        <div class="editor-identity">
+          <span class="editor-identity__label volca-section-title">{{ t('library.title') }}</span>
+        </div>
+      </header>
+
+      <div class="library-tabs" role="tablist" :aria-label="t('library.title')">
+        <button v-for="kind in kindTabs" :key="kind" class="library-tab" type="button" role="tab"
+          :aria-selected="activeKind === kind" :class="{ 'is-on': activeKind === kind }"
           @click="selectKind(kind)">
           {{ kindLabel(kind) }}
-        </v-btn>
+        </button>
       </div>
 
       <div class="save-row">
         <v-text-field v-model="saveName" :label="t('library.name')" maxlength="40" density="compact" hide-details
           @keydown.enter.prevent="saveCurrent" />
         <v-btn :disabled="!saveName.trim()" :loading="busy === 'save'" @click="saveCurrent">
-          <Save :size="17" class="mr-1" />{{ t('common.save') }}
+          <Save :size="16" class="mr-1" />{{ t('common.save') }}
         </v-btn>
         <v-btn :loading="busy === 'import'" @click="fileInput?.click()">
-          <FileUp :size="17" class="mr-1" />{{ t('library.import') }}
+          <FileUp :size="16" class="mr-1" />{{ t('library.import') }}
         </v-btn>
         <input ref="fileInput" type="file" :accept="LIBRARY_FILE_ACCEPT" hidden @change="importFile" />
       </div>
 
-      <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mt-3">
-        {{ errorMessage }}
-      </v-alert>
+      <p v-if="errorMessage" class="dialog-error">{{ errorMessage }}</p>
 
       <div class="library-list" :aria-busy="busy === 'load-list'">
         <div v-if="busy === 'load-list'" class="library-empty">{{ t('common.loading') }}</div>
@@ -37,38 +45,40 @@
             <strong>{{ record.name }}</strong>
             <small>{{ formatDate(record.updatedAt) }}</small>
           </div>
-          <v-btn size="small" @click="loadRecord(record)">{{ t('common.load') }}</v-btn>
-          <v-btn size="small" @click="exportRecord(record)">
-            <Download :size="15" class="mr-1" />{{ t('library.export') }}
+          <v-btn @click="loadRecord(record)">
+            <FolderOpen :size="16" class="mr-1" />{{ t('common.load') }}
+          </v-btn>
+          <v-btn @click="exportRecord(record)">
+            <Download :size="16" class="mr-1" />{{ t('library.export') }}
           </v-btn>
           <template v-if="deleteTarget === record.id">
-            <v-btn size="small" variant="text" @click="deleteTarget = null">{{ t('common.back') }}</v-btn>
-            <v-btn size="small" color="error" :loading="busy === record.id" @click="removeRecord(record.id)">{{ t('common.delete') }}</v-btn>
+            <v-btn @click="deleteTarget = null">
+              <Undo2 :size="16" class="mr-1" />{{ t('common.back') }}
+            </v-btn>
+            <v-btn class="dialog-danger-button" :loading="busy === record.id" @click="removeRecord(record.id)">
+              <Trash2 :size="16" class="mr-1" />{{ t('common.delete') }}
+            </v-btn>
           </template>
-          <v-btn v-else class="library-delete-button" icon variant="text" size="small"
-            :aria-label="t('library.deleteLabel', { name: record.name })" @click="deleteTarget = record.id">
-            <Trash2 :size="17" />
+          <v-btn v-else :aria-label="t('library.deleteLabel', { name: record.name })" @click="deleteTarget = record.id">
+            <Trash2 :size="16" class="mr-1" />{{ t('common.delete') }}
           </v-btn>
         </div>
       </div>
-    </v-card>
-  </v-dialog>
 
-  <AppDialog v-model="showReplaceConfirm" :title="t('library.replaceListTitle')" max-width="480">
-    <p>{{ t('library.replaceListDescription') }}</p>
-    <template #actions>
-      <v-btn variant="text" @click="cancelReplace">{{ t('common.cancel') }}</v-btn>
-      <v-btn @click="confirmReplace">{{ t('library.replaceList') }}</v-btn>
-    </template>
-  </AppDialog>
+      <p v-if="activeKind === 'bundle'" class="library-bundle-note">
+        <Info :size="16" aria-hidden="true" />
+        <span>{{ t('library.bundleDescription') }}</span>
+      </p>
+    </v-card>
+  </v-container>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Download, FileUp, Save, Trash2 } from '@lucide/vue';
+import { Download, FileUp, FolderOpen, Info, Save, Trash2, Undo2 } from '@lucide/vue';
 import AppDialog from '@/components/dialogs/AppDialog.vue';
-import DialogCloseButton from '@/components/DialogCloseButton.vue';
+import { useLibraryCurrent } from '@/composables/useLibraryCurrent';
 import { useMidiStore } from '@/stores/midiStore';
 import { useSequencerStore } from '@/stores/sequencerStore';
 import { useSoundStore } from '@/stores/soundStore';
@@ -80,7 +90,6 @@ import {
     decodeLibraryFile,
     encodeLibraryFile,
     libraryFilename,
-    serializeSoundList,
     deserializeSoundList,
     type LibraryKind,
     type LibraryPayload,
@@ -93,6 +102,7 @@ const soundStore = useSoundStore();
 const seqStore = useSequencerStore();
 const midiStore = useMidiStore();
 const { t, locale } = useI18n();
+const { suggestedNameFor, stampSoundName, saveCurrent: saveKind } = useLibraryCurrent();
 
 const kindTabs = LIBRARY_KINDS;
 const activeKind = ref<LibraryKind>('sound');
@@ -109,34 +119,16 @@ const kindLabel = (kind: LibraryKind) => t(
   kind === 'sound-list' ? 'library.kinds.soundList' : `library.kinds.${kind}`,
 );
 
-const suggestedNameFor = (kind: LibraryKind) => {
-  if (kind === 'sound') return soundStore.program.name.trim() || t('sound.untitled');
-  if (kind === 'sequence') return t('sequence.libraryName', { count: seqStore.programNo + 1 });
-  if (kind === 'sound-list') return t('library.suggestedSoundList');
-  return t('library.suggestedBundle');
-};
-
 const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-
-const currentPayload = (kind: LibraryKind): LibraryPayload => {
-  if (kind === 'sound') return { sound: soundStore.snapshot() };
-  if (kind === 'sequence') return { sequence: cloneJson(seqStore.toState()) };
-  if (kind === 'sound-list') return { soundList: serializeSoundList(midiStore.cloneSoundList()) };
-  return {
-    sound: soundStore.snapshot(),
-    sequence: cloneJson(seqStore.toState()),
-    soundList: serializeSoundList(midiStore.cloneSoundList()),
-  };
-};
-
-const stampSoundName = (payload: LibraryPayload, name: string) => {
-  if (payload.sound && typeof payload.sound === 'object' && payload.sound !== null && 'name' in payload.sound) {
-    (payload.sound as { name: string }).name = name.slice(0, 10);
-  }
-};
 
 const needsListConfirm = (kind: LibraryKind, payload: LibraryPayload) =>
   kind === 'sound-list' || (kind === 'bundle' && Boolean(payload.soundList));
+
+const destinationTab = (kind: LibraryKind) => {
+  if (kind === 'sequence') return 'sequencer';
+  if (kind === 'sound-list') return 'dx7';
+  return 'sound-edit';
+};
 
 const applyRecord = (record: LibraryRecord) => {
   const payload = cloneJson(record.payload);
@@ -151,7 +143,7 @@ const applyRecord = (record: LibraryRecord) => {
   if ((record.kind === 'sound-list' || record.kind === 'bundle') && payload.soundList) {
     midiStore.replaceSoundList(deserializeSoundList(payload.soundList));
   }
-  ui.showLibrary = false;
+  ui.activeTab = destinationTab(record.kind);
 };
 
 const refresh = async () => {
@@ -166,26 +158,32 @@ const refresh = async () => {
   }
 };
 
-watch(() => ui.showLibrary, open => {
-  if (!open) {
-    deleteTarget.value = null;
-    errorMessage.value = '';
-    showReplaceConfirm.value = false;
-    pendingLoad.value = null;
-    return;
-  }
-  activeKind.value = ui.libraryFocus;
-  saveName.value = suggestedNameFor(activeKind.value);
-  deleteTarget.value = null;
-  void refresh();
-});
-
 const selectKind = (kind: LibraryKind) => {
+  ui.libraryFocus = kind;
   activeKind.value = kind;
   saveName.value = suggestedNameFor(kind);
   deleteTarget.value = null;
   void refresh();
 };
+
+const openLibrary = () => {
+  activeKind.value = ui.libraryFocus;
+  saveName.value = suggestedNameFor(activeKind.value);
+  deleteTarget.value = null;
+  errorMessage.value = '';
+  showReplaceConfirm.value = false;
+  pendingLoad.value = null;
+  void refresh();
+};
+
+watch(() => ui.activeTab, tab => {
+  if (tab === 'library') openLibrary();
+}, { immediate: true });
+
+watch(() => ui.libraryFocus, kind => {
+  if (ui.activeTab !== 'library' || activeKind.value === kind) return;
+  selectKind(kind);
+});
 
 const saveCurrent = async () => {
   const name = saveName.value.trim();
@@ -193,9 +191,7 @@ const saveCurrent = async () => {
   busy.value = 'save';
   errorMessage.value = '';
   try {
-    const payload = currentPayload(activeKind.value);
-    if (activeKind.value === 'sound') stampSoundName(payload, name);
-    await saveLibrary(activeKind.value, name, payload);
+    await saveKind(activeKind.value, name);
     await refresh();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t('library.saveError');
@@ -257,9 +253,7 @@ const importFile = async (event: Event) => {
   try {
     const decoded = decodeLibraryFile(await file.text(), file.name);
     await saveLibrary(decoded.kind, decoded.name, decoded.payload);
-    activeKind.value = decoded.kind;
-    saveName.value = suggestedNameFor(decoded.kind);
-    await refresh();
+    selectKind(decoded.kind);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t('library.importError');
   } finally {
@@ -287,15 +281,27 @@ const formatDate = (timestamp: number) => new Intl.DateTimeFormat(locale.value, 
 </script>
 
 <style scoped>
-.unified-library { max-height: min(78vh, 760px); overflow: hidden; }
-.library-header { display: flex; align-items: center; justify-content: space-between; }
-.kind-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 16px 12px; }
-.kind-tab.is-on { box-shadow: inset 0 0 0 1px #ceb393, 0 3px 10px rgba(0,0,0,.16) !important; }
-.save-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 0 16px 14px; }
-.library-list { min-height: 150px; max-height: 430px; padding: 4px 8px 8px; overflow-y: auto; }
-.library-empty { display: grid; min-height: 150px; place-items: center; color: #ad9e96; font-size: var(--volca-type-body); }
-.library-item { min-height: 64px; display: flex; align-items: center; gap: 6px; border-top: 1px solid rgba(206,179,147,.16); }
-.library-meta { min-width: 0; flex: 1; display: grid; gap: 2px; padding: 10px 8px; }
-.library-meta strong { overflow: hidden; color: #e1d5cd; font-size: var(--volca-type-body); text-overflow: ellipsis; white-space: nowrap; }
-.library-meta small { color: #ad9e96; font-size: var(--volca-type-label); }
+.library-container { height: 100%; box-sizing: border-box; }
+.library-card { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.library-tabs { display: flex; flex: 0 0 auto; gap: 4px; margin: 4px 0 16px; border-bottom: 1px solid var(--volca-line); }
+.library-tab {
+  height: 40px; padding: 0 16px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  background: transparent; color: var(--volca-muted); font: inherit; font-size: var(--volca-type-body);
+  font-weight: 700; cursor: pointer;
+}
+.library-tab:hover { color: var(--volca-text); }
+.library-tab.is-on { color: var(--volca-accent-bright); border-bottom-color: var(--volca-accent); }
+.library-tab:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
+.save-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; margin-bottom: 12px; }
+.library-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
+.library-empty { display: grid; min-height: 180px; place-items: center; color: var(--volca-muted); font-size: var(--volca-type-body); }
+.library-item { min-height: 64px; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--volca-line); }
+.library-meta { min-width: 0; flex: 1; display: grid; gap: 2px; padding: 10px 0; }
+.library-meta strong { overflow: hidden; color: var(--volca-text); font-size: var(--volca-type-body); text-overflow: ellipsis; white-space: nowrap; }
+.library-meta small { color: var(--volca-muted); font-size: var(--volca-type-label); }
+.library-bundle-note {
+  display: flex; align-items: flex-start; gap: 8px; flex: 0 0 auto; margin: 14px 0 0; padding-top: 14px;
+  border-top: 1px solid var(--volca-line); color: var(--volca-muted); font-size: var(--volca-type-body); line-height: 1.55;
+}
+.library-bundle-note svg { flex: 0 0 auto; margin-top: 2px; color: var(--volca-teal); }
 </style>

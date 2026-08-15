@@ -57,7 +57,7 @@ const NumberControl = KnobControl;
 .algorithm-legend { display: flex; grid-column: 1 / -1; justify-content: center; gap: 10px; color: #ad9e96; font-size: var(--volca-type-label); }
 .algorithm-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .algorithm-legend i { width: 13px; height: 2px; display: inline-block; background: #f1e9e1; }
-.algorithm-legend i.feedback { background: #72d5ca; }.algorithm-legend i.output { background: #e7bd76; }
+.algorithm-legend i.feedback { background: var(--volca-teal); }.algorithm-legend i.output { background: var(--volca-accent-bright); }
 .global-mini-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 10px; padding: 2px 12px 14px; border-bottom: 1px solid rgba(206,179,147,.16); }
 .global-section { padding: 13px; }
 .global-section > h4 { margin: 0 0 9px; font-size: var(--volca-type-heading); }

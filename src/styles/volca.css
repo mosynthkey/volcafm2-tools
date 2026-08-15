@@ -4,6 +4,7 @@
   --volca-panel: rgba(56, 43, 45, 0.78);
   --volca-panel-solid: #382b2d;
   --volca-raised: #463638;
+  --volca-sunken: #251c1e;
   --volca-line: rgba(206, 179, 147, 0.15);
   --volca-line-strong: rgba(206, 179, 147, 0.3);
   --volca-accent: #ceb393;
@@ -11,6 +12,11 @@
   --volca-accent-soft: rgba(206, 179, 147, 0.12);
   --volca-text: #f1e9e1;
   --volca-muted: #a99a91;
+  --volca-ink: #33282a;
+  --volca-teal: #50ddd5;
+  --volca-teal-soft: rgba(80, 221, 213, 0.18);
+  --volca-pink: #f06b97;
+  --volca-pink-soft: rgba(240, 107, 151, 0.18);
   --volca-type-label: 14px;
   --volca-type-body: 14px;
   --volca-type-heading: 18px;
@@ -76,9 +82,9 @@ body { overflow: hidden; }
 .sidebar-rule { height: 1px; margin: 0 5px 13px; background: var(--volca-line); }
 .midi-state { display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 7px 10px; border: 1px solid var(--volca-line); border-radius: 9px; color: var(--volca-muted); background: rgba(255,255,255,.025); font-size: var(--volca-type-body); font-weight: 600; }
 .status-light, .device-dot { width: 7px; height: 7px; border-radius: 50%; background: #746769; box-shadow: 0 0 0 3px rgba(116,103,105,.12); }
-.midi-state.is-connected .status-light { background: #9fc592; box-shadow: 0 0 0 3px rgba(159,197,146,.12); }
+.midi-state.is-connected .status-light { background: var(--volca-teal); box-shadow: 0 0 0 3px var(--volca-teal-soft); }
 .midi-state.is-busy .status-light { background: var(--volca-accent); animation: status-pulse 1.2s ease-in-out infinite; }
-.midi-state.is-error .status-light { background: #d7786f; }
+.midi-state.is-error .status-light { background: var(--volca-pink); box-shadow: 0 0 0 3px var(--volca-pink-soft); }
 .nav-item:active, .about-button:active, .locale-switch:active { transform: scale(.97); }
 .volca-app .v-main { height: 100vh; display: flex; flex-direction: column; padding: 0 !important; }
 .app-layout { display: flex; min-height: 0; flex: 1 1 auto; }
@@ -119,31 +125,34 @@ body { overflow: hidden; }
 .volca-app .v-btn { height: 40px; min-height: 40px; }
 .volca-app .editor-toolbar .v-btn { height: 36px; min-height: 36px; }
 .volca-app .editor-toolbar .v-btn.v-btn--icon { width: 36px; min-width: 36px; }
-.workspace .v-btn { border: 1px solid rgba(255,255,255,.08); border-radius: 8px; background: var(--volca-accent) !important; color: #33282a !important; box-shadow: inset 0 1px rgba(255,255,255,.28), 0 3px 10px rgba(0,0,0,.16) !important; font-size: var(--volca-type-body); font-weight: 700; letter-spacing: .005em; text-transform: none; }
+.workspace .v-btn { border: 1px solid rgba(255,255,255,.08); border-radius: 8px; background: var(--volca-accent) !important; color: var(--volca-ink) !important; box-shadow: inset 0 1px rgba(255,255,255,.28), 0 3px 10px rgba(0,0,0,.16) !important; font-size: var(--volca-type-body); font-weight: 700; letter-spacing: .005em; text-transform: none; }
 .workspace .v-btn:hover { background: var(--volca-accent-bright) !important; }
+.workspace .v-btn.dialog-danger-button { background: var(--volca-pink) !important; color: var(--volca-bg) !important; }
+.workspace .v-btn.dialog-danger-button:hover { background: var(--volca-pink) !important; filter: brightness(1.08); }
 .workspace .v-btn:active { transform: scale(.98); }
 .workspace .v-field { border-radius: 8px !important; background: rgba(20,15,16,.38); font-size: var(--volca-type-body); }
 .workspace .v-label { font-size: var(--volca-type-label); }
 .workspace .v-divider { border-color: var(--volca-line); opacity: 1; }
 .workspace .v-card-title { font-size: var(--volca-type-heading); font-weight: 650; letter-spacing: -.01em; }
-.v-overlay__content > .v-card { padding: 0 !important; overflow: hidden; border: 1px solid var(--volca-line-strong) !important; border-radius: 16px !important; background: #382b2d !important; color: var(--volca-text) !important; box-shadow: 0 24px 70px rgba(10,5,6,.5) !important; }
+.v-overlay__content > .v-card { padding: 0 !important; overflow: hidden; border: 1px solid var(--volca-line-strong) !important; border-radius: 16px !important; background: var(--volca-panel-solid) !important; color: var(--volca-text) !important; box-shadow: 0 24px 70px rgba(10,5,6,.5) !important; }
 .v-overlay__content > .v-card .v-card-title { padding: 20px 20px 10px; font-size: var(--volca-type-heading); font-weight: 680; letter-spacing: -.02em; }
 .dialog-title-row { display: flex; align-items: center; justify-content: space-between; }
-.v-overlay__content > .v-card > .v-card-text { padding: 10px 20px 20px; color: #d8ccc4; font-size: var(--volca-type-body); line-height: 1.65; }
+.v-overlay__content > .v-card > .v-card-text { padding: 10px 20px 20px; color: var(--volca-text); font-size: var(--volca-type-body); line-height: 1.65; }
 .v-overlay__content > .v-card > .v-card-actions { gap: 8px; padding: 0 20px 18px; }
-.v-overlay__content > .v-card .v-btn { height: 40px; min-height: 40px; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; background: var(--volca-accent) !important; color: #33282a !important; box-shadow: inset 0 1px rgba(255,255,255,.28) !important; font-size: var(--volca-type-body); font-weight: 700; letter-spacing: 0; text-transform: none; }
+.v-overlay__content > .v-card .v-btn { height: 40px; min-height: 40px; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; background: var(--volca-accent) !important; color: var(--volca-ink) !important; box-shadow: inset 0 1px rgba(255,255,255,.28) !important; font-size: var(--volca-type-body); font-weight: 700; letter-spacing: 0; text-transform: none; }
+.v-overlay__content > .v-card .v-btn.v-btn--variant-text { border-color: var(--volca-line-strong); background: transparent !important; color: var(--volca-text) !important; box-shadow: none !important; }
+.v-overlay__content > .v-card .v-btn.v-btn--variant-text:hover { background: rgba(255,255,255,.07) !important; }
 .v-overlay__content > .v-card .dialog-close-button { width: 40px; min-width: 40px; margin: 12px 12px 0 0; border: 0; background: transparent !important; color: var(--volca-muted) !important; box-shadow: none !important; }
 .v-overlay__content > .v-card .dialog-close-button:hover { background: rgba(255,255,255,.07) !important; color: var(--volca-text) !important; }
-.v-overlay__content > .v-card .library-delete-button { width: 40px; min-width: 40px; border: 0; background: transparent !important; color: var(--volca-muted) !important; box-shadow: none !important; }
-.v-overlay__content > .v-card .library-delete-button:hover { background: rgba(255,255,255,.07) !important; color: var(--volca-text) !important; }
-.about-card, .program-load-card, .connection-card { background: #382b2d !important; }
-.connection-card__icon { width: 56px; height: 56px; margin: 20px 20px 8px; }
-.connection-card__icon img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.connection-card .v-card-text { line-height: 1.75; }
+.v-overlay__content > .v-card .dialog-danger-button { background: var(--volca-pink) !important; color: var(--volca-bg) !important; }
+.v-overlay__content .v-progress-linear { background: var(--volca-accent-soft) !important; }
+.v-overlay__content .v-progress-linear .v-progress-linear__determinate,
+.v-overlay__content .v-progress-linear .v-progress-linear__indeterminate { background: var(--volca-accent) !important; }
 .connection-steps { display: grid; gap: 8px; margin: 0; padding-left: 1.4rem; }
 .connection-steps li { padding-left: 4px; }
-.connection-card .v-card-actions { padding-top: 12px; }
-.program-load-copy { margin: 0 0 16px; color: #d8ccc4; }
+.dialog-error { margin: 0 0 12px; color: var(--volca-pink); }
+.sequencer-card > .dialog-error { margin: 12px 0 0; }
+.program-load-copy { margin: 0 0 16px; color: var(--volca-muted); }
 .program-load-status { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; color: var(--volca-muted); font-variant-numeric: tabular-nums; }
 .program-load-status strong { overflow: hidden; color: var(--volca-text); text-overflow: ellipsis; white-space: nowrap; }
 .about-log-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--volca-line); }

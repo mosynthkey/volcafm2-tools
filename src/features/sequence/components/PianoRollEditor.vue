@@ -79,7 +79,7 @@
       </div>
     </div>
     <div ref="rollBody" class="roll-body" :class="{ 'is-moving': drag?.kind === 'move', 'is-resizing': drag?.kind === 'resize', 'is-marquee': marqueeSelect }"
-      @pointerdown="rollDown" @pointermove="rollMove" @pointerup="rollUp" @pointercancel="rollUp" @dblclick="rollDblClick">
+      @pointerdown="rollDown" @pointermove="rollMove" @pointerup="rollUp" @pointercancel="rollUp">
       <div class="roll-pitches">
       <div v-if="marqueeStyle" class="note-marquee" :style="marqueeStyle"></div>
       <div v-for="pitch in pitches" :key="pitch" class="roll-row" @contextmenu.prevent="onNoteContextMenu(pitch,$event)">
@@ -118,12 +118,14 @@
         </div>
       </div>
     </div>
-    <div class="roll-row motion-step-row">
+    <div class="roll-row step-flags motion-step-row" @pointerdown="startFlag('motionStep', $event)" @pointermove="moveFlag" @pointerup="endFlag" @pointercancel="endFlag">
       <div class="pitch-gutter">{{ t('sequence.motionStep') }}</div>
-      <button v-for="step in 16" :key="step" type="button" class="step-cell motion-step-cell"
-        :class="{ beat:(step-1)%4===0, on: sequence.motionStepEnabled[sequence.motionIndex][step-1] }"
-        :aria-pressed="sequence.motionStepEnabled[sequence.motionIndex][step-1]" :aria-label="`${t('sequence.motionStep')} ${step}`"
-        @click="sequence.toggleMotionStep(sequence.motionIndex, step-1)" />
+      <div v-for="step in 16" :key="step" class="step-cell flag-cell" :class="{ beat:(step-1)%4===0 }">
+        <button type="button" class="flag"
+          :class="{ on: sequence.motionStepEnabled[sequence.motionIndex][step-1] }"
+          :aria-pressed="sequence.motionStepEnabled[sequence.motionIndex][step-1]" :aria-label="`${t('sequence.motionStep')} ${step}`"
+          @keydown.enter.prevent="sequence.toggleMotionStep(sequence.motionIndex, step-1)" />
+      </div>
     </div>
   </div>
   <MotionControlPanel />
@@ -226,8 +228,13 @@ type RollDrag =
   | { kind: 'marquee'; startStep: number; startPitch: number; endStep: number; endPitch: number; additive: boolean }
 const drag=ref<RollDrag|null>(null)
 const marqueeSelect=ref(false)
+let justDeleted: { pitch: number; startStep: number; at: number } | null = null
+const deleteClickedNote = (note: SequenceNote) => {
+  justDeleted = { pitch: note.pitch, startStep: note.startStep, at: performance.now() }
+  sequence.removeNote(note)
+}
 const draggingMotion=ref(false); const editingStep=ref<number|null>(null); const editValue=ref(0)
-type FlagKind = 'stepOn' | 'activeStep' | 'transpose'
+type FlagKind = 'stepOn' | 'activeStep' | 'transpose' | 'motionStep'
 const flagDrag=ref<{ kind: FlagKind; value: boolean; origin: number; snapshot: boolean[] }|null>(null)
 const noteNames=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; const noteLabel=(pitch:number)=>`${noteNames[pitch%12]}${Math.floor(pitch/12)-1}`; const isBlackKey=(pitch:number)=>[1,3,6,8,10].includes(pitch%12)
 const GUTTER_WIDTH = 180
@@ -356,13 +363,21 @@ const rollMove = (event: PointerEvent) => {
     state.endPitch = hit.pitch
   }
 }
-const rollUp = () => {
+const rollUp = (event: PointerEvent) => {
   const state = drag.value
   drag.value = null
   if (!state) return
   if (state.kind === 'paint') {
     const start = Math.min(state.start, state.end)
     const end = Math.max(state.start, state.end)
+    if (
+      justDeleted
+      && event.type === 'pointerup'
+      && performance.now() - justDeleted.at < 500
+      && justDeleted.pitch === state.pitch
+      && justDeleted.startStep >= start
+      && justDeleted.startStep <= end
+    ) return
     if (sequence.addNote(state.pitch, start, end - start + 1)) {
       sequence.selectNote(sequence.noteAt(start, state.pitch) ?? null)
       audition([state.pitch])
@@ -370,11 +385,22 @@ const rollUp = () => {
     return
   }
   if (state.kind === 'resize') {
-    sequence.resizeNote(state.key, state.end - state.key.startStep + 1)
+    const note = sequence.notes.find(item => item.pitch === state.key.pitch && item.startStep === state.key.startStep)
+    const nextLength = state.end - state.key.startStep + 1
+    if (note && nextLength === note.length) {
+      if (event.type === 'pointerup') deleteClickedNote(note)
+      return
+    }
+    sequence.resizeNote(state.key, nextLength)
     return
   }
   if (state.kind === 'move') {
-    if (state.dPitch || state.dStep) sequence.moveSelectedNotes(state.dPitch, state.dStep, PITCH_MIN, PITCH_MAX)
+    if (state.dPitch || state.dStep) {
+      sequence.moveSelectedNotes(state.dPitch, state.dStep, PITCH_MIN, PITCH_MAX)
+      return
+    }
+    const note = sequence.noteAt(state.originStep, state.originPitch)
+    if (note && event.type === 'pointerup') deleteClickedNote(note)
     return
   }
   const picked = notesIntersectingRect(
@@ -386,12 +412,6 @@ const rollUp = () => {
   } else {
     sequence.setNoteSelection(picked)
   }
-}
-const rollDblClick = (event: MouseEvent) => {
-  const hit = hitRoll(event)
-  if (!hit) return
-  const existing = sequence.noteAt(hit.step, hit.pitch)
-  if (existing) sequence.removeNote(existing)
 }
 const movePreview = computed(() => {
   const state = drag.value
@@ -474,10 +494,16 @@ const motionHit=(event:PointerEvent)=>{
 const motionStep=(event:PointerEvent)=>{const hit=motionHit(event);sequence.motionEnabled[sequence.motionIndex]=true;if(!sequence.motionStepEnabled[sequence.motionIndex][hit.step])sequence.motionStepEnabled[sequence.motionIndex][hit.step]=true;sequence.setMotionValue(sequence.motionIndex,hit.step,hit.value,hit.point)}
 const startMotion=(event:PointerEvent)=>{draggingMotion.value=true;motionStep(event)};const moveMotion=(event:PointerEvent)=>{if(draggingMotion.value)motionStep(event)}
 const beginMotionEdit=(step:number)=>{editingStep.value=step;editValue.value=midiToDisplay(sequence.motionIndex,sequence.motionValues[sequence.motionIndex][step][0],sequence.func.transposeNote);nextTick(()=>document.querySelector<HTMLInputElement>('.motion-value-input')?.select())};const commitMotion=()=>{if(editingStep.value!==null)sequence.setMotionValue(sequence.motionIndex,editingStep.value,displayToMidi(sequence.motionIndex,editValue.value,sequence.func.transposeNote));editingStep.value=null}
-const flagSnapshot=(kind:FlagKind)=>kind==='stepOn'?[...sequence.stepOn]:kind==='activeStep'?[...sequence.activeStep]:[...sequence.transposeFuncOn]
+const flagSnapshot=(kind:FlagKind)=>{
+  if(kind==='stepOn') return [...sequence.stepOn]
+  if(kind==='activeStep') return [...sequence.activeStep]
+  if(kind==='motionStep') return [...sequence.motionStepEnabled[sequence.motionIndex]]
+  return [...sequence.transposeFuncOn]
+}
 const writeFlag=(kind:FlagKind,step:number,value:boolean)=>{
   if(kind==='stepOn')sequence.setStepOn(step,value)
   else if(kind==='activeStep')sequence.setActiveStep(step,value)
+  else if(kind==='motionStep')sequence.setMotionStep(sequence.motionIndex,step,value)
   else sequence.setTransposeFunc(step,value)
 }
 const applyFlagRange=(current:number)=>{
@@ -499,7 +525,7 @@ const endFlag=()=>{ flagDrag.value=null }
 </script>
 
 <style scoped>
-.roll{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;border:1px solid #55454780;border-radius:4px;overflow:hidden}.roll-header,.roll-row{display:flex}.roll-body{flex:1;min-height:0;overflow-y:auto;touch-action:none;user-select:none}.roll-pitches{position:relative;min-height:100%}.motion-row{flex:0 0 auto;border-top:2px solid var(--volca-accent)}.pitch-gutter{position:sticky;left:0;display:flex;flex:0 0 180px;align-items:center;justify-content:flex-end;box-sizing:border-box;padding:0 10px;background:#382b2d;color:var(--volca-text);font-size:var(--volca-type-label);font-weight:700;letter-spacing:.02em;line-height:1.2;white-space:nowrap}.flag-gutter,.step-flags .pitch-gutter,.motion-step-row .pitch-gutter{justify-content:center;color:var(--volca-accent);text-align:center}.header-gutter{justify-content:center;gap:4px;padding:4px 4px}.header-tool{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.header-tool .marquee-icon{width:16px;height:16px;display:block}.header-tool:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.header-tool:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.header-tool.on{border-color:var(--volca-accent);background:rgba(206,179,147,.18);color:var(--volca-text)}.header-cell{min-height:40px;display:flex;align-items:center;justify-content:center}.motion-gutter{flex-direction:column;justify-content:center;align-items:stretch;gap:6px;padding:8px 6px;white-space:normal;color:var(--volca-accent);text-align:center}.motion-gutter__label{flex:0 0 auto;font-weight:700}.motion-target-select{flex:0 0 auto;min-width:0;width:100%;font-size:var(--volca-type-label)}.motion-gutter :deep(.v-field){border-radius:0!important;background:transparent!important;font-size:var(--volca-type-label);min-height:32px!important}.motion-gutter :deep(.v-field__input){min-height:28px;padding-top:2px;padding-bottom:2px;padding-inline:0;line-height:1.2}.motion-gutter :deep(.v-select__selection-text){white-space:nowrap;text-align:center}.motion-gutter__actions{display:flex;align-items:center;justify-content:center;gap:6px}.motion-gutter__clear{display:grid;place-items:center;width:50px;height:50px;min-width:50px;min-height:50px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:9px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.motion-gutter__clear:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.motion-gutter__clear:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.pitch-gutter.black-key{background:#2a2021;color:#9d8570}.step-cell{flex:1 1 0;width:0;min-width:28px;box-sizing:border-box;border-left:1px solid #55454740}.header-cell{position:relative;padding:4px 0;background:#4a3a3c;text-align:center;cursor:pointer}.header-cell.muted{opacity:.38}.header-cell.skipped{color:#8f8170;text-decoration:line-through}.note-cell{position:relative;display:flex;align-items:center;height:20px;border-top:1px solid #55454726;cursor:pointer;touch-action:none}.note-cell.muted,.note-cell.skipped{opacity:.42}.note-cell__label{z-index:2;overflow:hidden;padding-left:4px;color:#382b2d;font-size:var(--volca-type-label);font-weight:700;white-space:nowrap}.step-cell.cursor::after{content:'';position:absolute;inset:0;z-index:1;background:rgba(206,179,147,.2);pointer-events:none}.step-cell{position:relative}.step-cell.beat{border-left-color:#ceb39380}.note-cell.active,.motion-fill{background:var(--volca-accent)}.note-cell.active{cursor:grab}.note-cell.selected{box-shadow:inset 0 0 0 2px #f8eee4}.note-cell.full{cursor:not-allowed}.note-resize-handle{position:absolute;top:0;right:0;z-index:3;width:10px;height:100%;cursor:ew-resize}.roll-body.is-moving,.roll-body.is-moving .note-cell{cursor:grabbing}.roll-body.is-resizing,.roll-body.is-resizing .note-cell{cursor:ew-resize}.roll-body.is-marquee,.roll-body.is-marquee .note-cell,.roll-body.is-marquee .note-resize-handle{cursor:crosshair}.note-marquee{position:absolute;z-index:5;border:1px solid var(--volca-accent);background:rgba(206,179,147,.16);pointer-events:none}.step-flags{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426;touch-action:none}.step-flags .step-cell{border-left-color:transparent}.step-flags .step-cell.beat{border-left-color:transparent}.flag-cell{display:grid;min-height:22px;padding:0;cursor:pointer}.flag{min-height:0;margin:3px;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer;touch-action:none;pointer-events:none}.flag.on{background:#ceb393;border-color:#e7bd76}.flag.sound.on{background:#9dce91;border-color:#b7e0ad}.flag:focus-visible{outline:2px solid var(--volca-accent);outline-offset:1px}.motion-bars{display:flex;flex:1;height:160px;touch-action:none;cursor:pointer}.motion-bars.disabled{opacity:.55}.motion-col{display:flex;align-items:flex-end}.motion-col.off{opacity:.35}.motion-fill{position:absolute;inset:auto 0 0}.motion-fill.point{right:auto}.motion-value,.motion-value-input{position:absolute;top:6px;right:2px;left:2px;z-index:2;color:var(--volca-text);font-size:11px;font-weight:700;line-height:22px;text-align:center}.motion-value-input{height:24px;border:1px solid var(--volca-accent);border-radius:4px;background:#382b2d}.motion-step-row{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426}.motion-step-cell{height:18px;margin:3px;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer}.motion-step-cell.on{background:#ceb393;border-color:#e7bd76}.roll-header{touch-action:none}.header-cell{cursor:grab;user-select:none}.roll-header.is-copying,.roll-header.is-copying .header-cell{cursor:grabbing}.header-cell.copy-source{background:#6a5348;color:#f1e9e1}.header-cell.drop-target{background:var(--volca-accent);color:#33282a}
+.roll{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;border:1px solid #55454780;border-radius:4px;overflow:hidden}.roll-header,.roll-row{display:flex}.roll-body{flex:1;min-height:0;overflow-y:auto;touch-action:none;user-select:none}.roll-pitches{position:relative;min-height:100%}.motion-row{flex:0 0 auto;border-top:2px solid var(--volca-accent)}.pitch-gutter{position:sticky;left:0;display:flex;flex:0 0 180px;align-items:center;justify-content:flex-end;box-sizing:border-box;padding:0 10px;background:#382b2d;color:var(--volca-text);font-size:var(--volca-type-label);font-weight:700;letter-spacing:.02em;line-height:1.2;white-space:nowrap}.flag-gutter,.step-flags .pitch-gutter,.motion-step-row .pitch-gutter{justify-content:center;color:var(--volca-accent);text-align:center}.header-gutter{justify-content:center;gap:4px;padding:4px 4px}.header-tool{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.header-tool .marquee-icon{width:16px;height:16px;display:block}.header-tool:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.header-tool:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.header-tool.on{border-color:var(--volca-accent);background:rgba(206,179,147,.18);color:var(--volca-text)}.header-cell{min-height:40px;display:flex;align-items:center;justify-content:center}.motion-gutter{flex-direction:column;justify-content:center;align-items:stretch;gap:6px;padding:8px 6px;white-space:normal;color:var(--volca-accent);text-align:center}.motion-gutter__label{flex:0 0 auto;font-weight:700}.motion-target-select{flex:0 0 auto;min-width:0;width:100%;font-size:var(--volca-type-label)}.motion-gutter :deep(.v-field){border-radius:0!important;background:transparent!important;font-size:var(--volca-type-label);min-height:32px!important}.motion-gutter :deep(.v-field__input){min-height:28px;padding-top:2px;padding-bottom:2px;padding-inline:0;line-height:1.2}.motion-gutter :deep(.v-select__selection-text){white-space:nowrap;text-align:center}.motion-gutter__actions{display:flex;align-items:center;justify-content:center;gap:6px}.motion-gutter__clear{display:grid;place-items:center;width:50px;height:50px;min-width:50px;min-height:50px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:9px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.motion-gutter__clear:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.motion-gutter__clear:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.pitch-gutter.black-key{background:#2a2021;color:#9d8570}.step-cell{flex:1 1 0;width:0;min-width:28px;box-sizing:border-box;border-left:1px solid #55454740}.header-cell{position:relative;padding:4px 0;background:#4a3a3c;text-align:center;cursor:pointer}.header-cell.muted{opacity:.38}.header-cell.skipped{color:#8f8170;text-decoration:line-through}.note-cell{position:relative;display:flex;align-items:center;height:20px;border-top:1px solid #55454726;cursor:pointer;touch-action:none}.note-cell.muted,.note-cell.skipped{opacity:.42}.note-cell__label{z-index:2;overflow:hidden;padding-left:4px;color:#382b2d;font-size:var(--volca-type-label);font-weight:700;white-space:nowrap}.step-cell.cursor::after{content:'';position:absolute;inset:0;z-index:1;background:rgba(206,179,147,.2);pointer-events:none}.step-cell{position:relative}.step-cell.beat{border-left-color:#ceb39380}.note-cell.active,.motion-fill{background:var(--volca-accent)}.note-cell.active{cursor:grab}.note-cell.selected{box-shadow:inset 0 0 0 2px #f8eee4}.note-cell.full{cursor:not-allowed}.note-resize-handle{position:absolute;top:0;right:0;z-index:3;width:10px;height:100%;cursor:ew-resize}.roll-body.is-moving,.roll-body.is-moving .note-cell{cursor:grabbing}.roll-body.is-resizing,.roll-body.is-resizing .note-cell{cursor:ew-resize}.roll-body.is-marquee,.roll-body.is-marquee .note-cell,.roll-body.is-marquee .note-resize-handle{cursor:crosshair}.note-marquee{position:absolute;z-index:5;border:1px solid var(--volca-accent);background:rgba(206,179,147,.16);pointer-events:none}.step-flags{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426;touch-action:none}.step-flags .step-cell{border-left-color:transparent}.step-flags .step-cell.beat{border-left-color:transparent}.flag-cell{display:grid;min-height:22px;padding:0;cursor:pointer}.flag{min-height:0;margin:3px;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer;touch-action:none;pointer-events:none}.flag.on{background:#ceb393;border-color:var(--volca-accent-bright)}.flag.sound.on{background:var(--volca-teal);border-color:var(--volca-teal)}.flag:focus-visible{outline:2px solid var(--volca-accent);outline-offset:1px}.motion-bars{display:flex;flex:1;height:160px;touch-action:none;cursor:pointer}.motion-bars.disabled{opacity:.55}.motion-col{display:flex;align-items:flex-end}.motion-col.off{opacity:.35}.motion-fill{position:absolute;inset:auto 0 0}.motion-fill.point{right:auto}.motion-value,.motion-value-input{position:absolute;top:6px;right:2px;left:2px;z-index:2;color:var(--volca-text);font-size:11px;font-weight:700;line-height:22px;text-align:center}.motion-value-input{height:24px;border:1px solid var(--volca-accent);border-radius:4px;background:#382b2d}.motion-step-row{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426}.motion-step-cell{height:18px;margin:3px;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer}.motion-step-cell.on{background:#ceb393;border-color:var(--volca-accent-bright)}.roll-header{touch-action:none}.header-cell{cursor:grab;user-select:none}.roll-header.is-copying,.roll-header.is-copying .header-cell{cursor:grabbing}.header-cell.copy-source{background:#6a5348;color:#f1e9e1}.header-cell.drop-target{background:var(--volca-accent);color:#33282a}
 .focus-help-copy { margin: 0; }
 .focus-help-skip { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 0; color: var(--volca-muted); font-size: var(--volca-type-body); line-height: 1.4; cursor: pointer; }
 .focus-help-skip input { width: 16px; height: 16px; margin-top: 2px; flex: 0 0 auto; accent-color: var(--volca-accent); }
