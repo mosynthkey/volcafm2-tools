@@ -77,8 +77,10 @@ const feedbackPath = (operator: DexedAlgorithmOperator) => {
 .operator-block { fill: #514044; stroke: #f1e9e1; stroke-width: 1.25; outline: none; }
 .operator-node.carrier .operator-block { fill: #725f45; stroke: var(--volca-accent-bright); }
 .operator-node text { fill: #f8eee4; font-size: 9px; font-weight: 800; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
-.operator-node.selected .operator-block,.operator-block:focus-visible { fill: #d8bea0; stroke: #f8eee4; }
-.operator-node.selected text,.operator-block:focus-visible ~ text { fill: #2b2022; }
+.operator-block:focus-visible { fill: #d8bea0; stroke: #f8eee4; }
+.operator-block:focus-visible ~ text { fill: #2b2022; }
+.operator-node.selected .operator-block { stroke: var(--volca-pink); stroke-width: 2; }
+.operator-node.selected text { fill: #f8eee4; }
 .operator-node.off { opacity: .28; }
 .operator-block:focus,.operator-block:focus-visible { outline: none; }
 </style>
