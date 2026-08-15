@@ -1,10 +1,57 @@
 type Log = (message: string) => void
+type StateChangeHandler = (port: MIDIPort) => void
 
 export class MidiTransport {
   access: MIDIAccess | null = null
+  private stateChangeListener: ((event: Event) => void) | null = null
+
   constructor(private readonly log: Log) {}
 
-  async initialize() { this.access = await navigator.requestMIDIAccess({ sysex: true }); return this.access }
+  async initialize() {
+    const previous = this.access
+    await this.release()
+    this.access = await navigator.requestMIDIAccess({ sysex: true })
+    if (previous) {
+      this.log(previous === this.access
+        ? 'MIDIAccess is the same object (document-scoped). A window reload is needed to fully recreate it.'
+        : 'MIDIAccess is a new object.')
+    }
+    return this.access
+  }
+
+  async release() {
+    this.unbindStateChange()
+    const access = this.access
+    this.access = null
+    if (!access) return
+    const ports = [...access.inputs.values(), ...access.outputs.values()]
+    for (const port of ports) {
+      if (port.type === 'input') (port as MIDIInput).onmidimessage = null
+      try {
+        await port.close()
+      } catch {
+        /* already closed or unsupported */
+      }
+    }
+  }
+
+  bindStateChange(onStateChange: StateChangeHandler) {
+    this.unbindStateChange()
+    if (!this.access) return
+    this.stateChangeListener = (event: Event) => {
+      const port = (event as MIDIConnectionEvent).port
+      if (port) onStateChange(port)
+    }
+    this.access.addEventListener('statechange', this.stateChangeListener)
+  }
+
+  unbindStateChange() {
+    if (this.access && this.stateChangeListener) {
+      this.access.removeEventListener('statechange', this.stateChangeListener)
+    }
+    this.stateChangeListener = null
+  }
+
   inputNames() { return this.access ? [...this.access.inputs.values()].map(port => port.name ?? '').filter(Boolean) : [] }
   outputNames() { return this.access ? [...this.access.outputs.values()].map(port => port.name ?? '').filter(Boolean) : [] }
   matchingOutputId(inputName: string) { return this.access ? [...this.access.outputs].find(([, output]) => output.name === inputName)?.[0] ?? null : null }
@@ -22,4 +69,3 @@ export function formatMidiBytes(bytes: Uint8Array | number[], limit = 24) {
   const content = Array.from(bytes).slice(0, limit).map(byte => byte.toString(16).padStart(2, '0')).join(' ')
   return bytes.length > limit ? `${content} ... (${bytes.length} bytes)` : `${content} (${bytes.length} bytes)`
 }
-

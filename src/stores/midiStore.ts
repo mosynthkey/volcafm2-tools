@@ -6,6 +6,12 @@ import { SOUND_LIST_SLOT_COUNT, mapImportedVoiceSlots, padPackedProgram, padProg
 import { writePackedVoiceName } from '@/utils/soundProgramCodec';
 import { createMidiMessageRouter } from '@/midi/midiMessageRouter';
 import { createSysexAssembler } from '@/midi/sysexAssembler';
+import {
+    isStaleDetectGeneration,
+    midiStateChangeAction,
+    nextDetectGeneration,
+    selectedPortDisconnected,
+} from '@/midi/midiAccessSession';
 import { formatMidiBytes, MidiTransport } from '@/midi/midiTransport';
 import {
     createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry,
@@ -46,10 +52,14 @@ export const useMidiStore = defineStore('midi', () => {
     const currentVoiceData = ref<Uint8Array | null>(null);
     const soundEditState = ref<'idle' | 'requesting' | 'received' | 'sending' | 'ok' | 'error'>('idle');
     const logs = ref<string[]>([]);
+    const needsDocumentReload = ref(false);
     let programLoadPromise: Promise<boolean> | null = null;
     let currentVoiceFetchPromise: Promise<boolean> | null = null;
     let currentVoiceWaiter: ((ok: boolean) => void) | null = null;
     let programWriteWaiter: ((ok: boolean) => void) | null = null;
+    let detectGeneration = 0;
+    let rescanTimer: ReturnType<typeof setTimeout> | null = null;
+    let sessionTail = Promise.resolve();
 
     const receivedProgramCount = computed(() => programData.value.filter(Boolean).length);
     const isDeviceReady = computed(() => isDeviceReadyState(connectionState.value));
@@ -84,39 +94,114 @@ export const useMidiStore = defineStore('midi', () => {
     const onMidiMessage = router.onMessage;
     const onProgramChange = router.onProgramChange;
 
-    const initMIDI = async () => {
+    const runMidiSession = (work: () => Promise<void>) => {
+        const next = sessionTail.then(work, work);
+        sessionTail = next.then(() => undefined, () => undefined);
+        return next;
+    };
+
+    const refreshPortLists = () => {
+        midiInputs.value = transport.inputNames();
+        midiOutputs.value = transport.outputNames();
+    };
+
+    const bindInput = (input: MIDIInput, access: MIDIAccess) => {
+        const assembler = createSysexAssembler();
+        input.onmidimessage = (event: MIDIMessageEvent) => {
+            const eventData = event.data;
+            if (!eventData) return;
+            router.publishRaw(eventData, input.name ?? '');
+
+            if (assembler.isChannelMessage(eventData)) {
+                const messageType = eventData[0] & 0xf0;
+                if (messageType === 0xc0) log(`RX Program Change: #${eventData[1] & 0x7f}`);
+                router.publishChannel(eventData);
+                return;
+            }
+
+            for (const message of assembler.push(eventData)) {
+                processMIDIMessage(message, input, access);
+            }
+        };
+    };
+
+    const scheduleRescan = () => {
+        if (rescanTimer !== null) clearTimeout(rescanTimer);
+        rescanTimer = setTimeout(() => {
+            rescanTimer = null;
+            if (!isDeviceReadyState(connectionState.value)
+                && connectionState.value !== MIDIConnectionState.SEARCHING
+                && connectionState.value !== MIDIConnectionState.INITIALIZING) {
+                void detectVolcaFM2();
+            }
+        }, 300);
+    };
+
+    const handleStateChange = (port: MIDIPort) => {
+        const access = midiAccess.value;
+        if (!access) return;
+        refreshPortLists();
+        if (port.type === 'input' && port.state === 'connected') bindInput(port as MIDIInput, access);
+        const selectedDisconnected = selectedPortDisconnected(selectedMidiIn.value, access.inputs.values())
+            || selectedPortDisconnected(selectedMidiOut.value, access.outputs.values());
+        const action = midiStateChangeAction({
+            isDeviceReady: isDeviceReadyState(connectionState.value),
+            isBusy: connectionState.value === MIDIConnectionState.SEARCHING
+                || connectionState.value === MIDIConnectionState.INITIALIZING
+                || connectionState.value === MIDIConnectionState.RECEIVING,
+            portState: port.state,
+            selectedDisconnected,
+        });
+        log(`MIDI ${port.type} "${port.name ?? ''}" ${port.state}/${port.connection}.`);
+        if (action === 'mark-disconnected') {
+            selectedMidiIn.value = null;
+            selectedMidiOut.value = null;
+            connectionState.value = MIDIConnectionState.NOT_FOUND;
+            log('Selected MIDI port disconnected.');
+            return;
+        }
+        if (action === 'rescan') scheduleRescan();
+    };
+
+    const attachAccess = (access: MIDIAccess) => {
+        midiAccess.value = access;
+        needsDocumentReload.value = false;
+        refreshPortLists();
+        log(`MIDI initialized. inputs=[${midiInputs.value.join(', ')}] outputs=[${midiOutputs.value.join(', ')}]`);
+        access.inputs.forEach(input => bindInput(input, access));
+        transport.bindStateChange(handleStateChange);
+    };
+
+    const initMIDI = () => runMidiSession(async () => {
+        connectionState.value = MIDIConnectionState.INITIALIZING;
         try {
-            const access = await transport.initialize();
-            midiAccess.value = access;
-            midiInputs.value = transport.inputNames();
-            midiOutputs.value = transport.outputNames();
-
-            log(`MIDI initialized. inputs=[${midiInputs.value.join(', ')}] outputs=[${midiOutputs.value.join(', ')}]`);
-
-            access.inputs.forEach(input => {
-                const assembler = createSysexAssembler();
-                input.onmidimessage = (event: MIDIMessageEvent) => {
-                    const eventData = event.data;
-                    if (!eventData) return;
-                    router.publishRaw(eventData, input.name ?? '');
-
-                    if (assembler.isChannelMessage(eventData)) {
-                        const messageType = eventData[0] & 0xf0;
-                        if (messageType === 0xc0) log(`RX Program Change: #${eventData[1] & 0x7f}`);
-                        router.publishChannel(eventData);
-                        return;
-                    }
-
-                    for (const message of assembler.push(eventData)) {
-                        processMIDIMessage(message, input, access);
-                    }
-                };
-            });
+            attachAccess(await transport.initialize());
             detectVolcaFM2();
         } catch (err) {
             log(`MIDI init error: ${err}`);
+            needsDocumentReload.value = true;
             connectionState.value = MIDIConnectionState.ERROR;
         }
+    });
+
+    const reconnectMIDI = () => runMidiSession(async () => {
+        connectionState.value = MIDIConnectionState.INITIALIZING;
+        selectedMidiIn.value = null;
+        selectedMidiOut.value = null;
+        log('Reconnecting MIDI (close ports, requestMIDIAccess again)...');
+        try {
+            attachAccess(await transport.initialize());
+            detectVolcaFM2();
+        } catch (err) {
+            log(`MIDI reconnect error: ${err}`);
+            needsDocumentReload.value = true;
+            connectionState.value = MIDIConnectionState.ERROR;
+        }
+    });
+
+    const reloadMidiDocument = () => {
+        log('Reloading this window to recreate MIDIAccess (same as a browser refresh).');
+        window.location.reload();
     };
 
     const processMIDIMessage = (
@@ -191,6 +276,8 @@ export const useMidiStore = defineStore('midi', () => {
     };
 
     const detectVolcaFM2 = async () => {
+        const generation = nextDetectGeneration(detectGeneration);
+        detectGeneration = generation;
         connectionState.value = MIDIConnectionState.SEARCHING;
         log('Searching for volca fm2 (sending Device Inquiry to all outputs)...');
 
@@ -199,6 +286,7 @@ export const useMidiStore = defineStore('midi', () => {
         });
 
         setTimeout(() => {
+            if (isStaleDetectGeneration(generation, detectGeneration)) return;
             if (connectionState.value === MIDIConnectionState.SEARCHING) {
                 connectionState.value = MIDIConnectionState.NOT_FOUND;
                 log('volca fm2 not found (timeout).');
@@ -522,6 +610,7 @@ export const useMidiStore = defineStore('midi', () => {
         currentVoiceData,
         soundEditState,
         logs,
+        needsDocumentReload,
         receivedProgramCount,
         soundList,
         isDeviceReady,
@@ -530,6 +619,8 @@ export const useMidiStore = defineStore('midi', () => {
         isSearching,
         isFetchingCurrentProgram,
         initMIDI,
+        reconnectMIDI,
+        reloadMidiDocument,
         detectVolcaFM2,
         requestProgramDump,
         ensureAllProgramDumps,

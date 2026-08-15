@@ -21,11 +21,12 @@
     "verify:smf": "tsx scripts/verify-smf-import.ts",
     "verify:sound": "tsx scripts/verify-sound-program.ts",
     "verify:midi": "tsx scripts/verify-midi-protocol.ts",
+    "verify:midi-reconnect": "tsx scripts/verify-midi-reconnect.ts",
     "verify:motion": "tsx scripts/verify-motion-value.ts",
     "verify:dx7": "tsx scripts/verify-dx7-json-backup.ts",
     "verify:library": "tsx scripts/verify-library-format.ts",
     "verify:euclidean": "tsx scripts/verify-euclidean.ts",
-    "verify": "run-s verify:sequence verify:smf verify:sound verify:midi verify:motion verify:euclidean verify:dx7 verify:library",
+    "verify": "run-s verify:sequence verify:smf verify:sound verify:midi verify:midi-reconnect verify:motion verify:euclidean verify:dx7 verify:library",
     "midi:tool": "tsx scripts/midi-sequence-tool.ts"
   },
   "dependencies": {
@@ -59,7 +60,7 @@
     "vue-tsc": "^2.1.10"
   },
   "build": {
-    "appId": "com.melissa-audio.volca-fm2-tool",
+    "appId": "com.melissa-audio.volcafm2tools",
     "productName": "volca fm2 tools",
     "copyright": "Copyright © Masaki Ono",
     "directories": {

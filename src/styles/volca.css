@@ -82,6 +82,10 @@ body { overflow: hidden; }
 .sidebar-toggle:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
 .sidebar-rule { height: 1px; margin: 0 5px 13px; background: var(--volca-line); }
 .midi-state { display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 7px 10px; border: 1px solid var(--volca-line); border-radius: 9px; color: var(--volca-muted); background: rgba(255,255,255,.025); font-size: var(--volca-type-body); font-weight: 600; }
+button.midi-state { width: 100%; font: inherit; text-align: left; cursor: pointer; }
+button.midi-state:hover:not(:disabled) { color: var(--volca-text); background: rgba(255,255,255,.055); }
+button.midi-state:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
+button.midi-state:disabled { cursor: default; }
 .status-light, .device-dot { width: 7px; height: 7px; border-radius: 50%; background: #746769; box-shadow: 0 0 0 3px rgba(116,103,105,.12); }
 .midi-state.is-connected .status-light { background: var(--volca-teal); box-shadow: 0 0 0 3px var(--volca-teal-soft); }
 .midi-state.is-busy .status-light { background: var(--volca-accent); animation: status-pulse 1.2s ease-in-out infinite; }
@@ -151,6 +155,8 @@ body { overflow: hidden; }
 .v-overlay__content .v-progress-linear .v-progress-linear__indeterminate { background: var(--volca-accent) !important; }
 .connection-steps { display: grid; gap: 8px; margin: 0; padding-left: 1.4rem; }
 .connection-steps li { padding-left: 4px; }
+.connection-note { margin: 14px 0 0; color: var(--volca-muted); font-size: var(--volca-type-label); line-height: 1.55; }
+.connection-note.is-warn { color: var(--volca-pink); }
 .dialog-error { margin: 0 0 12px; color: var(--volca-pink); }
 .sequencer-card > .dialog-error { margin: 12px 0 0; }
 .program-load-copy { margin: 0 0 16px; color: var(--volca-muted); }

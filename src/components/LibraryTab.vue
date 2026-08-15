@@ -42,6 +42,20 @@
         <input ref="fileInput" type="file" :accept="LIBRARY_FILE_ACCEPT" hidden @change="importFile" />
       </div>
 
+      <p v-if="!isDesktopApp" class="library-storage-notice" role="note">
+        <Info :size="16" aria-hidden="true" />
+        <span>
+          {{ t('library.storageNotice') }}<br />
+          <button
+            class="library-storage-notice__link"
+            type="button"
+            :disabled="!hasDownloadableLibrary || busy === 'export-all'"
+            :title="t('library.storageNoticeLinkTitle')"
+            @click="downloadAllLibrary"
+          >{{ t('library.storageNoticeLink') }}</button>{{ t('library.storageNoticeAfter') }}
+        </span>
+      </p>
+
       <p v-if="errorMessage" class="dialog-error">{{ errorMessage }}</p>
 
       <div class="library-list" :aria-busy="busy === 'load-list'">
@@ -104,13 +118,14 @@ import {
 } from '@/utils/libraryFormat';
 import { deleteLibrary, importLibraryRecords, listLibrary, type LibraryRecord } from '@/utils/presetLibrary';
 import { downloadText } from '@/utils/downloadBinary';
+import { isDesktopApp } from '@/utils/runtime';
 
 const ui = useUiStore();
 const soundStore = useSoundStore();
 const seqStore = useSequencerStore();
 const midiStore = useMidiStore();
 const { t, locale } = useI18n();
-const { suggestedNameFor, stampSoundName, saveCurrent: saveKind } = useLibraryCurrent();
+const { suggestedNameFor, stampSoundName, saveCurrent: saveKind, currentPayload } = useLibraryCurrent();
 
 const kindTabs = LIBRARY_KINDS;
 const activeKind = ref<LibraryKind>('sound');
@@ -124,6 +139,7 @@ const showReplaceConfirm = ref(false);
 const pendingLoad = ref<LibraryRecord | null>(null);
 const showImportResult = ref(false);
 const importResult = ref({ added: 0, skipped: 0 });
+const hasDownloadableLibrary = ref(false);
 
 const kindLabel = (kind: LibraryKind) => t(
   kind === 'sound-list' ? 'library.kinds.soundList' : `library.kinds.${kind}`,
@@ -188,7 +204,12 @@ const refresh = async () => {
   busy.value = 'load-list';
   errorMessage.value = '';
   try {
-    records.value = await listLibrary(activeKind.value);
+    const [kindRecords, allRecords] = await Promise.all([
+      listLibrary(activeKind.value),
+      isDesktopApp ? Promise.resolve([]) : listLibrary(),
+    ]);
+    records.value = kindRecords;
+    hasDownloadableLibrary.value = allRecords.some(record => record.kind !== 'bundle');
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t('library.loadError');
   } finally {
@@ -282,6 +303,27 @@ const cancelReplace = () => {
   showReplaceConfirm.value = false;
 };
 
+const downloadAllLibrary = async () => {
+  if (isDesktopApp || !hasDownloadableLibrary.value || busy.value) return;
+  busy.value = 'export-all';
+  errorMessage.value = '';
+  try {
+    const payload = await currentPayload('bundle');
+    if (!payload.items?.length) {
+      hasDownloadableLibrary.value = false;
+      return;
+    }
+    downloadText(
+      encodeLibraryFile('bundle', t('library.suggestedBundle'), payload),
+      libraryFilename(t('library.suggestedBundle'), 'bundle'),
+    );
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : t('library.exportError');
+  } finally {
+    busy.value = null;
+  }
+};
+
 const exportRecord = (record: LibraryRecord) => {
   errorMessage.value = '';
   try {
@@ -354,6 +396,17 @@ const formatDate = (timestamp: number) => new Intl.DateTimeFormat(locale.value, 
 .library-tab.is-on { color: var(--volca-accent-bright); border-bottom-color: var(--volca-accent); }
 .library-tab:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
 .save-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; margin-bottom: 12px; }
+.library-storage-notice {
+  display: flex; align-items: flex-start; gap: 8px; flex: 0 0 auto; margin: 0 0 12px;
+  color: var(--volca-muted); font-size: var(--volca-type-body); line-height: 1.55;
+}
+.library-storage-notice svg { flex: 0 0 auto; margin-top: 2px; color: var(--volca-teal); }
+.library-storage-notice__link {
+  display: inline; padding: 0; border: 0; background: none; color: var(--volca-accent);
+  font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.library-storage-notice__link:hover:not(:disabled) { color: var(--volca-accent-bright); }
+.library-storage-notice__link:disabled { opacity: 0.45; cursor: default; text-decoration: none; }
 .library-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
 .library-empty { display: grid; min-height: 180px; place-items: center; color: var(--volca-muted); font-size: var(--volca-type-body); }
 .library-item { min-height: 64px; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--volca-line); }

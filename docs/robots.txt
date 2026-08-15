@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://mosynthkey.github.io/volcafm2-dx7/sitemap.xml
+Sitemap: https://mosynthkey.github.io/volcafm2-tools/sitemap.xml

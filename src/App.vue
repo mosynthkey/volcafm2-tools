@@ -29,13 +29,22 @@
             <li>{{ connectionTexts.step1 }}</li>
             <li>{{ connectionTexts.step2 }}</li>
             <li>{{ connectionTexts.step3 }}</li>
+            <li>{{ connectionTexts.step4 }}</li>
           </ol>
+          <p class="connection-note" :class="{ 'is-warn': connectionTexts.reloadWarn }">{{ connectionTexts.reloadHint }}</p>
         <template #actions>
           <v-btn
-            :loading="midiStore.isSearching"
-            @click="midiStore.detectVolcaFM2"
+            variant="text"
+            :disabled="midiStore.isSearching"
+            @click="midiStore.reloadMidiDocument"
           >
-            {{ connectionTexts.retry }}
+            {{ connectionTexts.reloadMidi }}
+          </v-btn>
+          <v-btn
+            :loading="midiStore.isSearching"
+            @click="midiStore.reconnectMIDI"
+          >
+            {{ connectionTexts.reconnect }}
           </v-btn>
         </template>
     </AppDialog>

@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: mode === 'desktop' ? './' : process.env.NODE_ENV === 'production' ? '/volcafm2-dx7/' : '/',
+  base: mode === 'desktop' ? './' : process.env.NODE_ENV === 'production' ? '/volcafm2-tools/' : '/',
   plugins: [
     vue(),
     vuetify({ autoImport: true }),

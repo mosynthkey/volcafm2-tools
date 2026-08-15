@@ -28,10 +28,12 @@
     <div class="sidebar-fill" />
     <div class="sidebar-footer">
       <LanguageSwitch />
-      <div class="midi-state" :class="`is-${connectionTone}`">
+      <button class="midi-state" type="button" :class="`is-${connectionTone}`"
+        :disabled="midiStore.isDeviceReady" :title="midiStore.isDeviceReady ? connectionLabel : connectionTexts.reconnect"
+        @click="openConnectionRecovery">
         <span class="status-light" />
         <span>{{ connectionLabel }}</span>
-      </div>
+      </button>
       <button class="about-button" type="button" @click="ui.showInfo = true">
         <img class="brand-mark" src="/app-icon.png" alt="" />
         <span>{{ t('app.about') }}</span>
@@ -49,5 +51,5 @@ import { useUiStore } from '@/stores/uiStore';
 
 const { t } = useI18n();
 const ui = useUiStore();
-const { sidebarToggleLabel, connectionTone, connectionLabel } = useMidiConnectionView();
+const { midiStore, sidebarToggleLabel, connectionTone, connectionLabel, connectionTexts, openConnectionRecovery } = useMidiConnectionView();
 </script>
