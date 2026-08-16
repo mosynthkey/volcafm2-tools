@@ -124,6 +124,7 @@ import { MIDIConnectionState, useMidiStore } from '@/stores/midiStore';
 import { useSoundStore } from '@/stores/soundStore';
 import { useUiStore } from '@/stores/uiStore';
 import { downloadBinary } from '@/utils/downloadBinary';
+import { programDisplayName } from '@/utils/programDisplayName';
 
 const midiStore = useMidiStore();
 const soundStore = useSoundStore();
@@ -151,8 +152,13 @@ watch([() => ui.activeTab, () => midiStore.isDeviceReady], ([tab, ready]) => {
   if (tab === 'dx7' && ready) void midiStore.ensureAllProgramDumps();
 }, { immediate: true });
 
+const listedPrograms = computed(() => midiStore.soundList.map(slot => ({
+  ...slot,
+  name: programDisplayName(slot.slot, midiStore.matchedProgramNo, soundStore.program.name, slot.name),
+})));
+
 const firstEmptySlot = computed(() => {
-  const emptySlot = midiStore.soundList.findIndex(slot => !slot.name.trim());
+  const emptySlot = listedPrograms.value.findIndex(slot => !slot.name.trim());
   return emptySlot === -1 ? 0 : emptySlot;
 });
 
@@ -161,7 +167,7 @@ const canWrite = computed(() =>
 
 const writePercent = computed(() => (midiStore.programWriteProgress / 64) * 100);
 
-const columnSlots = (column: number) => midiStore.soundList.slice(column * LIST_COLUMN_SIZE, column * LIST_COLUMN_SIZE + LIST_COLUMN_SIZE);
+const columnSlots = (column: number) => listedPrograms.value.slice(column * LIST_COLUMN_SIZE, column * LIST_COLUMN_SIZE + LIST_COLUMN_SIZE);
 
 const slotAria = (slot: { slot: number; name: string }) => {
   const name = slot.name.trim() || t('dx7.unnamedVoice');
@@ -216,7 +222,7 @@ const confirmWrite = async () => {
 
 const draggingMeta = computed(() => {
   if (draggingSlot.value === null) return null;
-  const slot = midiStore.soundList[draggingSlot.value];
+  const slot = listedPrograms.value[draggingSlot.value];
   return slot ? { slot: slot.slot, name: slot.name.trim() || '—' } : null;
 });
 

@@ -10,6 +10,7 @@ import {
 } from '../src/features/sound/lfoSpeedFromTime';
 import { buildDx7SingleVoice, parseDx7Sysex } from '../src/midi/dx7Cartridge';
 import { adsrToEg, egToAdsr, isAdsrEnvelope } from '../src/utils/adsrEnvelope';
+import { programDisplayName } from '../src/utils/programDisplayName';
 import { createInitialSoundProgram, decodeSoundProgram, encodeSoundProgram, normalizeSoundProgramName } from '../src/utils/soundProgramCodec';
 
 const initial = createInitialSoundProgram();
@@ -69,6 +70,9 @@ assert.equal(String.fromCharCode(...renamedBytes.slice(118, 128)), 'NEW NAME! ')
 assert.equal(decodeSoundProgram(renamedBytes).name, 'NEW NAME!');
 assert.equal(normalizeSoundProgramName('LONG VOICE NAME'), 'LONG VOICE');
 assert.equal(normalizeSoundProgramName('FM音色'), 'FM');
+assert.equal(programDisplayName(5, 5, '  LIVE  ', 'STORED'), 'LIVE');
+assert.equal(programDisplayName(5, 4, 'LIVE', 'STORED'), 'STORED');
+assert.equal(programDisplayName(5, null, 'LIVE', 'STORED'), 'STORED');
 
 const format0 = buildDx7SingleVoice(renamedBytes.subarray(0, 128));
 assert.equal(parseDx7Sysex(format0)[0]?.name, 'NEW NAME!');

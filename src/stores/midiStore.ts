@@ -243,6 +243,12 @@ export const useMidiStore = defineStore('midi', () => {
         window.location.reload();
     };
 
+    const matchIncomingCurrentVoice = (currentProgramData: Uint8Array) => {
+        const match = matchCurrentVoice(currentProgramData.slice(0, 128), programData.value, programNames.value);
+        matchedProgramNo.value = match.programNo;
+        log(`Current sound matched program #${match.programNo} "${match.currentName}" (byte differences=${match.differences}, nameCandidates=${match.nameCandidateCount}).`);
+    };
+
     const processMIDIMessage = (
         data: Uint8Array,
         input: MIDIInput,
@@ -278,17 +284,20 @@ export const useMidiStore = defineStore('midi', () => {
                 const currentProgramData = decodeCurrentVoice(data);
                 currentVoiceData.value = currentProgramData;
                 if (soundEditState.value === 'requesting') soundEditState.value = 'received';
-                if (currentProgramFetchState.value !== 'requesting') {
-                    log(`Sound Edit current program received (${currentProgramData.length} bytes).`);
+                const lookingUpProgramNo = currentProgramFetchState.value === 'requesting';
+                try {
+                    matchIncomingCurrentVoice(currentProgramData);
+                } catch (error) {
+                    if (lookingUpProgramNo) throw error;
+                    log(`Current sound matching failed: ${error}`);
+                }
+                if (lookingUpProgramNo) {
+                    currentProgramFetchState.value = 'received';
+                    currentVoiceWaiter?.(true);
+                    currentVoiceWaiter = null;
                     return;
                 }
-                const voiceData = currentProgramData.slice(0, 128);
-                const match = matchCurrentVoice(voiceData, programData.value, programNames.value);
-                matchedProgramNo.value = match.programNo;
-                currentProgramFetchState.value = 'received';
-                currentVoiceWaiter?.(true);
-                currentVoiceWaiter = null;
-                log(`Current sound matched program #${match.programNo} "${match.currentName}" (byte differences=${match.differences}, nameCandidates=${match.nameCandidateCount}).`);
+                log(`Sound Edit current program received (${currentProgramData.length} bytes).`);
             } catch (error) {
                 currentProgramFetchState.value = 'error';
                 currentVoiceWaiter?.(false);

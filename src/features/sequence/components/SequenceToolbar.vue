@@ -68,10 +68,15 @@ import AutoSendToggle from '@/components/AutoSendToggle.vue'
 import LibrarySection from '@/components/LibrarySection.vue'
 import { useMidiStore } from '@/stores/midiStore'
 import { useSequencerStore } from '@/stores/sequencerStore'
+import { useSoundStore } from '@/stores/soundStore'
+import { programDisplayName } from '@/utils/programDisplayName'
 
-const { t } = useI18n(); const midi = useMidiStore(); const sequence = useSequencerStore(); const fileInput = ref<HTMLInputElement | null>(null)
+const { t } = useI18n(); const midi = useMidiStore(); const sequence = useSequencerStore(); const sound = useSoundStore(); const fileInput = ref<HTMLInputElement | null>(null)
 const canSend = computed(() => midi.isIdleConnected)
-const currentProgramName = computed(() => midi.programNames[Number(sequence.programNo)]?.name.trim() ?? '')
+const currentProgramName = computed(() => {
+  const slot = Number(sequence.programNo)
+  return programDisplayName(slot, midi.matchedProgramNo, sound.program.name, midi.programNames[slot]?.name ?? '')
+})
 const selectFile = (event: Event) => { const input = event.target as HTMLInputElement; const file = input.files?.[0]; if (file) sequence.queueSmfImport(file); input.value = '' }
 </script>
 
