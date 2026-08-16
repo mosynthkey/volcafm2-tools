@@ -4,7 +4,7 @@
           <div class="about-identity">
             <img src="/app-icon.png" alt="" />
             <h2>{{ t('app.about') }}</h2>
-            <span>{{ t('app.version', { version: '2.0.2' }) }}</span>
+            <span>{{ t('app.version', { version: '2.0.3' }) }}</span>
             <span>{{ t('app.license') }}</span>
             <small>{{ t('app.copyright') }}</small>
           </div>
