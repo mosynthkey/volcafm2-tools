@@ -118,6 +118,7 @@ import {
     type LibraryKind,
 } from '@/utils/libraryFormat';
 import { deleteLibrary, importLibraryRecords, listLibrary, type LibraryRecord } from '@/utils/presetLibrary';
+import { formatThrownError } from '@/utils/appError';
 import { downloadText } from '@/utils/downloadBinary';
 import { isDesktopApp } from '@/utils/runtime';
 
@@ -126,6 +127,7 @@ const soundStore = useSoundStore();
 const seqStore = useSequencerStore();
 const midiStore = useMidiStore();
 const { t, locale } = useI18n();
+const thrown = (error: unknown, fallback: string) => formatThrownError(error, fallback, key => String(t(key)));
 const { suggestedNameFor, stampSoundName, saveCurrent: saveKind, currentPayload } = useLibraryCurrent();
 
 const kindTabs = LIBRARY_KINDS;
@@ -212,7 +214,7 @@ const refresh = async () => {
     records.value = kindRecords;
     hasDownloadableLibrary.value = allRecords.some(record => record.kind !== 'bundle');
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('library.loadError');
+    errorMessage.value = thrown(error, 'library.loadError');
   } finally {
     busy.value = null;
   }
@@ -254,7 +256,7 @@ const saveCurrent = async () => {
     await saveKind(activeKind.value, name);
     await refresh();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('library.saveError');
+    errorMessage.value = thrown(error, 'library.saveError');
   } finally {
     busy.value = null;
   }
@@ -281,7 +283,7 @@ const loadRecord = async (record: LibraryRecord) => {
     }
     applyRecord(record);
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('library.loadError');
+    errorMessage.value = thrown(error, 'library.loadError');
   } finally {
     if (busy.value === 'import') busy.value = null;
   }
@@ -295,7 +297,7 @@ const confirmReplace = () => {
   try {
     applyRecord(record);
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('library.loadError');
+    errorMessage.value = thrown(error, 'library.loadError');
   }
 };
 
@@ -319,7 +321,7 @@ const downloadAllLibrary = async () => {
       libraryFilename(t('library.suggestedBundle'), 'bundle'),
     );
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('library.exportError');
+    errorMessage.value = thrown(error, 'library.exportError');
   } finally {
     busy.value = null;
   }
@@ -339,7 +341,7 @@ const exportRecord = (record: LibraryRecord) => {
       libraryFilename(record.name, record.kind),
     );
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('library.exportError');
+    errorMessage.value = thrown(error, 'library.exportError');
   }
 };
 
@@ -359,7 +361,7 @@ const importFile = async (event: Event) => {
       selectKind(decoded.kind);
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('library.importError');
+    errorMessage.value = thrown(error, 'library.importError');
   } finally {
     busy.value = null;
   }
@@ -373,7 +375,7 @@ const removeRecord = async (id: string) => {
     deleteTarget.value = null;
     await refresh();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('library.deleteError');
+    errorMessage.value = thrown(error, 'library.deleteError');
   } finally {
     busy.value = null;
   }

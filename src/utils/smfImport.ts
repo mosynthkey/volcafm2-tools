@@ -1,3 +1,4 @@
+import { appError } from './appError';
 import type { SequenceNote } from '../types/sequence';
 
 export interface ImportedNote {
@@ -44,7 +45,7 @@ export const parseSmf = (buffer: ArrayBuffer): ParsedSmf => {
 
     const headerId = cursor.ascii(4);
     if (headerId !== 'MThd') {
-        throw new Error('MThdヘッダが見つかりません。標準MIDIファイル(.mid)を指定してください。');
+        throw appError('sequence.smfMissingHeader');
     }
     const headerLen = cursor.u32();
     const headerEnd = cursor.pos + headerLen;
@@ -54,7 +55,7 @@ export const parseSmf = (buffer: ArrayBuffer): ParsedSmf => {
     cursor.pos = headerEnd;
 
     if (division & 0x8000) {
-        throw new Error('SMPTEタイムコード形式のMIDIファイルには対応していません。');
+        throw appError('sequence.smfSmpteUnsupported');
     }
     const ticksPerQuarter = division;
 

@@ -36,6 +36,7 @@ import AppDialog from '@/components/dialogs/AppDialog.vue'
 import PageHintButton from '@/components/PageHintButton.vue'
 import { useLibraryCurrent } from '@/composables/useLibraryCurrent'
 import { useUiStore } from '@/stores/uiStore'
+import { formatThrownError } from '@/utils/appError'
 import type { PageHintId } from '@/utils/pageHint'
 import type { LibraryKind } from '@/utils/libraryFormat'
 
@@ -62,7 +63,7 @@ const confirmSave = async () => {
     await saveCurrent(props.kind, saveName.value)
     showSave.value = false
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('library.saveError')
+    errorMessage.value = formatThrownError(error, 'library.saveError', key => String(t(key)))
   } finally {
     saving.value = false
   }

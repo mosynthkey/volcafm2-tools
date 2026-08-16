@@ -1,5 +1,6 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
+import { i18n } from '@/i18n';
 import { useMidiStore } from '@/stores/midiStore';
 import {
     createEmptySequenceState, createMotionGrid, createMotionPoints, createMotionStepEnabled,
@@ -11,6 +12,7 @@ import { createRandomStepOrder, createReversedStepOrder, createShiftedStepOrder,
 import { clearSequenceStep, copySequenceNoteEuclid, copySequenceStep, copySequenceStepsEuclid, tieSequenceStep } from '../utils/sequenceStepEditing';
 import { moveSequenceNotes, resizeSequenceNote, sameNoteKey, clampedNoteMove, type NoteKey } from '../utils/sequenceNoteEditing';
 import { extractStepNotes, parseSmf } from '../utils/smfImport';
+import { formatThrownError } from '../utils/appError';
 import { getPref, setPref } from '../utils/appPrefs';
 import { displayToMidi } from '../utils/motionValue';
 
@@ -538,7 +540,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
             importNotes(imported, importedVelocity);
             importError.value = null;
         } catch (error) {
-            importError.value = String(error instanceof Error ? error.message : error);
+            importError.value = formatThrownError(error, 'sequence.importError', key => String(i18n.global.t(key)));
         } finally {
             pendingSmfFile = null;
         }
