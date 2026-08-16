@@ -10,19 +10,19 @@
     </div>
     <div class="sidebar-rule" />
     <button class="nav-item" :class="{ active: ui.activeTab === 'sound-edit' }" type="button" @click="ui.activeTab = 'sound-edit'">
-      <span class="nav-icon"><SlidersHorizontal :size="18" /></span>
+      <span class="nav-icon"><ProgramEditIcon /></span>
       <span><b>{{ t('app.nav.soundLabel') }}</b><small>{{ t('app.nav.sound') }}</small></span>
     </button>
     <button class="nav-item" :class="{ active: ui.activeTab === 'dx7' }" type="button" @click="ui.activeTab = 'dx7'">
-      <span class="nav-icon"><Library :size="18" /></span>
+      <span class="nav-icon"><ProgramListIcon /></span>
       <span><b>{{ t('app.nav.dx7Label') }}</b><small>{{ t('app.nav.dx7') }}</small></span>
     </button>
     <button class="nav-item" :class="{ active: ui.activeTab === 'sequencer' }" type="button" @click="ui.activeTab = 'sequencer'">
-      <span class="nav-icon"><Piano :size="18" /></span>
+      <span class="nav-icon"><SequenceIcon /></span>
       <span><b>{{ t('app.nav.sequenceLabel') }}</b><small>{{ t('app.nav.sequence') }}</small></span>
     </button>
     <button class="nav-item" :class="{ active: ui.activeTab === 'library' }" type="button" @click="ui.openLibrary(ui.libraryFocus)">
-      <span class="nav-icon"><Archive :size="18" /></span>
+      <span class="nav-icon"><Library :size="18" /></span>
       <span><b>{{ t('app.nav.libraryLabel') }}</b><small>{{ t('app.nav.library') }}</small></span>
     </button>
     <div class="sidebar-fill" />
@@ -43,9 +43,12 @@
 </template>
 
 <script setup lang="ts">
-import { Archive, Library, PanelLeftClose, PanelLeftOpen, Piano, SlidersHorizontal } from '@lucide/vue';
+import { Library, PanelLeftClose, PanelLeftOpen } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import LanguageSwitch from '@/components/LanguageSwitch.vue';
+import ProgramEditIcon from '@/components/icons/ProgramEditIcon.vue';
+import ProgramListIcon from '@/components/icons/ProgramListIcon.vue';
+import SequenceIcon from '@/components/icons/SequenceIcon.vue';
 import { useMidiConnectionView } from '@/composables/useMidiConnectionView';
 import { useUiStore } from '@/stores/uiStore';
 
