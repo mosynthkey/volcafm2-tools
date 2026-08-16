@@ -2,6 +2,10 @@
   <AppDialog :model-value="ui.showPageHint" :title="t('hint.title')" max-width="520" persistent
     @update:model-value="onUpdate">
     <p class="page-hint-copy">{{ body }}</p>
+    <section v-if="ui.pageHintId === 'sequence'" class="page-hint-issue">
+      <h3>{{ t('hint.knownIssue') }}</h3>
+      <p>{{ t('hint.sequenceKnownIssue') }}</p>
+    </section>
     <template #actions>
       <v-btn @click="ui.dismissPageHint()">{{ t('common.ok') }}</v-btn>
     </template>
@@ -53,5 +57,24 @@ watch([() => ui.activeTab, connectionBlocking], tryShow, { immediate: true })
   color: var(--volca-text);
   line-height: 1.65;
   white-space: pre-line;
+}
+.page-hint-issue {
+  margin: 18px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(206, 179, 147, 0.28);
+  border-radius: 10px;
+  background: rgba(48, 36, 38, 0.55);
+}
+.page-hint-issue h3 {
+  margin: 0 0 6px;
+  color: var(--volca-accent-bright);
+  font-size: var(--volca-type-body);
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+.page-hint-issue p {
+  margin: 0;
+  color: var(--volca-text);
+  line-height: 1.65;
 }
 </style>

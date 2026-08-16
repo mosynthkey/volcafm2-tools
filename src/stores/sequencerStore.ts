@@ -7,7 +7,7 @@ import {
     createSequenceNote, MOTION_PARAM_COUNT, NUM_OF_STEPS, NUM_OF_VOICES_PER_STEP,
     normalizeSequenceState, type SequenceNote, type SequenceState,
 } from '../types/sequence';
-import { encodeCurrentSequenceDump } from '../utils/sequenceCodec';
+import { decodeSequenceData, encodeCurrentSequenceDump } from '../utils/sequenceCodec';
 import { createRandomStepOrder, createReversedStepOrder, createShiftedStepOrder, reorderSequenceSteps, type SequenceReorderScope } from '../utils/sequenceRandomizer';
 import { clearSequenceStep, copySequenceNoteEuclid, copySequenceStep, copySequenceStepsEuclid, tieSequenceStep } from '../utils/sequenceStepEditing';
 import { moveSequenceNotes, resizeSequenceNote, sameNoteKey, clampedNoteMove, type NoteKey } from '../utils/sequenceNoteEditing';
@@ -50,6 +50,9 @@ export const useSequencerStore = defineStore('sequencer', () => {
         if (value === true) skipRandomizeDialog.value = true;
     });
     const showCaptureDialog = ref(false);
+    const showReceiveErrorDialog = ref(false);
+    const skipNextDeviceLoad = ref(false);
+    const syncedSignature = ref<string | null>(null);
     const showImportDialog = ref(false);
     const importError = ref<string | null>(null);
     const smfBarOffset = ref(1);
@@ -68,6 +71,9 @@ export const useSequencerStore = defineStore('sequencer', () => {
         transposeFuncOn: transposeFuncOn.value,
         func: func.value,
     });
+    const signature = () => JSON.stringify(toState());
+    const hasUnsavedChanges = computed(() => syncedSignature.value !== null && signature() !== syncedSignature.value);
+    const markSynced = () => { syncedSignature.value = signature(); };
 
     const noteAt = (step: number, pitch: number) =>
         notes.value.find(n => n.pitch === pitch && n.startStep <= step && n.startStep + n.length - 1 >= step);
@@ -385,8 +391,24 @@ export const useSequencerStore = defineStore('sequencer', () => {
         useMidiStore().sendCurrentSequenceDump(buildSysEx());
     };
 
+    const requestFromDevice = async (options?: { silent?: boolean }) => {
+        const midi = useMidiStore();
+        showReceiveErrorDialog.value = false;
+        const ok = await midi.requestCurrentSequenceDump();
+        if (!ok) {
+            if (!options?.silent) showReceiveErrorDialog.value = true;
+            return;
+        }
+        const data = midi.currentSequenceData;
+        if (data) loadFromDecoded(decodeSequenceData(data));
+        markSynced();
+    };
+
     const sendRetry = createSendRetry(sendToDevice);
-    watch(() => useMidiStore().sequenceWriteState, sendRetry.handleWriteState);
+    watch(() => useMidiStore().sequenceWriteState, state => {
+        sendRetry.handleWriteState(state);
+        if (state === 'ok') markSynced();
+    });
 
     const canInsertTie = computed(() => stepCursor.value > 0 && stepNoteCount(stepCursor.value - 1) > 0);
 
@@ -498,6 +520,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
     };
 
     const loadPreset = (data: unknown) => {
+        skipNextDeviceLoad.value = true;
         loadFromDecoded(data as SequenceState);
         sendToDevice();
     };
@@ -522,6 +545,9 @@ export const useSequencerStore = defineStore('sequencer', () => {
         chordBuffer,
         showRandomizeDialog,
         showCaptureDialog,
+        showReceiveErrorDialog,
+        skipNextDeviceLoad,
+        hasUnsavedChanges,
         showImportDialog,
         importError,
         sendRetrying: sendRetry.retrying,
@@ -570,6 +596,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
         copyNoteEuclid,
         buildSysEx,
         sendToDevice,
+        requestFromDevice,
         handleStepNote,
         toggleStepInput,
         insertStepRest,

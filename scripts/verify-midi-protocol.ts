@@ -2,13 +2,16 @@ import assert from 'node:assert/strict'
 import { createMidiMessageRouter } from '../src/midi/midiMessageRouter'
 import { createSysexAssembler } from '../src/midi/sysexAssembler'
 import { buildDx7Cartridge } from '../src/midi/dx7Cartridge'
-import { createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry, createProgramDump, createProgramRequest,
-  decodeCurrentVoice, decodeProgramDump, isCurrentVoiceDump, isProgramDump, unpackProgramDump } from '../src/midi/volcaFm2Protocol'
+import { createCurrentSequenceRequest, createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry, createProgramDump, createProgramRequest,
+  decodeCurrentSequence, decodeCurrentVoice, decodeProgramDump, isCurrentSequenceDump, isCurrentVoiceDump, isProgramDump, unpackProgramDump } from '../src/midi/volcaFm2Protocol'
+import { encodeCurrentSequenceDump } from '../src/utils/sequenceCodec'
+import { createEmptySequenceState } from '../src/types/sequence'
 import { loadProgramReferences, matchCurrentVoice } from '../src/midi/programLoader'
 
 assert.deepEqual([...createDeviceInquiry()], [0xf0, 0x7e, 0x7f, 0x06, 0x01, 0xf7])
 assert.deepEqual([...createProgramRequest(65)], [0xf0, 0x42, 0x30, 0, 1, 0x2f, 0x1e, 1, 0xf7])
 assert.deepEqual([...createCurrentVoiceRequest()], [0xf0, 0x42, 0x30, 0, 1, 0x2f, 0x12, 0xf7])
+assert.deepEqual([...createCurrentSequenceRequest()], [0xf0, 0x42, 0x30, 0, 1, 0x2f, 0x10, 0xf7])
 
 const voice = Uint8Array.from({ length: 140 }, (_, index) => (index * 37) & 0xff)
 const dump = createCurrentVoiceDump(voice)
@@ -56,5 +59,9 @@ const cartridge = buildDx7Cartridge([new Uint8Array([1, 2]), new Uint8Array([3])
 assert.deepEqual([...cartridge.slice(0, 6)], [0xf0, 0x43, 0x00, 0x09, 0x20, 0x00])
 assert.equal(cartridge[cartridge.length - 1], 0xf7)
 assert.equal(cartridge[cartridge.length - 2], (0x100 - (1 + 2 + 3)) & 0x7f)
+
+const sequenceDump = encodeCurrentSequenceDump(createEmptySequenceState())
+assert.equal(isCurrentSequenceDump(sequenceDump), true)
+assert.equal(decodeCurrentSequence(sequenceDump).length, 1920)
 
 console.log('MIDI protocol and message router verification passed.')

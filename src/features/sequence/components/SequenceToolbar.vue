@@ -11,13 +11,15 @@
         <span class="editor-identity__label volca-section-title">{{ t('sequence.program') }}</span>
         <v-text-field v-model.number="sequence.programNo" type="number" :aria-label="t('sequence.program')" min="0" max="63" density="compact" hide-details class="program-no-input" />
         <span class="editor-identity__name" :class="{ 'is-empty': !currentProgramName }" :title="currentProgramName || t('sequence.programNameUnknown')">{{ currentProgramName || '—' }}</span>
-        <v-btn :disabled="!canSend" :loading="midi.currentProgramFetchState === 'loading-programs' || midi.currentProgramFetchState === 'requesting'" @click="midi.requestCurrentVoiceProgramNo">
-          <HardDriveUpload :size="16" class="mr-1" />{{ t('sequence.getCurrentProgram') }}
-        </v-btn>
       </v-col>
       <v-col cols="auto" class="editor-toolbar-section">
         <span class="editor-toolbar-section__label volca-section-title">{{ t('sequence.sectionLabel') }}</span>
-        <v-btn :disabled="!canSend" @click="sequence.showCaptureDialog = true"><HardDriveUpload :size="16" class="mr-1" />{{ t('sequence.captureButton') }}</v-btn>
+        <v-btn :disabled="!canSend" :loading="midi.sequenceReadState === 'requesting'" @click="sequence.requestFromDevice()">
+          <HardDriveUpload :size="16" class="mr-1" />{{ t('sequence.captureButton') }}
+        </v-btn>
+        <v-btn :disabled="!canSend" @click="sequence.showCaptureDialog = true">
+          <Play :size="16" class="mr-1" />{{ t('sequence.capturePerformanceButton') }}
+        </v-btn>
         <div class="send-auto-split">
           <v-btn :disabled="!canSend" @click="sequence.sendToDevice()"><HardDriveDownload :size="16" class="mr-1" />{{ t('common.send') }}</v-btn>
           <AutoSendToggle />
@@ -63,7 +65,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, Dices, FileUp, HardDriveDownload, HardDriveUpload, MoreHorizontal, Piano, Trash2, X } from '@lucide/vue'
+import { ChevronDown, Dices, FileUp, HardDriveDownload, HardDriveUpload, MoreHorizontal, Piano, Play, Trash2, X } from '@lucide/vue'
 import AutoSendToggle from '@/components/AutoSendToggle.vue'
 import LibrarySection from '@/components/LibrarySection.vue'
 import { useMidiStore } from '@/stores/midiStore'

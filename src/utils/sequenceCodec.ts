@@ -5,6 +5,7 @@ import {
 } from '../types/sequence';
 
 const SEQ_DATA_SIZE = 1920;
+export const SEQUENCE_DATA_SIZE = SEQ_DATA_SIZE;
 const STEP_DATA_SIZE = 112;
 const STEP_DATA_OFFSET = 80;
 const TIE = 0x7f;

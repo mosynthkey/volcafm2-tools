@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
 import { MIDIConnectionState } from '@/midi/connectionState';
 import { useMidiStore } from '@/stores/midiStore';
@@ -45,6 +45,7 @@ export const useAutoSendStore = defineStore('autoSend', () => {
         || midi.soundEditState === 'sending'
         || midi.soundEditState === 'requesting'
         || midi.sequenceWriteState === 'sending'
+        || midi.sequenceReadState === 'requesting'
         || midi.programWriteState === 'sending'
         || sequence.sendRetrying
         || sound.sendRetrying
@@ -112,6 +113,11 @@ export const useAutoSendStore = defineStore('autoSend', () => {
         if (state === 'sending') cancel();
         if (state === 'ok') lastSentSequence = sequenceSignature();
         if (state === 'ok' && enabled.value && hasPending()) schedule(RETRY_MS);
+    });
+
+    watch(() => midi.sequenceReadState, state => {
+        if (state === 'requesting') cancel();
+        if (state === 'received') void nextTick(() => { lastSentSequence = sequenceSignature(); });
     });
 
     watch(() => midi.currentVoiceData, data => {

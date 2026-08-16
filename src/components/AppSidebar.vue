@@ -38,12 +38,17 @@
         <img class="brand-mark" src="/app-icon.png" alt="" />
         <span>{{ t('app.about') }}</span>
       </button>
+      <a class="sidebar-home-link" href="https://mosynthkey.github.io/"
+        :aria-label="t('app.backToMelissaAudio')" :title="t('app.backToMelissaAudio')">
+        <span class="nav-icon"><ArrowLeft :size="18" /></span>
+        <span>{{ t('app.backToMelissaAudio') }}</span>
+      </a>
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { Library, PanelLeftClose, PanelLeftOpen } from '@lucide/vue';
+import { ArrowLeft, Library, PanelLeftClose, PanelLeftOpen } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import LanguageSwitch from '@/components/LanguageSwitch.vue';
 import ProgramEditIcon from '@/components/icons/ProgramEditIcon.vue';

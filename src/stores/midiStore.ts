@@ -20,9 +20,9 @@ import {
 import { isDesktopApp } from '@/utils/runtime';
 import { formatMidiBytes, MidiTransport } from '@/midi/midiTransport';
 import {
-    createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry,
-    createProgramDump, createProgramRequest, decodeCurrentVoice, decodeProgramDump,
-    isCurrentVoiceDump, isDeviceInquiryReply, isProgramDump, isStatusReply, statusLabel,
+    createCurrentSequenceRequest, createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry,
+    createProgramDump, createProgramRequest, decodeCurrentSequence, decodeCurrentVoice, decodeProgramDump,
+    isCurrentSequenceDump, isCurrentVoiceDump, isDeviceInquiryReply, isProgramDump, isStatusReply, statusLabel,
 } from '@/midi/volcaFm2Protocol';
 import { loadProgramReferences, matchCurrentVoice } from '@/midi/programLoader';
 
@@ -32,6 +32,7 @@ type MIDIOutput = globalThis.MIDIOutput;
 type MIDIMessageEvent = globalThis.MIDIMessageEvent;
 
 const REPLY_TIMEOUT_MS = 4000;
+const SEQUENCE_DUMP_TIMEOUT_MS = 8000;
 const PROGRAM_WRITE_RETRY_COUNT = 5;
 const PROGRAM_WRITE_RETRY_DELAY_MS = 800;
 
@@ -52,6 +53,8 @@ export const useMidiStore = defineStore('midi', () => {
     const currentProgramFetchProgress = ref(0);
     const matchedProgramNo = ref<number | null>(null);
     const sequenceWriteState = ref<'idle' | 'sending' | 'ok' | 'nak' | 'error'>('idle');
+    const sequenceReadState = ref<'idle' | 'requesting' | 'received' | 'error'>('idle');
+    const currentSequenceData = ref<Uint8Array | null>(null);
     const programWriteState = ref<'idle' | 'sending' | 'ok' | 'nak' | 'error'>('idle');
     const programWriteProgress = ref(0);
     const programWriteSlot = ref<number | null>(null);
@@ -63,6 +66,8 @@ export const useMidiStore = defineStore('midi', () => {
     let programLoadPromise: Promise<boolean> | null = null;
     let currentVoiceFetchPromise: Promise<boolean> | null = null;
     let currentVoiceWaiter: ((ok: boolean) => void) | null = null;
+    let sequenceReadPromise: Promise<boolean> | null = null;
+    let sequenceReadWaiter: ((ok: boolean) => void) | null = null;
     let programWriteWaiter: ((ok: boolean) => void) | null = null;
     let detectGeneration = 0;
     let rescanTimer: ReturnType<typeof setTimeout> | null = null;
@@ -89,10 +94,10 @@ export const useMidiStore = defineStore('midi', () => {
         logs.value = [];
     };
 
-    const armTimeout = (isPending: () => boolean, onTimeout: () => void) => {
+    const armTimeout = (isPending: () => boolean, onTimeout: () => void, timeoutMs = REPLY_TIMEOUT_MS) => {
         setTimeout(() => {
             if (isPending()) onTimeout();
-        }, REPLY_TIMEOUT_MS);
+        }, timeoutMs);
     };
 
     const router = createMidiMessageRouter();
@@ -304,6 +309,24 @@ export const useMidiStore = defineStore('midi', () => {
                 currentVoiceWaiter = null;
                 log(`Current sound matching failed: ${error}`);
             }
+        } else if (isCurrentSequenceDump(data)) {
+            try {
+                const sequenceData = decodeCurrentSequence(data);
+                currentSequenceData.value = sequenceData;
+                if (sequenceReadState.value === 'requesting') {
+                    sequenceReadState.value = 'received';
+                    sequenceReadWaiter?.(true);
+                    sequenceReadWaiter = null;
+                }
+                log(`Current sequence dump received (${sequenceData.length} bytes).`);
+            } catch (error) {
+                if (sequenceReadState.value === 'requesting') {
+                    sequenceReadState.value = 'error';
+                    sequenceReadWaiter?.(false);
+                    sequenceReadWaiter = null;
+                }
+                log(`Current sequence dump decode failed: ${error}`);
+            }
         } else if (isStatusReply(data)) {
             log(`Status reply: 0x${data[6].toString(16)} (${statusLabel(data[6])})`);
             if (programWriteState.value === 'sending') {
@@ -315,6 +338,11 @@ export const useMidiStore = defineStore('midi', () => {
             }
             if (sequenceWriteState.value === 'sending') {
                 sequenceWriteState.value = data[6] === 0x23 ? 'ok' : 'nak';
+            }
+            if (sequenceReadState.value === 'requesting') {
+                sequenceReadState.value = 'error';
+                sequenceReadWaiter?.(false);
+                sequenceReadWaiter = null;
             }
             if (soundEditState.value === 'sending') {
                 soundEditState.value = data[6] === 0x23 ? 'ok' : 'nak';
@@ -571,6 +599,34 @@ export const useMidiStore = defineStore('midi', () => {
         return true;
     };
 
+    const failSequenceRead = (message: string) => {
+        sequenceReadState.value = 'error';
+        log(message);
+        sequenceReadWaiter?.(false);
+        sequenceReadWaiter = null;
+    };
+
+    const requestCurrentSequenceDump = async () => {
+        if (sequenceReadPromise) return sequenceReadPromise;
+        sequenceReadPromise = (async () => {
+            sequenceReadState.value = 'requesting';
+            log('Requesting CURRENT SEQUENCE DATA DUMP (Func 0x10)...');
+            if (!sendSysEx(createCurrentSequenceRequest())) {
+                failSequenceRead('Failed to send current sequence request: no MIDI output selected.');
+                return false;
+            }
+            return await new Promise<boolean>(resolve => {
+                sequenceReadWaiter = resolve;
+                armTimeout(
+                    () => sequenceReadState.value === 'requesting',
+                    () => failSequenceRead('Current sequence request timed out (no Func 0x40 reply within 8s).'),
+                    SEQUENCE_DUMP_TIMEOUT_MS,
+                );
+            });
+        })().finally(() => { sequenceReadPromise = null; });
+        return sequenceReadPromise;
+    };
+
     const sendCurrentSequenceDump = (bytes: Uint8Array) => {
         sequenceWriteState.value = 'sending';
         log('Sending CURRENT SEQUENCE DATA DUMP (Func 0x40)...');
@@ -654,6 +710,8 @@ export const useMidiStore = defineStore('midi', () => {
         currentProgramFetchProgress,
         matchedProgramNo,
         sequenceWriteState,
+        sequenceReadState,
+        currentSequenceData,
         programWriteState,
         programWriteProgress,
         programWriteSlot,
@@ -686,6 +744,7 @@ export const useMidiStore = defineStore('midi', () => {
         dx7CartridgeBytes,
         sendSysEx,
         requestCurrentVoiceProgramNo,
+        requestCurrentSequenceDump,
         sendCurrentSequenceDump,
         requestCurrentVoiceDump,
         sendCurrentVoiceDump,

@@ -22,11 +22,6 @@ export const useAppShell = () => {
     });
     onUnmounted(() => unsubscribeProgramChange?.());
 
-    watch([() => ui.activeTab, () => midiStore.connectionState], ([tab]) => {
-        if (tab === 'sequencer' && midiStore.isLibraryReady) {
-            void midiStore.requestCurrentVoiceProgramNo();
-        }
-    });
     watch(() => midiStore.matchedProgramNo, programNo => {
         if (programNo !== null) sequencerStore.setProgramNo(programNo);
     });
