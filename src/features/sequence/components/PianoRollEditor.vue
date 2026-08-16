@@ -1,13 +1,13 @@
 <template>
-  <AppDialog v-model="showFocusHelp" :title="t('sequence.focusUsedPitchesTitle')">
-    <p class="focus-help-copy">{{ t('sequence.focusUsedPitchesDescription') }}</p>
-    <label class="focus-help-skip">
-      <input v-model="dontShowFocusHelpAgain" type="checkbox" />
+  <AppDialog v-model="showFoldHelp" :title="t('sequence.foldTitle')">
+    <p class="fold-help-copy">{{ t('sequence.foldDescription') }}</p>
+    <label class="fold-help-skip">
+      <input v-model="dontShowFoldHelpAgain" type="checkbox" />
       <span>{{ t('sequence.randomizeDontShowAgain') }}</span>
     </label>
     <template #actions>
-      <v-btn variant="text" @click="showFocusHelp = false">{{ t('common.cancel') }}</v-btn>
-      <v-btn @click="confirmFocusHelp">{{ t('common.ok') }}</v-btn>
+      <v-btn variant="text" @click="showFoldHelp = false">{{ t('common.cancel') }}</v-btn>
+      <v-btn @click="confirmFoldHelp">{{ t('common.ok') }}</v-btn>
     </template>
   </AppDialog>
 
@@ -34,10 +34,11 @@
           :aria-label="t('sequence.shiftStepsRight')" @click="sequence.shiftSteps(1)">
           <ChevronRight :size="16" />
         </button>
-        <button type="button" class="header-tool" :class="{ on: focusUsedPitches }"
-          :aria-pressed="focusUsedPitches" :title="t('sequence.focusUsedPitches')"
-          :aria-label="t('sequence.focusUsedPitches')" @click="requestFocusUsedPitches">
-          <Focus :size="16" />
+        <button type="button" class="header-tool" :class="{ on: foldUsedPitches }"
+          :aria-pressed="foldUsedPitches" :title="t('sequence.fold')"
+          :aria-label="t('sequence.fold')" @click="requestFoldUsedPitches">
+          <ChevronsDownUp v-if="foldUsedPitches" :size="16" />
+          <ChevronsUpDown v-else :size="16" />
         </button>
         <button type="button" class="header-tool" :class="{ on: marqueeSelect }"
           :aria-pressed="marqueeSelect" :title="t('sequence.marqueeSelect')"
@@ -134,7 +135,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Trash2, Focus, ChevronLeft, ChevronRight } from '@lucide/vue'
+import { Trash2, ChevronsDownUp, ChevronsUpDown, ChevronLeft, ChevronRight } from '@lucide/vue'
 import AppToggle from '@/components/AppToggle.vue'
 import AppDialog from '@/components/dialogs/AppDialog.vue'
 import { usePersistedFlag } from '@/composables/usePersistedFlag'
@@ -148,39 +149,39 @@ import { notesIntersectingRect, previewMovedNotes, type NoteKey } from '@/utils/
 import { getPref, setPref } from '@/utils/appPrefs'
 import { displayToMidi, formatMotionValue, getMotionDisplayRange, midiToDisplay } from '@/utils/motionValue'
 
-const SKIP_FOCUS_PREF = 'skipFocusUsedPitchesDialog'
+const SKIP_FOLD_PREF = 'skipFocusUsedPitchesDialog'
 const { t }=useI18n(); const sequence=useSequencerStore(); const ui=useUiStore(); const { audition }=useNoteAudition()
 const motionItems = computed(() => MOTION_PARAM_KEYS.map((key, index) => ({ label: t(`sequence.motionParams.${key}`), value: index })))
 const ALL_PITCHES = Array.from({ length: 61 }, (_, index) => 96 - index)
 const PITCH_MIN = 36
 const PITCH_MAX = 96
-const focusUsedPitches = usePersistedFlag('volca-fm2-show-used-notes', false)
-const skipFocusHelp = ref(false)
-const showFocusHelp = ref(false)
-const dontShowFocusHelpAgain = ref(false)
-getPref<boolean>(SKIP_FOCUS_PREF).then(value => { if (value === true) skipFocusHelp.value = true })
-const requestFocusUsedPitches = () => {
-  if (focusUsedPitches.value) {
-    focusUsedPitches.value = false
+const foldUsedPitches = usePersistedFlag('volca-fm2-show-used-notes', false)
+const skipFoldHelp = ref(false)
+const showFoldHelp = ref(false)
+const dontShowFoldHelpAgain = ref(false)
+getPref<boolean>(SKIP_FOLD_PREF).then(value => { if (value === true) skipFoldHelp.value = true })
+const requestFoldUsedPitches = () => {
+  if (foldUsedPitches.value) {
+    foldUsedPitches.value = false
     return
   }
-  if (skipFocusHelp.value) {
-    focusUsedPitches.value = true
+  if (skipFoldHelp.value) {
+    foldUsedPitches.value = true
     return
   }
-  dontShowFocusHelpAgain.value = false
-  showFocusHelp.value = true
+  dontShowFoldHelpAgain.value = false
+  showFoldHelp.value = true
 }
-const confirmFocusHelp = () => {
-  if (dontShowFocusHelpAgain.value) {
-    skipFocusHelp.value = true
-    setPref(SKIP_FOCUS_PREF, true).catch(() => { skipFocusHelp.value = false })
+const confirmFoldHelp = () => {
+  if (dontShowFoldHelpAgain.value) {
+    skipFoldHelp.value = true
+    setPref(SKIP_FOLD_PREF, true).catch(() => { skipFoldHelp.value = false })
   }
-  showFocusHelp.value = false
-  focusUsedPitches.value = true
+  showFoldHelp.value = false
+  foldUsedPitches.value = true
 }
 const pitches = computed(() => {
-  if (!focusUsedPitches.value || sequence.notes.length === 0) return ALL_PITCHES
+  if (!foldUsedPitches.value || sequence.notes.length === 0) return ALL_PITCHES
   const visible = new Set<number>()
   for (const note of sequence.notes) {
     for (const octaves of [-2, -1, 0, 1, 2]) {
@@ -526,9 +527,9 @@ const endFlag=()=>{ flagDrag.value=null }
 
 <style scoped>
 .roll{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;border:1px solid #55454780;border-radius:4px;overflow:hidden}.roll-header,.roll-row{display:flex}.roll-body{flex:1;min-height:0;overflow-y:auto;touch-action:none;user-select:none}.roll-pitches{position:relative;min-height:100%}.motion-row{flex:0 0 auto;border-top:2px solid var(--volca-accent)}.pitch-gutter{position:sticky;left:0;display:flex;flex:0 0 180px;align-items:center;justify-content:flex-end;box-sizing:border-box;padding:0 10px;background:#382b2d;color:var(--volca-text);font-size:var(--volca-type-label);font-weight:700;letter-spacing:.02em;line-height:1.2;white-space:nowrap}.flag-gutter,.step-flags .pitch-gutter,.motion-step-row .pitch-gutter{justify-content:center;color:var(--volca-accent);text-align:center}.header-gutter{justify-content:center;gap:4px;padding:4px 4px}.header-tool{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.header-tool .marquee-icon{width:16px;height:16px;display:block}.header-tool:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.header-tool:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.header-tool.on{border-color:var(--volca-accent);background:rgba(206,179,147,.18);color:var(--volca-text)}.header-cell{min-height:40px;display:flex;align-items:center;justify-content:center}.motion-gutter{flex-direction:column;justify-content:center;align-items:stretch;gap:6px;padding:8px 6px;white-space:normal;color:var(--volca-accent);text-align:center}.motion-gutter__label{flex:0 0 auto;font-weight:700}.motion-target-select{flex:0 0 auto;min-width:0;width:100%;font-size:var(--volca-type-label)}.motion-gutter :deep(.v-field){border-radius:0!important;background:transparent!important;font-size:var(--volca-type-label);min-height:32px!important}.motion-gutter :deep(.v-field__input){min-height:28px;padding-top:2px;padding-bottom:2px;padding-inline:0;line-height:1.2}.motion-gutter :deep(.v-select__selection-text){white-space:nowrap;text-align:center}.motion-gutter__actions{display:flex;align-items:center;justify-content:center;gap:6px}.motion-gutter__clear{display:grid;place-items:center;width:50px;height:50px;min-width:50px;min-height:50px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:9px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.motion-gutter__clear:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.motion-gutter__clear:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.pitch-gutter.black-key{background:#2a2021;color:#9d8570}.step-cell{flex:1 1 0;width:0;min-width:28px;box-sizing:border-box;border-left:1px solid #55454740}.header-cell{position:relative;padding:4px 0;background:#4a3a3c;text-align:center;cursor:pointer}.header-cell.muted{opacity:.38}.header-cell.skipped{color:#8f8170;text-decoration:line-through}.note-cell{position:relative;display:flex;align-items:center;height:20px;border-top:1px solid #55454726;cursor:pointer;touch-action:none}.note-cell.muted,.note-cell.skipped{opacity:.42}.note-cell__label{z-index:2;overflow:hidden;padding-left:4px;color:#382b2d;font-size:var(--volca-type-label);font-weight:700;white-space:nowrap}.step-cell.cursor::after{content:'';position:absolute;inset:0;z-index:1;background:rgba(206,179,147,.2);pointer-events:none}.step-cell{position:relative}.step-cell.beat{border-left-color:#ceb39380}.note-cell.active,.motion-fill{background:var(--volca-accent)}.note-cell.active{cursor:grab}.note-cell.selected{box-shadow:inset 0 0 0 2px #f8eee4}.note-cell.full{cursor:not-allowed}.note-resize-handle{position:absolute;top:0;right:0;z-index:3;width:10px;height:100%;cursor:ew-resize}.roll-body.is-moving,.roll-body.is-moving .note-cell{cursor:grabbing}.roll-body.is-resizing,.roll-body.is-resizing .note-cell{cursor:ew-resize}.roll-body.is-marquee,.roll-body.is-marquee .note-cell,.roll-body.is-marquee .note-resize-handle{cursor:crosshair}.note-marquee{position:absolute;z-index:5;border:1px solid var(--volca-accent);background:rgba(206,179,147,.16);pointer-events:none}.step-flags{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426;touch-action:none}.step-flags .step-cell{border-left-color:transparent}.step-flags .step-cell.beat{border-left-color:transparent}.flag-cell{display:grid;min-height:22px;padding:0;cursor:pointer}.flag{min-height:0;margin:3px;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer;touch-action:none;pointer-events:none}.flag.on{background:#ceb393;border-color:var(--volca-accent-bright)}.flag.sound.on{background:var(--volca-teal);border-color:var(--volca-teal)}.flag:focus-visible{outline:2px solid var(--volca-accent);outline-offset:1px}.motion-bars{display:flex;flex:1;height:160px;touch-action:none;cursor:pointer}.motion-bars.disabled{opacity:.55}.motion-col{display:flex;align-items:flex-end}.motion-col.off{opacity:.35}.motion-fill{position:absolute;inset:auto 0 0}.motion-fill.point{right:auto}.motion-value,.motion-value-input{position:absolute;top:6px;right:2px;left:2px;z-index:2;color:var(--volca-text);font-size:11px;font-weight:700;line-height:22px;text-align:center}.motion-value-input{height:24px;border:1px solid var(--volca-accent);border-radius:4px;background:#382b2d}.motion-step-row{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426}.motion-step-cell{height:18px;margin:3px;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer}.motion-step-cell.on{background:#ceb393;border-color:var(--volca-accent-bright)}.roll-header{touch-action:none}.header-cell{cursor:grab;user-select:none}.roll-header.is-copying,.roll-header.is-copying .header-cell{cursor:grabbing}.header-cell.copy-source{background:#6a5348;color:#f1e9e1}.header-cell.drop-target{background:var(--volca-accent);color:#33282a}
-.focus-help-copy { margin: 0; }
-.focus-help-skip { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 0; color: var(--volca-muted); font-size: var(--volca-type-body); line-height: 1.4; cursor: pointer; }
-.focus-help-skip input { width: 16px; height: 16px; margin-top: 2px; flex: 0 0 auto; accent-color: var(--volca-accent); }
+.fold-help-copy { margin: 0; }
+.fold-help-skip { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 0; color: var(--volca-muted); font-size: var(--volca-type-body); line-height: 1.4; cursor: pointer; }
+.fold-help-skip input { width: 16px; height: 16px; margin-top: 2px; flex: 0 0 auto; accent-color: var(--volca-accent); }
 </style>
 
 <style>
