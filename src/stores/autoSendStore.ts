@@ -12,9 +12,9 @@ const RETRY_MS = 250;
 
 const readEnabled = () => {
     try {
-        return localStorage.getItem(STORAGE_KEY) === '1';
+        return localStorage.getItem(STORAGE_KEY) !== '0';
     } catch {
-        return false;
+        return true;
     }
 };
 
