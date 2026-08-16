@@ -6,13 +6,13 @@
         density="compact" hide-details class="voice-name-input" />
       <span class="program-slot" :class="{ 'is-empty': midiStore.matchedProgramNo === null }"
         :title="t('sound.programNo')">{{ programSlotLabel }}</span>
+    </div>
+    <div class="editor-toolbar-section">
+      <span class="editor-toolbar-section__label volca-section-title">{{ t('sound.sectionLabel') }}</span>
       <v-btn @click="midiStore.requestCurrentVoiceDump" :disabled="!midiStore.isDeviceReady"
         :loading="midiStore.soundEditState === 'requesting'">
         <HardDriveUpload :size="16" class="mr-1" />{{ t('sound.getCurrent') }}
       </v-btn>
-    </div>
-    <div class="editor-toolbar-section">
-      <span class="editor-toolbar-section__label volca-section-title">{{ t('sound.sectionLabel') }}</span>
       <div class="send-auto-split">
         <v-btn class="send-button" :class="{ 'needs-send': soundStore.hasUnsavedChanges }" @click="soundStore.sendToDevice"
           :disabled="!midiStore.isDeviceReady" :loading="midiStore.soundEditState === 'sending'">

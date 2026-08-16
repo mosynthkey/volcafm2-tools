@@ -29,11 +29,7 @@ const duration = (rate: number, fromLevel: number, toLevel: number) => {
   return table[clampIndex(rate)] * Math.abs(LEVEL_PERCENT[to] - LEVEL_PERCENT[from]);
 };
 
-/** Display hold after L3. DX7 has no sustain time; level stays until key off. */
-const SUSTAIN_TIME = 10;
-/** Fixed time window for the graph. Scale never depends on the current rates. */
-const VIEW_TIME = 32;
-
+// Port of Dexed EnvDisplay::paint() geometry from DXComponents.cpp.
 export const dx7EnvelopeGeometry = (
   rates: number[],
   levels: number[],
@@ -45,29 +41,19 @@ export const dx7EnvelopeGeometry = (
   const innerHeight = Math.max(1, height - padding * 2);
   const d = [duration(rates[0], levels[3], levels[0]), duration(rates[1], levels[0], levels[1]),
     duration(rates[2], levels[1], levels[2]), duration(rates[3], levels[2], levels[3])];
-  const scale = innerWidth / VIEW_TIME;
-  const times = [0, d[0], d[0] + d[1], d[0] + d[1] + d[2], d[0] + d[1] + d[2] + SUSTAIN_TIME];
-  times.push(times[4] + d[3]);
-  const vertexLevels = [levels[3], levels[0], levels[1], levels[2], levels[2], levels[3]];
-  const yAt = (level: number) => padding + innerHeight - (innerHeight / 99) * clampIndex(level);
-  const xAt = (time: number) => padding + time * scale;
-  const points: EnvelopePoint[] = [{ x: xAt(0), y: yAt(vertexLevels[0]) }];
-  for (let index = 0; index < 5; index += 1) {
-    const start = times[index];
-    const end = times[index + 1];
-    const from = vertexLevels[index];
-    const to = vertexLevels[index + 1];
-    if (start >= VIEW_TIME) break;
-    if (end <= VIEW_TIME) {
-      points.push({ x: xAt(end), y: yAt(to) });
-      continue;
-    }
-    const u = (VIEW_TIME - start) / Math.max(end - start, 1e-9);
-    points.push({ x: padding + innerWidth, y: yAt(from + (to - from) * u) });
-    break;
-  }
-  while (points.length < 6) points.push(points[points.length - 1]);
-  return points;
+  const attackDecay = d[0] + d[1] + d[2];
+  const keyoff = attackDecay + 10;
+  const scale = innerWidth / (keyoff + d[3]);
+  const x = (value: number) => padding + value;
+  const y = (level: number) => padding + innerHeight - (innerHeight / 99) * clampIndex(level);
+  return [
+    { x: x(0), y: y(levels[3]) },
+    { x: x(d[0] * scale), y: y(levels[0]) },
+    { x: x((d[0] + d[1]) * scale), y: y(levels[1]) },
+    { x: x(attackDecay * scale), y: y(levels[2]) },
+    { x: x(keyoff * scale), y: y(levels[2]) },
+    { x: x(Math.min(innerWidth, (attackDecay + keyoff + d[3]) * scale)), y: y(levels[3]) },
+  ];
 };
 
 export const dx7EnvelopePoints = (rates: number[], levels: number[], width: number, height: number, padding = 8) =>

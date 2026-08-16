@@ -140,8 +140,8 @@ const NumberControl = KnobControl;
 .control-grid { display: grid; gap: 8px; }
 .control-grid.scaling-grid { grid-template-columns: repeat(6, minmax(72px,1fr)); }
 .control-grid.four { grid-template-columns: repeat(4, minmax(92px,1fr)); }
-.mode-control { display: grid; align-content: start; gap: 5px; }
-.mode-control > label { color: #ad9e96; font-size: var(--volca-type-label); }
+.mode-control { display: grid; justify-items: center; align-content: start; gap: 5px; }
+.mode-control > label { color: #ad9e96; font-size: var(--volca-type-label); text-align: center; }
 .mode-segment { width: fit-content; height: 40px; display: grid; grid-template-columns: 1fr 1fr; padding: 3px; box-sizing: border-box; border: 1px solid rgba(206,179,147,.3); border-radius: 9px; background: #251c1e; }
 .mode-segment button { width: 72px; height: 32px; padding: 0 12px; border: 0; background: transparent; color: #ad9e96; font: inherit; font-size: var(--volca-type-body); font-weight: 700; cursor: pointer; }
 .mode-segment button + button { border-left: 1px solid rgba(206,179,147,.32); }
