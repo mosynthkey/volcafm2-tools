@@ -15,10 +15,9 @@ import { extractStepNotes, parseSmf } from '../utils/smfImport';
 import { formatThrownError } from '../utils/appError';
 import { getPref, setPref } from '../utils/appPrefs';
 import { displayToMidi } from '../utils/motionValue';
+import { createSendRetry } from '@/utils/sendRetry';
 
 const SKIP_RANDOMIZE_PREF = 'skipRandomizeDialog';
-const SEND_MAX_ATTEMPTS = 5;
-const SEND_RETRY_DELAY_MS = 800;
 const HISTORY_LIMIT = 80;
 const HISTORY_COMMIT_MS = 320;
 
@@ -53,13 +52,6 @@ export const useSequencerStore = defineStore('sequencer', () => {
     const showCaptureDialog = ref(false);
     const showImportDialog = ref(false);
     const importError = ref<string | null>(null);
-    const sendRetrying = ref(false);
-    const showSendRetrySnackbar = ref(false);
-    const showSendErrorDialog = ref(false);
-    const lastSendFailure = ref<'nak' | 'error' | null>(null);
-    let sendAttempts = 0;
-    let sendRetryScheduled = false;
-    let sendRetryTimer: ReturnType<typeof setTimeout> | null = null;
     const smfBarOffset = ref(1);
     let pendingSmfFile: File | null = null;
 
@@ -389,53 +381,12 @@ export const useSequencerStore = defineStore('sequencer', () => {
 
     const buildSysEx = (channel = 0) => encodeCurrentSequenceDump(toState(), channel);
 
-    const clearSendRetryTimer = () => {
-        if (sendRetryTimer === null) return;
-        clearTimeout(sendRetryTimer);
-        sendRetryTimer = null;
-    };
-
     const sendToDevice = () => {
         useMidiStore().sendCurrentSequenceDump(buildSysEx());
     };
 
-    watch(() => useMidiStore().sequenceWriteState, state => {
-        if (state === 'sending') {
-            if (!sendRetryScheduled) {
-                sendAttempts = 0;
-                showSendErrorDialog.value = false;
-            }
-            sendRetryScheduled = false;
-            sendAttempts += 1;
-            return;
-        }
-        if (state === 'ok') {
-            clearSendRetryTimer();
-            sendAttempts = 0;
-            sendRetrying.value = false;
-            showSendRetrySnackbar.value = false;
-            lastSendFailure.value = null;
-            return;
-        }
-        if (state !== 'nak' && state !== 'error') return;
-
-        lastSendFailure.value = state;
-        clearSendRetryTimer();
-        if (sendAttempts < SEND_MAX_ATTEMPTS) {
-            sendRetrying.value = true;
-            showSendRetrySnackbar.value = true;
-            sendRetryScheduled = true;
-            sendRetryTimer = setTimeout(() => {
-                sendRetryTimer = null;
-                sendToDevice();
-            }, SEND_RETRY_DELAY_MS);
-            return;
-        }
-        sendRetrying.value = false;
-        showSendRetrySnackbar.value = false;
-        showSendErrorDialog.value = true;
-        sendAttempts = 0;
-    });
+    const sendRetry = createSendRetry(sendToDevice);
+    watch(() => useMidiStore().sequenceWriteState, sendRetry.handleWriteState);
 
     const canInsertTie = computed(() => stepCursor.value > 0 && stepNoteCount(stepCursor.value - 1) > 0);
 
@@ -573,10 +524,9 @@ export const useSequencerStore = defineStore('sequencer', () => {
         showCaptureDialog,
         showImportDialog,
         importError,
-        sendRetrying,
-        showSendRetrySnackbar,
-        showSendErrorDialog,
-        lastSendFailure,
+        sendRetrying: sendRetry.retrying,
+        showSendErrorDialog: sendRetry.showErrorDialog,
+        lastSendFailure: sendRetry.lastFailure,
         smfBarOffset,
         canInsertTie,
         canUndo,

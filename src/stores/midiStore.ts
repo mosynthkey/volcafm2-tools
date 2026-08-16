@@ -56,7 +56,7 @@ export const useMidiStore = defineStore('midi', () => {
     const programWriteProgress = ref(0);
     const programWriteSlot = ref<number | null>(null);
     const currentVoiceData = ref<Uint8Array | null>(null);
-    const soundEditState = ref<'idle' | 'requesting' | 'received' | 'sending' | 'ok' | 'error'>('idle');
+    const soundEditState = ref<'idle' | 'requesting' | 'received' | 'sending' | 'ok' | 'nak' | 'error'>('idle');
     const logs = ref<string[]>([]);
     const needsDocumentReload = ref(false);
     const autoReloading = ref(false);
@@ -317,7 +317,7 @@ export const useMidiStore = defineStore('midi', () => {
                 sequenceWriteState.value = data[6] === 0x23 ? 'ok' : 'nak';
             }
             if (soundEditState.value === 'sending') {
-                soundEditState.value = data[6] === 0x23 ? 'ok' : 'error';
+                soundEditState.value = data[6] === 0x23 ? 'ok' : 'nak';
             }
         } else {
             log(`Unrecognized SysEx (func=0x${data[6]?.toString(16) ?? '??'}).`);

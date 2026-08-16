@@ -8,11 +8,7 @@
       </template>
     </AppDialog>
 
-    <AppErrorDialog v-model="seqStore.showSendErrorDialog" :title="t('sequence.sendFailedTitle')" :message="sendErrorMessage" />
-    <v-snackbar v-model="seqStore.showSendRetrySnackbar" :timeout="-1" location="bottom" color="#463638"
-      class="send-retry-snackbar">
-      {{ t('sequence.sendRetrying') }}
-    </v-snackbar>
+    <AppErrorDialog v-model="seqStore.showSendErrorDialog" :title="t('common.sendFailedTitle')" :message="sendErrorMessage" />
 
     <AppDialog v-model="seqStore.showRandomizeDialog" :title="t('sequence.randomizeTitle')">
       <p class="randomize-copy">{{ t('sequence.randomizeDescription') }}</p>
@@ -85,7 +81,7 @@ const programFetchStatusText = computed(() =>
 
 const showProgramFetchErrorDialog = ref(false);
 const sendErrorMessage = computed(() =>
-  seqStore.lastSendFailure === 'nak' ? t('sequence.sendNak') : t('sequence.sendError')
+  seqStore.lastSendFailure === 'nak' ? t('common.sendNak') : t('common.sendError')
 );
 
 watch(() => midiStore.currentProgramFetchState, state => {
@@ -128,12 +124,5 @@ watch(() => midiStore.currentProgramFetchState, state => {
   margin-top: 2px;
   flex: 0 0 auto;
   accent-color: var(--volca-accent);
-}
-
-:deep(.send-retry-snackbar .v-snackbar__wrapper) {
-  min-width: 280px;
-  border: 1px solid rgba(206, 179, 147, 0.28);
-  color: var(--volca-text);
-  font-weight: 650;
 }
 </style>

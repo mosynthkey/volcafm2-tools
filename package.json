@@ -26,7 +26,8 @@
     "verify:dx7": "tsx scripts/verify-dx7-json-backup.ts",
     "verify:library": "tsx scripts/verify-library-format.ts",
     "verify:euclidean": "tsx scripts/verify-euclidean.ts",
-    "verify": "run-s verify:sequence verify:smf verify:sound verify:midi verify:midi-reconnect verify:motion verify:euclidean verify:dx7 verify:library",
+    "verify:send-retry": "tsx scripts/verify-send-retry.ts",
+    "verify": "run-s verify:sequence verify:smf verify:sound verify:midi verify:midi-reconnect verify:motion verify:euclidean verify:dx7 verify:library verify:send-retry",
     "midi:tool": "tsx scripts/midi-sequence-tool.ts"
   },
   "dependencies": {

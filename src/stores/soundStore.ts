@@ -2,6 +2,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
 import { useMidiStore } from '@/stores/midiStore';
 import type { SoundOperator, SoundProgram } from '@/types/soundProgram';
+import { createSendRetry } from '@/utils/sendRetry';
 import { createInitialSoundProgram, decodeSoundProgram, encodeSoundProgram, normalizeSoundProgramName } from '@/utils/soundProgramCodec';
 
 const HISTORY_LIMIT = 80;
@@ -12,7 +13,6 @@ export const useSoundStore = defineStore('sound', () => {
     const loadedSignature = ref<string | null>(null);
     const selectedOperator = ref(-1);
     const showAlgorithmPicker = ref(false);
-    const showError = ref(false);
     const skipNextDeviceLoad = ref(false);
     let skipLibrarianSync = false;
 
@@ -142,6 +142,9 @@ export const useSoundStore = defineStore('sound', () => {
         useMidiStore().sendCurrentVoiceDump(bytes);
     };
 
+    const sendRetry = createSendRetry(sendToDevice);
+    watch(() => useMidiStore().soundEditState, sendRetry.handleWriteState);
+
     const loadLibrarianSlot = (slot: number) => {
         const midi = useMidiStore();
         skipNextDeviceLoad.value = true;
@@ -189,7 +192,9 @@ export const useSoundStore = defineStore('sound', () => {
         hasUnsavedChanges,
         selectedOperator,
         showAlgorithmPicker,
-        showError,
+        sendRetrying: sendRetry.retrying,
+        showSendErrorDialog: sendRetry.showErrorDialog,
+        lastSendFailure: sendRetry.lastFailure,
         skipNextDeviceLoad,
         loadFromVoiceData,
         loadLibrarianSlot,

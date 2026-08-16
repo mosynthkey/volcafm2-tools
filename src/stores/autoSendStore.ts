@@ -47,6 +47,7 @@ export const useAutoSendStore = defineStore('autoSend', () => {
         || midi.sequenceWriteState === 'sending'
         || midi.programWriteState === 'sending'
         || sequence.sendRetrying
+        || sound.sendRetrying
         || midi.connectionState === MIDIConnectionState.RECEIVING
         || sequence.showCaptureDialog;
 
@@ -104,7 +105,6 @@ export const useAutoSendStore = defineStore('autoSend', () => {
     watch(() => midi.soundEditState, state => {
         if (state === 'sending') cancel();
         if (state === 'ok') sound.markSaved();
-        if (state === 'error') sound.showError = true;
         if (state === 'ok' && enabled.value && hasPending()) schedule(RETRY_MS);
     });
 

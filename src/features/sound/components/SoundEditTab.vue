@@ -1,6 +1,6 @@
 <template>
   <v-container class="sound-container">
-    <AppErrorDialog v-model="soundStore.showError" :title="t('sound.title')" :message="t('sound.connectionError')" />
+    <AppErrorDialog v-model="soundStore.showSendErrorDialog" :title="t('common.sendFailedTitle')" :message="sendErrorMessage" />
 
     <AppDialog v-model="soundStore.showAlgorithmPicker" :title="t('sound.selectAlgorithm')" max-width="1040" card-class="algorithm-picker-card">
         <div class="algorithm-picker-grid">
@@ -40,12 +40,15 @@ import SoundToolbar from '@/features/sound/components/SoundToolbar.vue';
 import { useSoundSync } from '@/features/sound/composables/useSoundSync';
 import { useSoundUndo } from '@/features/sound/composables/useSoundUndo';
 import { storeToRefs } from 'pinia';
+import { computed } from 'vue';
 import { useSoundStore } from '@/stores/soundStore';
 import { useI18n } from 'vue-i18n';
 
 const soundStore = useSoundStore();
 const { program } = storeToRefs(soundStore);
 const { t } = useI18n();
+const sendErrorMessage = computed(() =>
+  soundStore.lastSendFailure === 'nak' ? t('common.sendNak') : t('common.sendError'));
 useSoundSync();
 useSoundUndo();
 </script>
