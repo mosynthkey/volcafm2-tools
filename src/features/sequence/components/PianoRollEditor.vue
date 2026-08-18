@@ -40,13 +40,6 @@
           <ChevronsDownUp v-if="foldUsedPitches" :size="16" />
           <ChevronsUpDown v-else :size="16" />
         </button>
-        <button type="button" class="header-tool" :class="{ on: marqueeSelect }"
-          :aria-pressed="marqueeSelect" :title="t('sequence.marqueeSelect')"
-          :aria-label="t('sequence.marqueeSelect')" @click="marqueeSelect = !marqueeSelect">
-          <svg class="marquee-icon" viewBox="0 0 16 16" aria-hidden="true">
-            <rect x="2.5" y="2.5" width="11" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.5 2" />
-          </svg>
-        </button>
       </div>
       <div v-for="step in 16" :key="step" class="step-cell header-cell"
         :class="{ beat:(step-1)%4===0, cursor:sequence.stepInputActive&&step-1===sequence.stepCursor, muted:!sequence.stepOn[step-1], skipped:!sequence.activeStep[step-1], 'copy-source': stepCopy && step-1===stepCopy.from, 'drop-target': stepCopy?.dragging && step-1===stepCopy.to && step-1!==stepCopy.from }"
@@ -79,7 +72,7 @@
           @keydown.enter.prevent="sequence.toggleTransposeFunc(step-1)" />
       </div>
     </div>
-    <div ref="rollBody" class="roll-body" :class="{ 'is-moving': drag?.kind === 'move', 'is-resizing': drag?.kind === 'resize', 'is-marquee': marqueeSelect }"
+    <div ref="rollBody" class="roll-body" :class="{ 'is-moving': drag?.kind === 'move', 'is-resizing': drag?.kind === 'resize', 'is-marquee': drag?.kind === 'marquee' }"
       @pointerdown="rollDown" @pointermove="rollMove" @pointerup="rollUp" @pointercancel="rollUp">
       <div class="roll-pitches">
       <div v-if="marqueeStyle" class="note-marquee" :style="marqueeStyle"></div>
@@ -145,7 +138,7 @@ import { useNoteAudition } from '@/features/sequence/composables/useNoteAudition
 import EuclidCopyDialog from '@/features/sequence/components/EuclidCopyDialog.vue'
 import MotionControlPanel from '@/features/sequence/components/MotionControlPanel.vue'
 import { MOTION_PARAM_KEYS, type SequenceNote } from '@/types/sequence'
-import { notesIntersectingRect, previewMovedNotes, type NoteKey } from '@/utils/sequenceNoteEditing'
+import { notesIntersectingRect, previewMovedNotes, previewResizedNotes, type NoteKey } from '@/utils/sequenceNoteEditing'
 import { getPref, setPref } from '@/utils/appPrefs'
 import { displayToMidi, formatMotionValue, getMotionDisplayRange, midiToDisplay } from '@/utils/motionValue'
 
@@ -222,16 +215,18 @@ onMounted(() => {
 })
 const motionRange=computed(()=>getMotionDisplayRange(sequence.motionIndex, sequence.func.transposeNote))
 const formatStepValue=(step:number)=>formatMotionValue(sequence.motionIndex, sequence.motionValues[sequence.motionIndex][step][0], sequence.func.transposeNote)
+type NoteKeySnap = { pitch: number; startStep: number }
 type RollDrag =
-  | { kind: 'paint'; pitch: number; start: number; end: number }
-  | { kind: 'resize'; key: NoteKey; end: number }
-  | { kind: 'move'; originPitch: number; originStep: number; dPitch: number; dStep: number }
-  | { kind: 'marquee'; startStep: number; startPitch: number; endStep: number; endPitch: number; additive: boolean }
+  | { kind: 'resize'; key: NoteKey; end: number; originX: number; originY: number; dragged: boolean }
+  | { kind: 'move'; originPitch: number; originStep: number; dPitch: number; dStep: number; originX: number; originY: number; dragged: boolean }
+  | { kind: 'marquee'; startStep: number; startPitch: number; endStep: number; endPitch: number; additive: boolean; base: NoteKeySnap[] }
 const drag=ref<RollDrag|null>(null)
-const marqueeSelect=ref(false)
-let justDeleted: { pitch: number; startStep: number; at: number } | null = null
+const CLICK_SLOP = 4
+const markDragged = (state: RollDrag, event: PointerEvent) => {
+  if (state.kind === 'marquee' || state.dragged) return
+  if (Math.hypot(event.clientX - state.originX, event.clientY - state.originY) >= CLICK_SLOP) state.dragged = true
+}
 const deleteClickedNote = (note: SequenceNote) => {
-  justDeleted = { pitch: note.pitch, startStep: note.startStep, at: performance.now() }
   sequence.removeNote(note)
 }
 const draggingMotion=ref(false); const editingStep=ref<number|null>(null); const editValue=ref(0)
@@ -289,6 +284,15 @@ const onRollKeydown = (event: KeyboardEvent) => {
     const tag = target.tagName
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return
   }
+  if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
+    if (!sequence.selectedNoteKeys.length) return
+    event.preventDefault()
+    const delta = event.key === 'ArrowUp' ? 12 : -12
+    if (sequence.moveSelectedNotes(delta, 0, PITCH_MIN, PITCH_MAX)) {
+      audition(sequence.selectedNoteKeys.map(key => key.pitch))
+    }
+    return
+  }
   if (event.key !== 'Backspace' && event.key !== 'Delete') return
   if (!sequence.selectedNoteKeys.length) return
   event.preventDefault()
@@ -313,24 +317,25 @@ const isNoteEnd = (step: number, pitch: number) => {
   const note = sequence.noteAt(step, pitch)
   return !!note && step === note.startStep + note.length - 1
 }
+const sameKey = (left: NoteKeySnap, right: NoteKeySnap) =>
+  left.pitch === right.pitch && left.startStep === right.startStep
+const applyMarqueeSelection = (state: Extract<RollDrag, { kind: 'marquee' }>) => {
+  const picked = notesIntersectingRect(
+    sequence.notes, state.startStep, state.startPitch, state.endStep, state.endPitch,
+  ).map(note => ({ pitch: note.pitch, startStep: note.startStep }))
+  if (!state.additive) {
+    sequence.setNoteSelection(picked)
+    return
+  }
+  const extra = picked.filter(key => !state.base.some(item => sameKey(item, key)))
+  sequence.setNoteSelection([...state.base, ...extra])
+}
 const rollDown = (event: PointerEvent) => {
   if (event.button !== 0) return
   const hit = hitRoll(event)
   if (!hit) return
   event.preventDefault()
   const existing = sequence.noteAt(hit.step, hit.pitch)
-  if (marqueeSelect.value || (!existing && event.shiftKey)) {
-    drag.value = {
-      kind: 'marquee',
-      startStep: hit.step,
-      startPitch: hit.pitch,
-      endStep: hit.step,
-      endPitch: hit.pitch,
-      additive: event.shiftKey,
-    }
-    ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
-    return
-  }
   if (existing) {
     if (event.shiftKey) {
       sequence.selectNote(existing, true)
@@ -341,58 +346,53 @@ const rollDown = (event: PointerEvent) => {
     const resize = hit.step === lastStep && (onHandle || hit.localX >= hit.cellWidth - RESIZE_HANDLE)
     if (!sequence.isNoteSelected(existing)) sequence.selectNote(existing)
     drag.value = resize
-      ? { kind: 'resize', key: { pitch: existing.pitch, startStep: existing.startStep }, end: lastStep }
-      : { kind: 'move', originPitch: hit.pitch, originStep: hit.step, dPitch: 0, dStep: 0 }
+      ? { kind: 'resize', key: { pitch: existing.pitch, startStep: existing.startStep }, end: lastStep, originX: event.clientX, originY: event.clientY, dragged: false }
+      : { kind: 'move', originPitch: hit.pitch, originStep: hit.step, dPitch: 0, dStep: 0, originX: event.clientX, originY: event.clientY, dragged: false }
     ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
     return
   }
-  drag.value = { kind: 'paint', pitch: hit.pitch, start: hit.step, end: hit.step }
+  const additive = event.shiftKey
+  drag.value = {
+    kind: 'marquee',
+    startStep: hit.step,
+    startPitch: hit.pitch,
+    endStep: hit.step,
+    endPitch: hit.pitch,
+    additive,
+    base: additive ? sequence.selectedNoteKeys.map(key => ({ pitch: key.pitch, startStep: key.startStep })) : [],
+  }
+  applyMarqueeSelection(drag.value)
   ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
 }
 const rollMove = (event: PointerEvent) => {
   const state = drag.value
   if (!state) return
+  markDragged(state, event)
   const hit = hitRoll(event)
   if (!hit) return
-  if (state.kind === 'paint') state.end = hit.step
-  else if (state.kind === 'resize') state.end = Math.max(state.key.startStep, hit.step)
+  if (state.kind === 'resize') state.end = Math.max(state.key.startStep, hit.step)
   else if (state.kind === 'move') {
     state.dPitch = hit.pitch - state.originPitch
     state.dStep = hit.step - state.originStep
   } else {
     state.endStep = hit.step
     state.endPitch = hit.pitch
+    applyMarqueeSelection(state)
   }
 }
 const rollUp = (event: PointerEvent) => {
   const state = drag.value
   drag.value = null
   if (!state) return
-  if (state.kind === 'paint') {
-    const start = Math.min(state.start, state.end)
-    const end = Math.max(state.start, state.end)
-    if (
-      justDeleted
-      && event.type === 'pointerup'
-      && performance.now() - justDeleted.at < 500
-      && justDeleted.pitch === state.pitch
-      && justDeleted.startStep >= start
-      && justDeleted.startStep <= end
-    ) return
-    if (sequence.addNote(state.pitch, start, end - start + 1)) {
-      sequence.selectNote(sequence.noteAt(start, state.pitch) ?? null)
-      audition([state.pitch])
-    }
-    return
-  }
+  markDragged(state, event)
   if (state.kind === 'resize') {
     const note = sequence.notes.find(item => item.pitch === state.key.pitch && item.startStep === state.key.startStep)
     const nextLength = state.end - state.key.startStep + 1
-    if (note && nextLength === note.length) {
-      if (event.type === 'pointerup') deleteClickedNote(note)
+    if (note && nextLength !== note.length) {
+      sequence.resizeNote(state.key, nextLength)
       return
     }
-    sequence.resizeNote(state.key, nextLength)
+    if (note && !state.dragged && event.type === 'pointerup') deleteClickedNote(note)
     return
   }
   if (state.kind === 'move') {
@@ -401,17 +401,15 @@ const rollUp = (event: PointerEvent) => {
       return
     }
     const note = sequence.noteAt(state.originStep, state.originPitch)
-    if (note && event.type === 'pointerup') deleteClickedNote(note)
+    if (note && !state.dragged && event.type === 'pointerup') deleteClickedNote(note)
     return
   }
-  const picked = notesIntersectingRect(
-    sequence.notes, state.startStep, state.startPitch, state.endStep, state.endPitch,
-  ).map(note => ({ pitch: note.pitch, startStep: note.startStep }))
-  if (state.additive) {
-    const extra = picked.filter(key => !sequence.selectedNoteKeys.some(item => item.pitch === key.pitch && item.startStep === key.startStep))
-    sequence.setNoteSelection([...sequence.selectedNoteKeys, ...extra])
-  } else {
-    sequence.setNoteSelection(picked)
+  const sameCell = state.startStep === state.endStep && state.startPitch === state.endPitch
+  if (sameCell && !state.additive && event.type === 'pointerup') {
+    if (sequence.addNote(state.startPitch, state.startStep, 1)) {
+      sequence.selectNote(sequence.noteAt(state.startStep, state.startPitch) ?? null)
+      audition([state.startPitch])
+    }
   }
 }
 const movePreview = computed(() => {
@@ -419,10 +417,30 @@ const movePreview = computed(() => {
   if (state?.kind !== 'move' || (!state.dPitch && !state.dStep)) return []
   return previewMovedNotes(sequence.notes, sequence.selectedNoteKeys, state.dPitch, state.dStep, PITCH_MIN, PITCH_MAX)
 })
+const resizePreview = computed(() => {
+  const state = drag.value
+  if (state?.kind !== 'resize') return []
+  const origin = sequence.notes.find(item => item.pitch === state.key.pitch && item.startStep === state.key.startStep)
+  if (!origin) return []
+  const delta = state.end - state.key.startStep + 1 - origin.length
+  if (!delta) return []
+  const keys = sequence.selectedNoteKeys.some(item => item.pitch === state.key.pitch && item.startStep === state.key.startStep)
+    ? sequence.selectedNoteKeys
+    : [state.key]
+  return previewResizedNotes(sequence.notes, keys, delta)
+})
+const notePreview = computed(() => movePreview.value.length ? movePreview.value : resizePreview.value)
+const hidingNote = (note: SequenceNote | null | undefined) => {
+  if (!note || !sequence.isNoteSelected(note)) return false
+  const state = drag.value
+  if (state?.kind === 'move') return !!(state.dPitch || state.dStep)
+  return state?.kind === 'resize' && resizePreview.value.length > 0
+}
 const marqueeStyle = computed(() => {
   const state = drag.value
   const body = rollBody.value
   if (state?.kind !== 'marquee' || !body) return null
+  if (state.startStep === state.endStep && state.startPitch === state.endPitch) return null
   const list = pitches.value
   const a = list.indexOf(state.startPitch)
   const b = list.indexOf(state.endPitch)
@@ -469,20 +487,28 @@ const endStepCopy=()=>{
 }
 const cellClass=(step:number,pitch:number)=>{
   const note=sequence.noteAt(step,pitch)
-  const paint=drag.value?.kind==='paint'&&drag.value.pitch===pitch&&step>=Math.min(drag.value.start,drag.value.end)&&step<=Math.max(drag.value.start,drag.value.end)
-  const resize=drag.value?.kind==='resize'&&pitch===drag.value.key.pitch&&step>=drag.value.key.startStep&&step<=drag.value.end
-  const preview=movePreview.value.some(item=>item.pitch===pitch&&item.startStep<=step&&item.startStep+item.length>step)
-  const moving=drag.value?.kind==='move'&&!!note&&sequence.isNoteSelected(note)
+  const hiding=hidingNote(note)
+  const preview=notePreview.value.find(item=>item.pitch===pitch&&item.startStep<=step&&item.startStep+item.length>step)
+  const shown=preview ?? (note && !hiding ? note : undefined)
   const input=sequence.stepInputActive&&step===sequence.stepCursor&&sequence.chordBuffer.has(pitch)
-  const selected=!!note && sequence.isNoteSelected(note)
-  return{beat:step%4===0,active:(!!note&&!moving)||paint||resize||preview||input,selected:selected||preview,full:!note&&!paint&&!preview&&sequence.stepNoteCount(step)>=6,cursor:sequence.stepInputActive&&step===sequence.stepCursor,muted:!sequence.stepOn[step],skipped:!sequence.activeStep[step]}
+  return{
+    beat:step%4===0,
+    active:!!shown||input,
+    selected:!!preview||(!!note&&!hiding&&sequence.isNoteSelected(note)),
+    'note-start':!!shown&&step===shown.startStep,
+    'note-end':!!shown&&step===shown.startStep+shown.length-1,
+    full:!shown&&sequence.stepNoteCount(step)>=6,
+    cursor:sequence.stepInputActive&&step===sequence.stepCursor,
+    muted:!sequence.stepOn[step],
+    skipped:!sequence.activeStep[step],
+  }
 }
 const cellLabel=(step:number,pitch:number)=>{
   const note=sequence.noteAt(step,pitch)
-  const paint=drag.value?.kind==='paint'&&drag.value.pitch===pitch&&step===Math.min(drag.value.start,drag.value.end)
-  const preview=movePreview.value.find(item=>item.pitch===pitch&&item.startStep===step)
+  const hiding=hidingNote(note)
+  const preview=notePreview.value.find(item=>item.pitch===pitch&&item.startStep===step)
   const input=sequence.stepInputActive&&step===sequence.stepCursor&&sequence.chordBuffer.has(pitch)
-  return note?.startStep===step||paint||preview||input?noteLabel(pitch):''
+  return (!hiding && note?.startStep===step)||preview||input?noteLabel(pitch):''
 }
 const motionHit=(event:PointerEvent)=>{
   const rect=(event.currentTarget as HTMLElement).getBoundingClientRect()
@@ -526,8 +552,13 @@ const endFlag=()=>{ flagDrag.value=null }
 </script>
 
 <style scoped>
-.roll{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;border:1px solid #55454780;border-radius:4px;overflow:hidden}.roll-header,.roll-row{display:flex}.roll-body{flex:1;min-height:0;overflow-y:auto;touch-action:none;user-select:none}.roll-pitches{position:relative;min-height:100%}.motion-row{flex:0 0 auto;border-top:2px solid var(--volca-accent)}.pitch-gutter{position:sticky;left:0;display:flex;flex:0 0 180px;align-items:center;justify-content:flex-end;box-sizing:border-box;padding:0 10px;background:#382b2d;color:var(--volca-text);font-size:var(--volca-type-label);font-weight:700;letter-spacing:.02em;line-height:1.2;white-space:nowrap}.flag-gutter,.step-flags .pitch-gutter,.motion-step-row .pitch-gutter{justify-content:center;color:var(--volca-accent);text-align:center}.header-gutter{justify-content:center;gap:4px;padding:4px 4px}.header-tool{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.header-tool .marquee-icon{width:16px;height:16px;display:block}.header-tool:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.header-tool:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.header-tool.on{border-color:var(--volca-accent);background:rgba(206,179,147,.18);color:var(--volca-text)}.header-cell{min-height:40px;display:flex;align-items:center;justify-content:center}.motion-gutter{flex-direction:column;justify-content:center;align-items:stretch;gap:6px;padding:8px 6px;white-space:normal;color:var(--volca-accent);text-align:center}.motion-gutter__label{flex:0 0 auto;font-weight:700}.motion-target-select{flex:0 0 auto;min-width:0;width:100%;font-size:var(--volca-type-label)}.motion-gutter :deep(.v-field){border-radius:0!important;background:transparent!important;font-size:var(--volca-type-label);min-height:32px!important}.motion-gutter :deep(.v-field__input){min-height:28px;padding-top:2px;padding-bottom:2px;padding-inline:0;line-height:1.2}.motion-gutter :deep(.v-select__selection-text){white-space:nowrap;text-align:center}.motion-gutter__actions{display:flex;align-items:center;justify-content:center;gap:6px}.motion-gutter__clear{display:grid;place-items:center;width:50px;height:50px;min-width:50px;min-height:50px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:9px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.motion-gutter__clear:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.motion-gutter__clear:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.pitch-gutter.black-key{background:#2a2021;color:#9d8570}.step-cell{flex:1 1 0;width:0;min-width:28px;box-sizing:border-box;border-left:1px solid #55454740}.header-cell{position:relative;padding:4px 0;background:#4a3a3c;text-align:center;cursor:pointer}.header-cell.muted{opacity:.38}.header-cell.skipped{color:#8f8170;text-decoration:line-through}.note-cell{position:relative;display:flex;align-items:center;height:20px;border-top:1px solid #55454726;cursor:pointer;touch-action:none}.note-cell.muted,.note-cell.skipped{opacity:.42}.note-cell__label{z-index:2;overflow:hidden;padding-left:4px;color:#382b2d;font-size:var(--volca-type-label);font-weight:700;white-space:nowrap}.step-cell.cursor::after{content:'';position:absolute;inset:0;z-index:1;background:rgba(206,179,147,.2);pointer-events:none}.step-cell{position:relative}.step-cell.beat{border-left-color:#ceb39380}.note-cell.active,.motion-fill{background:var(--volca-accent)}.note-cell.active{cursor:grab}.note-cell.selected{box-shadow:inset 0 0 0 2px #f8eee4}.note-cell.full{cursor:not-allowed}.note-resize-handle{position:absolute;top:0;right:0;z-index:3;width:10px;height:100%;cursor:ew-resize}.roll-body.is-moving,.roll-body.is-moving .note-cell{cursor:grabbing}.roll-body.is-resizing,.roll-body.is-resizing .note-cell{cursor:ew-resize}.roll-body.is-marquee,.roll-body.is-marquee .note-cell,.roll-body.is-marquee .note-resize-handle{cursor:crosshair}.note-marquee{position:absolute;z-index:5;border:1px solid var(--volca-accent);background:rgba(206,179,147,.16);pointer-events:none}.step-flags{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426;touch-action:none}.step-flags .step-cell{border-left-color:transparent}.step-flags .step-cell.beat{border-left-color:transparent}.flag-cell{display:grid;min-height:22px;padding:0;cursor:pointer}.flag{min-height:0;margin:3px;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer;touch-action:none;pointer-events:none}.flag.on{background:#ceb393;border-color:var(--volca-accent-bright)}.flag.sound.on{background:var(--volca-teal);border-color:var(--volca-teal)}.flag:focus-visible{outline:2px solid var(--volca-accent);outline-offset:1px}.motion-bars{display:flex;flex:1;height:160px;touch-action:none;cursor:pointer}.motion-bars.disabled{opacity:.55}.motion-col{display:flex;align-items:flex-end}.motion-col.off{opacity:.35}.motion-fill{position:absolute;inset:auto 0 0}.motion-fill.point{right:auto}.motion-value,.motion-value-input{position:absolute;top:6px;right:2px;left:2px;z-index:2;color:var(--volca-text);font-size:11px;font-weight:700;line-height:22px;text-align:center}.motion-value-input{height:24px;border:1px solid var(--volca-accent);border-radius:4px;background:#382b2d}.motion-step-row{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426}.motion-step-cell{height:18px;margin:3px;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer}.motion-step-cell.on{background:#ceb393;border-color:var(--volca-accent-bright)}.roll-header{touch-action:none}.header-cell{cursor:grab;user-select:none}.roll-header.is-copying,.roll-header.is-copying .header-cell{cursor:grabbing}.header-cell.copy-source{background:#6a5348;color:#f1e9e1}.header-cell.drop-target{background:var(--volca-accent);color:#33282a}
+.roll{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;border:1px solid #55454780;border-radius:4px;overflow:hidden}.roll-header,.roll-row{display:flex}.roll-body{flex:1;min-height:0;overflow-y:auto;touch-action:none;user-select:none}.roll-pitches{position:relative;min-height:100%}.motion-row{flex:0 0 auto;border-top:2px solid var(--volca-accent)}.pitch-gutter{position:sticky;left:0;display:flex;flex:0 0 180px;align-items:center;justify-content:flex-end;box-sizing:border-box;padding:0 10px;background:#382b2d;color:var(--volca-text);font-size:var(--volca-type-label);font-weight:700;letter-spacing:.02em;line-height:1.2;white-space:nowrap}.flag-gutter,.step-flags .pitch-gutter,.motion-step-row .pitch-gutter{justify-content:center;color:var(--volca-accent);text-align:center}.header-gutter{justify-content:center;gap:4px;padding:4px 4px}.header-tool{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.header-tool:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.header-tool:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.header-tool.on{border-color:var(--volca-accent);background:rgba(206,179,147,.18);color:var(--volca-text)}.header-cell{min-height:40px;display:flex;align-items:center;justify-content:center}.motion-gutter{flex-direction:column;justify-content:center;align-items:stretch;gap:6px;padding:8px 6px;white-space:normal;color:var(--volca-accent);text-align:center}.motion-gutter__label{flex:0 0 auto;font-weight:700}.motion-target-select{flex:0 0 auto;min-width:0;width:100%;font-size:var(--volca-type-label)}.motion-gutter :deep(.v-field){border-radius:0!important;background:transparent!important;font-size:var(--volca-type-label);min-height:32px!important}.motion-gutter :deep(.v-field__input){min-height:28px;padding-top:2px;padding-bottom:2px;padding-inline:0;line-height:1.2}.motion-gutter :deep(.v-select__selection-text){white-space:nowrap;text-align:center}.motion-gutter__actions{display:flex;align-items:center;justify-content:center;gap:6px}.motion-gutter__clear{display:grid;place-items:center;width:50px;height:50px;min-width:50px;min-height:50px;margin:0;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:9px;background:#251c1e;color:var(--volca-muted);cursor:pointer}.motion-gutter__clear:hover{border-color:rgba(206,179,147,.65);color:var(--volca-text)}.motion-gutter__clear:focus-visible{outline:2px solid var(--volca-accent);outline-offset:2px}.pitch-gutter.black-key{background:#2a2021;color:#9d8570}.step-cell{flex:1 1 0;width:0;min-width:28px;box-sizing:border-box;border-left:1px solid #55454740}.header-cell{position:relative;padding:4px 0;background:#4a3a3c;text-align:center;cursor:pointer}.header-cell.muted{opacity:.38}.header-cell.skipped{color:#8f8170;text-decoration:line-through}.note-cell{position:relative;display:flex;align-items:center;height:20px;border-top:1px solid #55454726;cursor:pointer;touch-action:none}.note-cell.muted,.note-cell.skipped{opacity:.42}.note-cell__label{z-index:2;overflow:hidden;padding-left:4px;color:#382b2d;font-size:var(--volca-type-label);font-weight:700;white-space:nowrap}.step-cell.cursor::after{content:'';position:absolute;inset:0;z-index:1;background:rgba(206,179,147,.2);pointer-events:none}.step-cell{position:relative}.step-cell.beat{border-left-color:#ceb39380}.note-cell.active,.motion-fill{background:var(--volca-accent)}.note-cell.active{cursor:grab}.note-cell.selected{box-shadow:none}.note-cell.full{cursor:not-allowed}.note-resize-handle{position:absolute;top:0;right:0;z-index:3;width:10px;height:100%;cursor:ew-resize}.roll-body.is-moving,.roll-body.is-moving .note-cell{cursor:grabbing}.roll-body.is-resizing,.roll-body.is-resizing .note-cell{cursor:ew-resize}.roll-body.is-marquee,.roll-body.is-marquee .note-cell,.roll-body.is-marquee .note-resize-handle{cursor:crosshair}.note-marquee{position:absolute;z-index:5;border:1px solid var(--volca-accent);background:rgba(206,179,147,.16);pointer-events:none}.step-flags{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426;touch-action:none}.step-flags .step-cell{border-left-color:transparent}.step-flags .step-cell.beat{border-left-color:transparent}.flag-cell{display:grid;min-height:22px;padding:0;cursor:pointer}.flag{min-height:0;margin:3px;padding:0;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer;touch-action:none;pointer-events:none}.flag.on{background:#ceb393;border-color:var(--volca-accent-bright)}.flag.sound.on{background:var(--volca-teal);border-color:var(--volca-teal)}.flag:focus-visible{outline:2px solid var(--volca-accent);outline-offset:1px}.motion-bars{display:flex;flex:1;height:160px;touch-action:none;cursor:pointer}.motion-bars.disabled{opacity:.55}.motion-col{display:flex;align-items:flex-end}.motion-col.off{opacity:.35}.motion-fill{position:absolute;inset:auto 0 0}.motion-fill.point{right:auto}.motion-value,.motion-value-input{position:absolute;top:6px;right:2px;left:2px;z-index:2;color:var(--volca-text);font-size:11px;font-weight:700;line-height:22px;text-align:center}.motion-value-input{height:24px;border:1px solid var(--volca-accent);border-radius:4px;background:#382b2d}.motion-step-row{flex:0 0 auto;border-top:1px solid rgba(206,179,147,.28);background:#2f2426}.motion-step-cell{height:18px;margin:3px;border:1px solid rgba(206,179,147,.28);border-radius:7px;background:#251c1e;cursor:pointer}.motion-step-cell.on{background:#ceb393;border-color:var(--volca-accent-bright)}.roll-header{touch-action:none}.header-cell{cursor:grab;user-select:none}.roll-header.is-copying,.roll-header.is-copying .header-cell{cursor:grabbing}.header-cell.copy-source{background:#6a5348;color:#f1e9e1}.header-cell.drop-target{background:var(--volca-accent);color:#33282a}
 .fold-help-copy { margin: 0; }
+.note-cell.active:not(.note-start) { border-left-color: var(--volca-accent); }
+.note-cell.selected:not(.note-start):not(.note-end) { box-shadow: inset 0 2px 0 0 #f8eee4, inset 0 -2px 0 0 #f8eee4; }
+.note-cell.selected.note-start:not(.note-end) { box-shadow: inset 2px 2px 0 0 #f8eee4, inset 0 -2px 0 0 #f8eee4; }
+.note-cell.selected.note-end:not(.note-start) { box-shadow: inset -2px 2px 0 0 #f8eee4, inset 0 -2px 0 0 #f8eee4; }
+.note-cell.selected.note-start.note-end { box-shadow: inset 0 0 0 2px #f8eee4; }
 .fold-help-skip { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 0; color: var(--volca-muted); font-size: var(--volca-type-body); line-height: 1.4; cursor: pointer; }
 .fold-help-skip input { width: 16px; height: 16px; margin-top: 2px; flex: 0 0 auto; accent-color: var(--volca-accent); }
 </style>

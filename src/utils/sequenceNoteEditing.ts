@@ -48,6 +48,43 @@ export const notesIntersectingRect = (
     });
 };
 
+const clampedLength = (note: SequenceNote, lengthDelta: number) =>
+    Math.max(1, Math.min(NUM_OF_STEPS - note.startStep, note.length + Math.round(lengthDelta)));
+
+const notesOverlapOnPitch = (left: SequenceNote, right: SequenceNote) =>
+    left.pitch === right.pitch && occupies(left, right.startStep, right.startStep + right.length - 1);
+
+export const resizeSequenceNotes = (
+    notes: SequenceNote[],
+    keys: NoteKey[],
+    lengthDelta: number,
+): SequenceNote[] | null => {
+    if (!keys.length || !Math.round(lengthDelta)) return notes;
+    const keySet = new Set(keys.map(noteKeyOf));
+    const resizing = notes.filter(note => keySet.has(noteKeyOf(note)));
+    if (!resizing.length) return notes;
+    const resized = resizing.map(note => createSequenceNote(
+        note.pitch,
+        note.startStep,
+        clampedLength(note, lengthDelta),
+        note.velocity,
+        note.gatePercent,
+    ));
+    if (resized.every((note, index) => note.length === resizing[index].length)) return notes;
+    for (let index = 0; index < resized.length; index++) {
+        for (let other = index + 1; other < resized.length; other++) {
+            if (notesOverlapOnPitch(resized[index], resized[other])) return null;
+        }
+    }
+    let next = notes.filter(note => !keySet.has(noteKeyOf(note)));
+    for (const note of resized) next = replaceOverlappingPitch(next, note);
+    for (const note of resized) {
+        if (!canPlace(next, note.startStep, note.length)) return null;
+        next = [...next, note];
+    }
+    return next;
+};
+
 export const resizeSequenceNote = (
     notes: SequenceNote[],
     key: NoteKey,
@@ -55,13 +92,24 @@ export const resizeSequenceNote = (
 ): SequenceNote[] | null => {
     const target = notes.find(note => sameNoteKey(note, key));
     if (!target) return null;
-    const length = Math.max(1, Math.min(NUM_OF_STEPS - target.startStep, Math.round(newLength)));
-    if (length === target.length) return notes;
-    const resized = createSequenceNote(target.pitch, target.startStep, length, target.velocity, target.gatePercent);
-    const without = notes.filter(note => note !== target);
-    const next = replaceOverlappingPitch(without, resized);
-    if (!canPlace(next, resized.startStep, resized.length)) return null;
-    return [...next, resized];
+    return resizeSequenceNotes(notes, [key], Math.round(newLength) - target.length);
+};
+
+export const previewResizedNotes = (
+    notes: SequenceNote[],
+    keys: NoteKey[],
+    lengthDelta: number,
+): SequenceNote[] => {
+    const keySet = new Set(keys.map(noteKeyOf));
+    return notes
+        .filter(note => keySet.has(noteKeyOf(note)))
+        .map(note => createSequenceNote(
+            note.pitch,
+            note.startStep,
+            clampedLength(note, lengthDelta),
+            note.velocity,
+            note.gatePercent,
+        ));
 };
 
 export const clampedNoteMove = (

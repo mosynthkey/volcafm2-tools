@@ -19,7 +19,7 @@ import {
 import { MOTION_PARAM_COUNT, NUM_OF_STEPS, createEmptySequenceState, createMotionPoints, createSequenceNote, type SequenceNote, type SequenceState } from '../src/types/sequence';
 import { createReversedStepOrder, createShiftedStepOrder, reorderSequenceSteps } from '../src/utils/sequenceRandomizer';
 import { clearSequenceStep, copySequenceStep, tieSequenceStep } from '../src/utils/sequenceStepEditing';
-import { moveSequenceNotes, notesIntersectingRect, resizeSequenceNote } from '../src/utils/sequenceNoteEditing';
+import { moveSequenceNotes, notesIntersectingRect, resizeSequenceNote, resizeSequenceNotes } from '../src/utils/sequenceNoteEditing';
 import { createMotionPattern } from '../src/utils/motionPatterns';
 
 let failCount = 0;
@@ -271,6 +271,16 @@ check('move keeps relative chord', !!chordMove
     && chordMove.some(note => note.pitch === 79 && note.startStep === 3));
 const boxed = notesIntersectingRect(editNotes, 3, 60, 5, 67);
 check('marquee selects intersecting notes', boxed.length === 2 && boxed.every(note => note.startStep === 4));
+const chordResize = resizeSequenceNotes(editNotes, [{ pitch: 64, startStep: 4 }, { pitch: 67, startStep: 4 }], 2);
+check('resize applies the same delta to all selected notes', !!chordResize
+    && chordResize.some(note => note.pitch === 64 && note.startStep === 4 && note.length === 3)
+    && chordResize.some(note => note.pitch === 67 && note.startStep === 4 && note.length === 4));
+const overlapResize = resizeSequenceNotes(
+    [createSequenceNote(60, 0, 2, 100, 80), createSequenceNote(60, 4, 2, 100, 80)],
+    [{ pitch: 60, startStep: 0 }, { pitch: 60, startStep: 4 }],
+    3,
+);
+check('resize rejects selected notes that would overlap', overlapResize === null);
 const clampedResize = resizeSequenceNote(editNotes, { pitch: 60, startStep: 0 }, 99);
 check('resize clamps to remaining steps', !!clampedResize && clampedResize.some(note => note.pitch === 60 && note.length === 16));
 const blocked = Array.from({ length: 6 }, (_, index) => createSequenceNote(50 + index, 8, 1, 100, 80));

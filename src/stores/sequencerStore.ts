@@ -10,7 +10,7 @@ import {
 import { decodeSequenceData, encodeCurrentSequenceDump } from '../utils/sequenceCodec';
 import { createRandomStepOrder, createReversedStepOrder, createShiftedStepOrder, reorderSequenceSteps, type SequenceReorderScope } from '../utils/sequenceRandomizer';
 import { clearSequenceStep, copySequenceNoteEuclid, copySequenceStep, copySequenceStepsEuclid, tieSequenceStep } from '../utils/sequenceStepEditing';
-import { moveSequenceNotes, resizeSequenceNote, sameNoteKey, clampedNoteMove, type NoteKey } from '../utils/sequenceNoteEditing';
+import { moveSequenceNotes, resizeSequenceNotes, sameNoteKey, clampedNoteMove, type NoteKey } from '../utils/sequenceNoteEditing';
 import { extractStepNotes, parseSmf } from '../utils/smfImport';
 import { formatThrownError } from '../utils/appError';
 import { getPref, setPref } from '../utils/appPrefs';
@@ -260,11 +260,13 @@ export const useSequencerStore = defineStore('sequencer', () => {
     };
 
     const resizeNote = (key: NoteKey, newLength: number) => {
-        const next = resizeSequenceNote(notes.value, key, newLength);
-        if (!next) return false;
+        const target = notes.value.find(note => sameNoteKey(note, key));
+        if (!target) return false;
         const keys = selectedNoteKeys.value.some(item => sameNoteKey(item, key))
             ? selectedNoteKeys.value
             : [key];
+        const next = resizeSequenceNotes(notes.value, keys, Math.round(newLength) - target.length);
+        if (!next) return false;
         return applyNotes(next, keys);
     };
 
