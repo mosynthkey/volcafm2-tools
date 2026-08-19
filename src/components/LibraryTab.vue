@@ -23,11 +23,18 @@
       <p>{{ t('library.backupLoadAllDescription') }}</p>
       <template #actions>
         <v-btn variant="text" @click="showBackupRestoreConfirm = false">{{ t('common.cancel') }}</v-btn>
-        <v-btn @click="confirmBackupRestoreAll">{{ t('library.backupLoadAll') }}</v-btn>
+        <v-btn variant="flat" @click="confirmBackupRestoreAll">{{ t('library.backupLoadAll') }}</v-btn>
       </template>
     </AppDialog>
     <AppDialog :model-value="backupWritePhase !== null" :title="t('library.backupLoadWriteTitle')" max-width="480" :persistent="true" :closable="false">
       <p>{{ backupWriteCopy }}</p>
+    </AppDialog>
+    <AppDialog v-model="showBackupRestoreFailed" :title="t('library.backupRestoreFailedTitle')" max-width="480">
+      <p>{{ backupRestoreFailedCopy }}</p>
+      <template #actions>
+        <v-btn variant="text" @click="showBackupRestoreFailed = false">{{ t('common.close') }}</v-btn>
+        <v-btn :disabled="backupBusy" @click="retryBackupRestore">{{ t('app.connection.retry') }}</v-btn>
+      </template>
     </AppDialog>
     <LibraryBackupDialog
       v-model="showBackupBrowser"
@@ -35,11 +42,13 @@
       :programs="backupPrograms"
       :sequences="backupSequences"
       :loading="backupBusy"
+      :can-retry="backupRestoreResume !== null"
       :error-message="backupBrowserError"
       @load-program="loadBackupProgram"
       @load-sequence="loadBackupSequence"
       @load-with-program="openBackupSlotPicker"
       @load-all="openBackupRestoreConfirm"
+      @retry="retryBackupRestore"
     />
     <LibraryBackupProgramSlotDialog
       v-model="showBackupSlotPicker"
@@ -214,7 +223,9 @@ const backupSlotError = ref('');
 const backupBrowserError = ref('');
 const backupWritePhase = ref<'program' | 'sequence' | null>(null);
 const showBackupRestoreConfirm = ref(false);
+const showBackupRestoreFailed = ref(false);
 const backupRestoreProgress = ref<DeviceBackupProgress | null>(null);
+const backupRestoreResume = ref<{ phase: 'program' | 'sequence'; slot: number } | null>(null);
 
 const backupBusy = computed(() => backupWritePhase.value !== null || backupRestoreProgress.value !== null);
 
@@ -254,6 +265,17 @@ const backupRestorePercent = computed(() => {
     ? progress.current
     : SOUND_LIST_SLOT_COUNT + progress.current;
   return (completed / (SOUND_LIST_SLOT_COUNT + NUM_OF_SEQUENCES)) * 100;
+});
+
+const backupRestoreFailedCopy = computed(() => {
+  const resume = backupRestoreResume.value;
+  if (!resume) return '';
+  if (resume.phase === 'program') {
+    return t('library.backupRestoreFailedProgram', { slot: String(resume.slot).padStart(2, '0') });
+  }
+  return t('library.backupRestoreFailedSequence', {
+    slot: String(resume.slot + 1).padStart(2, '0'),
+  });
 });
 
 const kindLabel = (kind: LibraryKind) => t(
@@ -406,6 +428,8 @@ const loadRecord = async (record: LibraryRecord) => {
       backupPrograms.value = parseDeviceBackupPrograms(record.payload);
       backupSequences.value = parseDeviceBackupSequences(record.payload);
       backupBrowserError.value = '';
+      backupRestoreResume.value = null;
+      showBackupRestoreFailed.value = false;
       showBackupBrowser.value = true;
       return;
     }
@@ -597,32 +621,46 @@ const openBackupRestoreConfirm = () => {
   showBackupRestoreConfirm.value = true;
 };
 
-const confirmBackupRestoreAll = async () => {
+const restoreBackupFrom = async (start: { phase: 'program' | 'sequence'; slot: number }) => {
   if (backupBusy.value) return;
   if (!midiStore.isIdleConnected) {
     backupBrowserError.value = t('library.backupNotConnected');
+    backupRestoreResume.value = start;
+    showBackupRestoreFailed.value = true;
     return;
   }
-  showBackupRestoreConfirm.value = false;
+  showBackupRestoreFailed.value = false;
+  backupRestoreResume.value = null;
   backupBrowserError.value = '';
   midiStore.backupRestoring = true;
-  midiStore.replaceSoundList(backupPrograms.value);
-  backupRestoreProgress.value = { phase: 'program', current: 0, total: SOUND_LIST_SLOT_COUNT };
+  backupRestoreProgress.value = {
+    phase: start.phase,
+    current: start.slot + 1,
+    total: start.phase === 'program' ? SOUND_LIST_SLOT_COUNT : NUM_OF_SEQUENCES,
+  };
   try {
-    for (let slot = 0; slot < SOUND_LIST_SLOT_COUNT; slot++) {
-      backupRestoreProgress.value = { phase: 'program', current: slot + 1, total: SOUND_LIST_SLOT_COUNT };
-      const ok = await midiStore.writeProgramSlot(slot);
-      if (!ok) {
-        backupBrowserError.value = t('library.backupLoadProgramSlotWriteFailed');
-        return;
+    let slot = start.slot;
+    if (start.phase === 'program') {
+      for (; slot < SOUND_LIST_SLOT_COUNT; slot++) {
+        backupRestoreProgress.value = { phase: 'program', current: slot + 1, total: SOUND_LIST_SLOT_COUNT };
+        const ok = await midiStore.writeProgramSlot(slot);
+        if (!ok) {
+          backupRestoreResume.value = { phase: 'program', slot };
+          backupBrowserError.value = t('library.backupLoadProgramSlotWriteFailed');
+          showBackupRestoreFailed.value = true;
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 20));
       }
-      await new Promise(resolve => setTimeout(resolve, 20));
+      slot = 0;
     }
-    for (let slot = 0; slot < NUM_OF_SEQUENCES; slot++) {
+    for (; slot < NUM_OF_SEQUENCES; slot++) {
       backupRestoreProgress.value = { phase: 'sequence', current: slot + 1, total: NUM_OF_SEQUENCES };
       const ok = await writeBackupSequenceSlot(slot);
       if (!ok) {
+        backupRestoreResume.value = { phase: 'sequence', slot };
         backupBrowserError.value = t('library.backupLoadSequenceSlotWriteFailed');
+        showBackupRestoreFailed.value = true;
         return;
       }
       await new Promise(resolve => setTimeout(resolve, 20));
@@ -632,6 +670,22 @@ const confirmBackupRestoreAll = async () => {
     backupRestoreProgress.value = null;
     midiStore.backupRestoring = false;
   }
+};
+
+const retryBackupRestore = () => {
+  if (!backupRestoreResume.value) return;
+  void restoreBackupFrom(backupRestoreResume.value);
+};
+
+const confirmBackupRestoreAll = async () => {
+  if (backupBusy.value) return;
+  if (!midiStore.isIdleConnected) {
+    backupBrowserError.value = t('library.backupNotConnected');
+    return;
+  }
+  showBackupRestoreConfirm.value = false;
+  midiStore.replaceSoundList(backupPrograms.value);
+  await restoreBackupFrom({ phase: 'program', slot: 0 });
 };
 
 const confirmBackupSlot = async (destSlot: number) => {

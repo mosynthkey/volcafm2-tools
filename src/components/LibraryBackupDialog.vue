@@ -71,8 +71,8 @@
       </section>
     </div>
     <template #actions>
-      <v-btn variant="text" :disabled="loading" @click="open = false">{{ t('common.close') }}</v-btn>
-      <v-btn :disabled="loading" @click="emit('load-all')">{{ t('library.backupLoadAll') }}</v-btn>
+      <v-btn v-if="canRetry" :disabled="loading" @click="emit('retry')">{{ t('app.connection.retry') }}</v-btn>
+      <v-btn variant="flat" :disabled="loading" @click="emit('load-all')">{{ t('library.backupLoadAll') }}</v-btn>
     </template>
   </AppDialog>
 </template>
@@ -90,9 +90,11 @@ const props = withDefaults(defineProps<{
   programs: SoundListProgram[]
   sequences: SequenceState[]
   loading?: boolean
+  canRetry?: boolean
   errorMessage?: string
 }>(), {
   loading: false,
+  canRetry: false,
   errorMessage: '',
 })
 const emit = defineEmits<{
@@ -101,6 +103,7 @@ const emit = defineEmits<{
   'load-sequence': [slot: number]
   'load-with-program': [slot: number]
   'load-all': []
+  retry: []
 }>()
 const { t } = useI18n()
 const selectedSequenceSlot = ref(0)
