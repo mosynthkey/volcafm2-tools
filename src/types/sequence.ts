@@ -1,5 +1,6 @@
 // Sequence dump layout from the public MIDI implementation (TABLE 3).
 export const NUM_OF_STEPS = 16;
+export const NUM_OF_SEQUENCES = 16;
 export const NUM_OF_VOICES_PER_STEP = 6;
 export const MOTION_PARAM_COUNT = 13;
 export const MOTION_POINT_COUNT = 5;

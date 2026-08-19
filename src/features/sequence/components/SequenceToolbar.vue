@@ -1,4 +1,19 @@
 <template>
+  <AppDialog v-model="showWriteConfirm" :title="t('sequence.writeTitle')" max-width="480">
+    <p>{{ t('sequence.writeDescription') }}</p>
+    <v-text-field v-model.number="writeSlot" type="number" min="0" :max="sequenceCount - 1"
+      :label="t('sequence.writeSlot')" density="compact" hide-details class="write-slot-input" />
+    <label class="app-skip-confirm">
+      <input v-model="dontShowWriteAgain" type="checkbox" />
+      <span>{{ t('common.dontShowAgain') }}</span>
+    </label>
+    <template #actions>
+      <v-btn variant="text" @click="cancelWrite()">{{ t('common.cancel') }}</v-btn>
+      <v-btn @click="confirmWrite()">{{ t('common.write') }}</v-btn>
+    </template>
+  </AppDialog>
+  <AppErrorDialog v-model="showWriteError" :title="t('sequence.writeTitle')" :message="writeError" />
+
   <v-row align="center" no-gutters class="editor-toolbar">
     <template v-if="sequence.stepInputActive">
       <v-col cols="auto"><v-btn icon :title="t('sequence.stepInputExit')" :aria-label="t('sequence.stepInputExit')" @click="sequence.toggleStepInput()"><X :size="18" /></v-btn></v-col>
@@ -14,44 +29,81 @@
       </v-col>
       <v-col cols="auto" class="editor-toolbar-section">
         <span class="editor-toolbar-section__label volca-section-title">{{ t('sequence.sectionLabel') }}</span>
-        <v-btn :disabled="!canSend" :loading="midi.sequenceReadState === 'requesting'" @click="sequence.requestFromDevice()">
-          <HardDriveUpload :size="16" class="mr-1" />{{ t('sequence.captureButton') }}
-        </v-btn>
-        <v-btn :disabled="!canSend" @click="sequence.showCaptureDialog = true">
-          <Play :size="16" class="mr-1" />{{ t('sequence.capturePerformanceButton') }}
-        </v-btn>
+        <ToolbarIconButton :label="t('sequence.captureButton')">
+          <v-btn icon :disabled="!canSend" :loading="midi.sequenceReadState === 'requesting'"
+            :title="t('sequence.captureButton')" :aria-label="t('sequence.captureButton')"
+            @click="sequence.requestFromDevice()">
+            <HardDriveUpload :size="16" />
+          </v-btn>
+        </ToolbarIconButton>
+        <ToolbarIconButton :label="t('sequence.capturePerformanceButton')">
+          <v-btn icon :disabled="!canSend" :title="t('sequence.capturePerformanceButton')"
+            :aria-label="t('sequence.capturePerformanceButton')" @click="sequence.showCaptureDialog = true">
+            <Play :size="16" />
+          </v-btn>
+        </ToolbarIconButton>
         <div class="send-auto-split">
-          <v-btn :disabled="!canSend" @click="sequence.sendToDevice()"><HardDriveDownload :size="16" class="mr-1" />{{ t('common.send') }}</v-btn>
-          <AutoSendToggle />
+          <ToolbarIconButton :label="t('common.send')">
+            <v-btn icon :disabled="!canSend" :title="t('common.send')" :aria-label="t('common.send')"
+              @click="sequence.sendToDevice()">
+              <HardDriveDownload :size="16" />
+            </v-btn>
+          </ToolbarIconButton>
+          <ToolbarIconButton :label="t('common.autoSend')">
+            <AutoSendToggle compact />
+          </ToolbarIconButton>
         </div>
-        <v-btn @click="sequence.clearAll"><Trash2 :size="16" class="mr-1" />{{ t('sequence.clear') }}</v-btn>
-        <v-btn @click="sequence.toggleStepInput()"><Piano :size="16" class="mr-1" />{{ t('sequence.stepInput') }}</v-btn>
-        <div class="randomize-split">
-          <v-btn class="randomize-main" @click="sequence.requestRandomize()"><Dices :size="16" class="mr-1" />{{ t('sequence.randomize') }}</v-btn>
+        <ToolbarIconButton :label="t('sequence.write')">
+          <v-btn icon :disabled="!canWrite" :loading="midi.sequenceWriteState === 'sending'"
+            :title="t('sequence.write')" :aria-label="t('sequence.write')" @click="requestWrite">
+            <HardDrive :size="16" />
+          </v-btn>
+        </ToolbarIconButton>
+        <ToolbarIconButton :label="t('sequence.clear')">
+          <v-btn icon :title="t('sequence.clear')" :aria-label="t('sequence.clear')" @click="sequence.clearAll">
+            <Trash2 :size="16" />
+          </v-btn>
+        </ToolbarIconButton>
+        <ToolbarIconButton :label="t('sequence.stepInput')">
+          <v-btn icon :title="t('sequence.stepInput')" :aria-label="t('sequence.stepInput')" @click="sequence.toggleStepInput()">
+            <Piano :size="16" />
+          </v-btn>
+        </ToolbarIconButton>
+        <ToolbarIconButton :label="t('sequence.randomize')">
+          <div class="randomize-split">
+            <v-btn icon class="randomize-main" :title="t('sequence.randomize')" :aria-label="t('sequence.randomize')"
+              @click="sequence.requestRandomize()">
+              <Dices :size="16" />
+            </v-btn>
+            <v-menu location="bottom end" offset="6">
+              <template #activator="{ props: menuProps }">
+                <v-btn v-bind="menuProps" class="randomize-menu-btn" icon :title="t('sequence.randomizeMore')"
+                  :aria-label="t('sequence.randomizeMore')">
+                  <ChevronDown :size="14" />
+                </v-btn>
+              </template>
+              <v-list class="sequence-more-menu" density="compact">
+                <v-list-item :title="t('sequence.randomizeNotes')" @click="sequence.randomizeSteps(Math.random, 'notes')" />
+                <v-list-item :title="t('sequence.randomizeMotion')" @click="sequence.randomizeSteps(Math.random, 'motion')" />
+                <v-list-item :title="t('sequence.reverseSequence')" @click="sequence.reverseSteps()" />
+              </v-list>
+            </v-menu>
+          </div>
+        </ToolbarIconButton>
+        <ToolbarIconButton :label="t('common.more')">
           <v-menu location="bottom end" offset="6">
             <template #activator="{ props: menuProps }">
-              <v-btn v-bind="menuProps" class="randomize-menu-btn" icon :title="t('sequence.randomizeMore')"
-                :aria-label="t('sequence.randomizeMore')">
-                <ChevronDown :size="16" />
+              <v-btn v-bind="menuProps" icon :title="t('common.more')" :aria-label="t('common.more')">
+                <MoreHorizontal :size="18" />
               </v-btn>
             </template>
             <v-list class="sequence-more-menu" density="compact">
-              <v-list-item :title="t('sequence.randomizeNotes')" @click="sequence.randomizeSteps(Math.random, 'notes')" />
-              <v-list-item :title="t('sequence.randomizeMotion')" @click="sequence.randomizeSteps(Math.random, 'motion')" />
-              <v-list-item :title="t('sequence.reverseSequence')" @click="sequence.reverseSteps()" />
+              <v-list-item :title="t('sequence.importSmf')" @click="fileInput?.click()">
+                <template #prepend><FileUp :size="17" /></template>
+              </v-list-item>
             </v-list>
           </v-menu>
-        </div>
-        <v-menu location="bottom end" offset="6">
-          <template #activator="{ props: menuProps }">
-            <v-btn v-bind="menuProps" icon variant="text" :title="t('common.more')" :aria-label="t('common.more')"><MoreHorizontal :size="21" /></v-btn>
-          </template>
-          <v-list class="sequence-more-menu" density="compact">
-            <v-list-item :title="t('sequence.importSmf')" @click="fileInput?.click()">
-              <template #prepend><FileUp :size="17" /></template>
-            </v-list-item>
-          </v-list>
-        </v-menu>
+        </ToolbarIconButton>
         <input ref="fileInput" type="file" accept=".mid,.midi" hidden @change="selectFile" />
       </v-col>
       <v-spacer />
@@ -65,28 +117,84 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, Dices, FileUp, HardDriveDownload, HardDriveUpload, MoreHorizontal, Piano, Play, Trash2, X } from '@lucide/vue'
+import { ChevronDown, Dices, FileUp, HardDrive, HardDriveDownload, HardDriveUpload, MoreHorizontal, Piano, Play, Trash2, X } from '@lucide/vue'
 import AutoSendToggle from '@/components/AutoSendToggle.vue'
+import AppDialog from '@/components/dialogs/AppDialog.vue'
+import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue'
 import LibrarySection from '@/components/LibrarySection.vue'
+import ToolbarIconButton from '@/components/ToolbarIconButton.vue'
+import { SKIP_DEVICE_WRITE_PREF, useSkipConfirm } from '@/composables/useSkipConfirm'
 import { useMidiStore } from '@/stores/midiStore'
 import { useSequencerStore } from '@/stores/sequencerStore'
 import { useSoundStore } from '@/stores/soundStore'
+import { NUM_OF_SEQUENCES } from '@/types/sequence'
+import { getPref, setPref } from '@/utils/appPrefs'
 import { programDisplayName } from '@/utils/programDisplayName'
 
-const { t } = useI18n(); const midi = useMidiStore(); const sequence = useSequencerStore(); const sound = useSoundStore(); const fileInput = ref<HTMLInputElement | null>(null)
+const SEQUENCE_WRITE_SLOT_PREF = 'lastSequenceWriteSlot'
+const { t } = useI18n()
+const midi = useMidiStore()
+const sequence = useSequencerStore()
+const sound = useSoundStore()
+const fileInput = ref<HTMLInputElement | null>(null)
+const sequenceCount = NUM_OF_SEQUENCES
+const writeSlot = ref(0)
+const showWriteError = ref(false)
+const writeError = ref('')
+const {
+  show: showWriteConfirm,
+  dontShowAgain: dontShowWriteAgain,
+  request: requestWriteConfirm,
+  confirm: confirmWrite,
+  cancel: cancelWrite,
+} = useSkipConfirm(SKIP_DEVICE_WRITE_PREF)
 const canSend = computed(() => midi.isIdleConnected)
+const canWrite = computed(() => midi.isIdleConnected && midi.sequenceWriteState !== 'sending')
 const currentProgramName = computed(() => {
   const slot = Number(sequence.programNo)
   return programDisplayName(slot, midi.matchedProgramNo, sound.program.name, midi.programNames[slot]?.name ?? '')
 })
-const selectFile = (event: Event) => { const input = event.target as HTMLInputElement; const file = input.files?.[0]; if (file) sequence.queueSmfImport(file); input.value = '' }
+
+getPref<number>(SEQUENCE_WRITE_SLOT_PREF).then(value => {
+  if (typeof value === 'number' && value >= 0 && value < NUM_OF_SEQUENCES) writeSlot.value = value
+})
+
+const clampedWriteSlot = () => Math.max(0, Math.min(NUM_OF_SEQUENCES - 1, Number(writeSlot.value) || 0))
+
+const requestWrite = () => {
+  if (!canWrite.value) return
+  requestWriteConfirm(() => { void runWrite() })
+}
+
+const runWrite = async () => {
+  const slot = clampedWriteSlot()
+  writeSlot.value = slot
+  setPref(SEQUENCE_WRITE_SLOT_PREF, slot).catch(() => undefined)
+  const ok = await sequence.writeToSlot(slot)
+  if (!ok) {
+    writeError.value = t('sequence.writeError', { slot: String(slot).padStart(2, '0') })
+    showWriteError.value = true
+  }
+}
+
+const selectFile = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) sequence.queueSmfImport(file)
+  input.value = ''
+}
 </script>
 
 <style scoped>
 .step-input-status { color: var(--volca-accent-bright); font-weight: 750; font-variant-numeric: tabular-nums; }
 .program-no-input { width: 72px; flex: 0 0 72px; }
+.write-slot-input { margin-top: 12px; }
 .sequence-more-menu { min-width: 220px; border: 1px solid rgba(206,179,147,.28); border-radius: 10px; background: #2b2022; color: var(--volca-text); }
 .randomize-split { display: inline-flex; align-items: stretch; }
 .randomize-split :deep(.randomize-main) { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
-.randomize-split :deep(.randomize-menu-btn) { width: 28px; min-width: 28px; border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; box-shadow: inset 1px 0 rgba(51,40,42,.22), inset 0 1px rgba(255,255,255,.28), 0 3px 10px rgba(0,0,0,.16) !important; }
+.randomize-split :deep(.randomize-menu-btn) {
+  width: 22px; min-width: 22px;
+  border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important;
+  box-shadow: inset 1px 0 rgba(51,40,42,.22), inset 0 1px rgba(255,255,255,.28), 0 3px 10px rgba(0,0,0,.16) !important;
+}
 </style>

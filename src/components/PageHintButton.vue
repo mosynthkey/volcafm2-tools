@@ -1,5 +1,5 @@
 <template>
-  <v-btn icon variant="text" :title="t('hint.title')" :aria-label="t('hint.title')" @click="ui.openPageHint(page)">
+  <v-btn icon :title="t('hint.title')" :aria-label="t('hint.title')" @click="ui.openPageHint(page)">
     <CircleHelp :size="18" />
   </v-btn>
 </template>

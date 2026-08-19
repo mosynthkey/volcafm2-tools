@@ -142,6 +142,16 @@ export const useSoundStore = defineStore('sound', () => {
         useMidiStore().sendCurrentVoiceDump(bytes);
     };
 
+    const writeToMatchedSlot = async () => {
+        const midi = useMidiStore();
+        const slot = midi.matchedProgramNo;
+        if (slot === null) return false;
+        const bytes = encodedForSend();
+        skipLibrarianSync = false;
+        midi.updateSoundListSlot(slot, bytes);
+        return midi.writeProgramSlot(slot);
+    };
+
     const sendRetry = createSendRetry(sendToDevice);
     watch(() => useMidiStore().soundEditState, sendRetry.handleWriteState);
 
@@ -204,6 +214,7 @@ export const useSoundStore = defineStore('sound', () => {
         snapshot,
         encodedForSend,
         sendToDevice,
+        writeToMatchedSlot,
         updateOperator,
         selectOperator,
         toggleOperator,

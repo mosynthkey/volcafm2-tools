@@ -1,13 +1,14 @@
 <template>
   <v-app class="volca-app" @dragstart.prevent>
-    <AppDialog v-model="ui.showInfo" :title="t('app.about')" max-width="440">
+    <AppDialog v-model="ui.showInfo" :title="t('app.about')" max-width="640">
           <div class="about-identity">
             <img src="/app-icon.png" alt="" />
             <h2>{{ t('app.about') }}</h2>
-            <span>{{ t('app.version', { version: '2.0.3' }) }}</span>
+            <span>{{ t('app.version', { version: '2.1.0' }) }}</span>
             <span>{{ t('app.license') }}</span>
             <small>{{ t('app.copyright') }}</small>
           </div>
+          <ChangelogList />
           <div class="about-log-toggle">
             <span>{{ t('app.showLog') }}</span>
             <AppToggle v-model="ui.showLog" :aria-label="t('app.showLog')" />
@@ -68,6 +69,7 @@
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AppToggle from './components/AppToggle.vue';
+import ChangelogList from './components/ChangelogList.vue';
 import AppSidebar from './components/AppSidebar.vue';
 import LibraryTab from './components/LibraryTab.vue';
 import PageHintDialog from './components/PageHintDialog.vue';

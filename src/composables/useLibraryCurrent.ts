@@ -24,6 +24,7 @@ export const useLibraryCurrent = () => {
     if (kind === 'sound') return soundStore.program.name.trim() || t('sound.untitled')
     if (kind === 'sequence') return t('sequence.libraryName', { count: seqStore.programNo + 1 })
     if (kind === 'sound-list') return t('library.suggestedSoundList')
+    if (kind === 'backup') return t('library.suggestedBackup')
     return t('library.suggestedBundle')
   }
 
@@ -46,6 +47,7 @@ export const useLibraryCurrent = () => {
     if (kind === 'sound') return { sound: soundStore.snapshot() }
     if (kind === 'sequence') return { sequence: cloneJson(seqStore.toState()) }
     if (kind === 'sound-list') return { soundList: serializeSoundList(midiStore.cloneSoundList()) }
+    if (kind === 'backup') return {}
     return { items: await catalogSnapshot() }
   }
 
@@ -58,6 +60,9 @@ export const useLibraryCurrent = () => {
   const saveCurrent = async (kind: LibraryKind, name: string) => {
     const trimmed = name.trim()
     if (!trimmed) return
+    if (kind === 'backup') {
+      throw new Error('Device backup must be captured from the volca fm2.')
+    }
     const payload = await currentPayload(kind)
     if (kind === 'sound') stampSoundName(payload, trimmed)
     await saveLibrary(kind, trimmed, payload)

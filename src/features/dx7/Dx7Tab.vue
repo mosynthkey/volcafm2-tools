@@ -3,9 +3,13 @@
     <AppErrorDialog v-model="showError" :title="t('dx7.listTitle')" :message="errorMessage" />
     <AppDialog v-model="showWriteConfirm" :title="t('dx7.writeTitle')" max-width="480">
       <p>{{ t('dx7.writeDescription') }}</p>
+      <label class="app-skip-confirm">
+        <input v-model="dontShowWriteAgain" type="checkbox" />
+        <span>{{ t('common.dontShowAgain') }}</span>
+      </label>
       <template #actions>
-        <v-btn variant="text" @click="showWriteConfirm = false">{{ t('common.cancel') }}</v-btn>
-        <v-btn @click="confirmWrite">{{ t('dx7.write') }}</v-btn>
+        <v-btn variant="text" @click="cancelWrite()">{{ t('common.cancel') }}</v-btn>
+        <v-btn @click="confirmWriteDialog()">{{ t('dx7.write') }}</v-btn>
       </template>
     </AppDialog>
     <AppDialog :model-value="showWriteProgress" :title="t('dx7.writeTitle')" max-width="480" persistent :closable="false">
@@ -19,38 +23,50 @@
       <header class="editor-toolbar">
         <div class="editor-identity">
           <span class="editor-identity__label volca-section-title">{{ t('dx7.listTitle') }}</span>
-          <v-btn class="reorder-btn" :class="{ 'is-on': reorderEnabled }" :aria-pressed="reorderEnabled"
-            @click="reorderEnabled = !reorderEnabled">
-            <ArrowUpDown :size="16" class="mr-1" />{{ t('dx7.reorder') }}
-          </v-btn>
+          <ToolbarIconButton :label="t('dx7.reorder')">
+            <v-btn icon class="reorder-btn" :class="{ 'is-on': reorderEnabled }" :aria-pressed="reorderEnabled"
+              :title="t('dx7.reorder')" :aria-label="t('dx7.reorder')"
+              @click="reorderEnabled = !reorderEnabled">
+              <ArrowUpDown :size="16" />
+            </v-btn>
+          </ToolbarIconButton>
         </div>
         <div class="editor-toolbar-section">
-          <v-btn :disabled="!midiStore.isDeviceReady" :loading="midiStore.connectionState === MIDIConnectionState.RECEIVING"
-            :title="t('dx7.reloadHint')" @click="midiStore.reloadAllProgramDumps()">
-            <HardDriveUpload :size="16" class="mr-1" />{{ t('dx7.receive') }}
-          </v-btn>
-          <v-btn :disabled="!canWrite" :loading="midiStore.programWriteState === 'sending'"
-            @click="showWriteConfirm = true">
-            <HardDriveDownload :size="16" class="mr-1" />{{ t('dx7.send') }}
-          </v-btn>
+          <ToolbarIconButton :label="t('dx7.receive')">
+            <v-btn icon :disabled="!midiStore.isDeviceReady"
+              :loading="midiStore.connectionState === MIDIConnectionState.RECEIVING"
+              :title="t('dx7.reloadHint')" :aria-label="t('dx7.receive')"
+              @click="midiStore.reloadAllProgramDumps()">
+              <HardDriveUpload :size="16" />
+            </v-btn>
+          </ToolbarIconButton>
+          <ToolbarIconButton :label="t('dx7.send')">
+            <v-btn icon :disabled="!canWrite" :loading="midiStore.programWriteState === 'sending'"
+              :title="t('dx7.send')" :aria-label="t('dx7.send')" @click="requestWrite">
+              <HardDriveDownload :size="16" />
+            </v-btn>
+          </ToolbarIconButton>
         </div>
         <div class="editor-toolbar-section">
           <span class="editor-toolbar-section__label volca-section-title">{{ t('dx7.groupDx7') }}</span>
-          <v-btn @click="dx7FileInput?.click()">
-            <FileUp :size="16" class="mr-1" />{{ t('dx7.fileImport') }}
-          </v-btn>
-          <v-menu location="bottom start" offset="6">
-            <template #activator="{ props: menuProps }">
-              <v-btn v-bind="menuProps">
-                <Download :size="16" class="mr-1" />{{ t('dx7.fileExport') }}
-                <ChevronDown :size="16" class="ml-1" />
-              </v-btn>
-            </template>
-            <v-list class="sound-list-menu" density="compact">
-              <v-list-item :title="t('dx7.exportCartridge', { start: '00', end: '31' })" @click="downloadCartridge(0)" />
-              <v-list-item :title="t('dx7.exportCartridge', { start: '32', end: '63' })" @click="downloadCartridge(1)" />
-            </v-list>
-          </v-menu>
+          <ToolbarIconButton :label="t('dx7.fileImport')">
+            <v-btn icon :title="t('dx7.fileImport')" :aria-label="t('dx7.fileImport')" @click="dx7FileInput?.click()">
+              <FileUp :size="16" />
+            </v-btn>
+          </ToolbarIconButton>
+          <ToolbarIconButton :label="t('dx7.fileExport')">
+            <v-menu location="bottom start" offset="6">
+              <template #activator="{ props: menuProps }">
+                <v-btn v-bind="menuProps" icon :title="t('dx7.fileExport')" :aria-label="t('dx7.fileExport')">
+                  <Download :size="16" />
+                </v-btn>
+              </template>
+              <v-list class="sound-list-menu" density="compact">
+                <v-list-item :title="t('dx7.exportCartridge', { start: '00', end: '31' })" @click="downloadCartridge(0)" />
+                <v-list-item :title="t('dx7.exportCartridge', { start: '32', end: '63' })" @click="downloadCartridge(1)" />
+              </v-list>
+            </v-menu>
+          </ToolbarIconButton>
         </div>
         <div class="editor-toolbar-spacer"></div>
         <LibrarySection kind="sound-list" page="sound-list" />
@@ -118,7 +134,9 @@ import { ArrowUpDown, ChevronDown, ChevronUp, Download, FileUp, GripVertical, Ha
 import AppDialog from '@/components/dialogs/AppDialog.vue';
 import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue';
 import LibrarySection from '@/components/LibrarySection.vue';
+import ToolbarIconButton from '@/components/ToolbarIconButton.vue';
 import Dx7VoiceImportDialog from '@/features/dx7/Dx7VoiceImportDialog.vue';
+import { SKIP_DEVICE_WRITE_PREF, useSkipConfirm } from '@/composables/useSkipConfirm';
 import { parseDx7Sysex, type Dx7PackedVoice } from '@/midi/dx7Cartridge';
 import { MIDIConnectionState, useMidiStore } from '@/stores/midiStore';
 import { useSoundStore } from '@/stores/soundStore';
@@ -145,8 +163,14 @@ const showError = ref(false);
 const errorMessage = ref('');
 const showVoicePicker = ref(false);
 const parsedVoices = ref<Dx7PackedVoice[]>([]);
-const showWriteConfirm = ref(false);
 const showWriteProgress = ref(false);
+const {
+  show: showWriteConfirm,
+  dontShowAgain: dontShowWriteAgain,
+  request: requestWriteConfirm,
+  confirm: confirmWriteDialog,
+  cancel: cancelWrite,
+} = useSkipConfirm(SKIP_DEVICE_WRITE_PREF);
 
 watch([() => ui.activeTab, () => midiStore.isDeviceReady], ([tab, ready]) => {
   if (tab === 'dx7' && ready) void midiStore.ensureAllProgramDumps();
@@ -207,6 +231,11 @@ const applyDx7Import = (payload: { selectedIndexes: number[]; startSlot: number 
     .map(voiceIndex => parsedVoices.value[voiceIndex]?.packed)
     .filter((voice): voice is Uint8Array => Boolean(voice));
   midiStore.importPackedVoices(voices, payload.startSlot);
+};
+
+const requestWrite = () => {
+  if (!canWrite.value) return;
+  requestWriteConfirm(() => { void confirmWrite(); });
 };
 
 const confirmWrite = async () => {

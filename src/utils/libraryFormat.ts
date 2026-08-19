@@ -7,12 +7,13 @@ import {
     padProgramDump,
     type SoundListProgram,
 } from './soundListBackup';
+import { NUM_OF_SEQUENCES, normalizeSequenceState } from '../types/sequence';
 
 export const LIBRARY_FILE_VERSION = 2;
 
-export const LIBRARY_KINDS = ['sound', 'sound-list', 'sequence', 'bundle'] as const;
+export const LIBRARY_KINDS = ['sound', 'sound-list', 'sequence', 'backup', 'bundle'] as const;
 export type LibraryKind = (typeof LIBRARY_KINDS)[number];
-export const CATALOG_KINDS = ['sound', 'sound-list', 'sequence'] as const;
+export const CATALOG_KINDS = ['sound', 'sound-list', 'sequence', 'backup'] as const;
 export type CatalogKind = (typeof CATALOG_KINDS)[number];
 
 export const LIBRARY_EXTENSIONS: Record<LibraryKind, string> = {
@@ -20,15 +21,17 @@ export const LIBRARY_EXTENSIONS: Record<LibraryKind, string> = {
     sequence: 'vfm2_seq',
     'sound-list': 'vfm2_list',
     bundle: 'vfm2_bundle',
+    backup: 'vfm2_backup',
 };
 
-export const LIBRARY_FILE_ACCEPT = '.vfm2_sound,.vfm2_seq,.vfm2_list,.vfm2_bundle,.json';
+export const LIBRARY_FILE_ACCEPT = '.vfm2_sound,.vfm2_seq,.vfm2_list,.vfm2_bundle,.vfm2_backup,.json';
 
 export const LIBRARY_FILE_KIND: Record<LibraryKind, string> = {
     sound: 'volca-fm2-sound',
     sequence: 'volca-fm2-sequence',
     'sound-list': SOUND_LIST_BACKUP_KIND,
     bundle: 'volca-fm2-bundle',
+    backup: 'volca-fm2-backup',
 };
 
 export type LibrarySoundList = {
@@ -49,6 +52,8 @@ export type LibraryPayload = {
     sound?: unknown;
     sequence?: unknown;
     soundList?: LibrarySoundList;
+    programs?: LibrarySoundList;
+    sequences?: unknown[];
     items?: LibraryItemSnapshot[];
 };
 
@@ -79,6 +84,7 @@ export const kindFromExtension = (filename: string): LibraryKind | null => {
     if (lower.endsWith('.vfm2_seq')) return 'sequence';
     if (lower.endsWith('.vfm2_list')) return 'sound-list';
     if (lower.endsWith('.vfm2_bundle')) return 'bundle';
+    if (lower.endsWith('.vfm2_backup')) return 'backup';
     return null;
 };
 
@@ -125,6 +131,7 @@ const kindFromFileKind = (kind: string): LibraryKind | null => {
     if (kind === LIBRARY_FILE_KIND.sequence) return 'sequence';
     if (kind === LIBRARY_FILE_KIND['sound-list'] || kind === 'volca-fm2-sound-list') return 'sound-list';
     if (kind === LIBRARY_FILE_KIND.bundle) return 'bundle';
+    if (kind === LIBRARY_FILE_KIND.backup) return 'backup';
     return null;
 };
 
@@ -149,7 +156,7 @@ export const encodeLibraryFile = (
 };
 
 export const isCatalogKind = (kind: unknown): kind is CatalogKind =>
-    kind === 'sound' || kind === 'sound-list' || kind === 'sequence';
+    kind === 'sound' || kind === 'sound-list' || kind === 'sequence' || kind === 'backup';
 
 const snapshotFromUnknown = (value: unknown): LibraryItemSnapshot | null => {
     if (!isRecord(value) || !isCatalogKind(value.kind) || typeof value.id !== 'string' || !value.id.trim()) return null;
@@ -193,6 +200,8 @@ const payloadFromFile = (parsed: Record<string, unknown>, kind: LibraryKind): Li
     if (parsed.sound !== undefined) payload.sound = parsed.sound;
     if (parsed.sequence !== undefined) payload.sequence = parsed.sequence;
     if (Array.isArray(parsed.soundList)) payload.soundList = parsed.soundList as LibrarySoundList;
+    if (Array.isArray(parsed.programs)) payload.programs = parsed.programs as LibrarySoundList;
+    if (Array.isArray(parsed.sequences)) payload.sequences = parsed.sequences as unknown[];
     if (Array.isArray(parsed.items)) {
         payload.items = parsed.items.flatMap(item => {
             const snapshot = snapshotFromUnknown(item);
@@ -226,5 +235,12 @@ export const decodeLibraryFile = (json: string, filename = ''): DecodedLibraryFi
     if (kind === 'sound' && payload.sound === undefined) throw new Error('Sound file is missing sound data.');
     if (kind === 'sequence' && payload.sequence === undefined) throw new Error('Sequence file is missing sequence data.');
     if (kind === 'sound-list') deserializeSoundList(payload.soundList ?? []);
+    if (kind === 'backup') {
+        deserializeSoundList(payload.programs ?? []);
+        if (!Array.isArray(payload.sequences) || payload.sequences.length !== NUM_OF_SEQUENCES) {
+            throw new Error('Backup file must contain 16 sequences.');
+        }
+        payload.sequences = payload.sequences.map(sequence => normalizeSequenceState(sequence as Parameters<typeof normalizeSequenceState>[0]));
+    }
     return { kind, name, savedAt, id, payload };
 };

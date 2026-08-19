@@ -6,26 +6,33 @@ import {
     bytesToHex,
     padProgramDump,
 } from '../src/utils/soundListBackup'
+import { NUM_OF_SEQUENCES, createEmptySequenceState } from '../src/types/sequence'
 import {
     catalogItemsFromPayload,
     decodeLibraryFile,
     encodeLibraryFile,
     extensionForKind,
+    isCatalogKind,
     kindFromExtension,
     libraryFilename,
     serializeSoundList,
     deserializeSoundList,
 } from '../src/utils/libraryFormat'
+import { buildDeviceBackupPayload, parseDeviceBackupPrograms, parseDeviceBackupSequences } from '../src/utils/deviceBackup'
 
 assert.equal(extensionForKind('sound'), 'vfm2_sound')
 assert.equal(extensionForKind('sequence'), 'vfm2_seq')
 assert.equal(extensionForKind('sound-list'), 'vfm2_list')
 assert.equal(extensionForKind('bundle'), 'vfm2_bundle')
+assert.equal(extensionForKind('backup'), 'vfm2_backup')
 assert.equal(kindFromExtension('Lead.vfm2_sound'), 'sound')
 assert.equal(kindFromExtension('groove.VFM2_SEQ'), 'sequence')
 assert.equal(kindFromExtension('bank.vfm2_list'), 'sound-list')
 assert.equal(kindFromExtension('all.vfm2_bundle'), 'bundle')
+assert.equal(kindFromExtension('device.vfm2_backup'), 'backup')
 assert.equal(libraryFilename('My Voice', 'sound'), 'My Voice.vfm2_sound')
+assert.equal(isCatalogKind('backup'), true)
+assert.equal(isCatalogKind('bundle'), false)
 
 const sound = createInitialSoundProgram()
 sound.name = 'BRASS 1'
@@ -126,5 +133,49 @@ assert.equal(legacyItems[0]?.kind, 'sound')
 assert.equal(legacyItems[1]?.kind, 'sequence')
 assert.equal(legacyItems[2]?.kind, 'sound-list')
 assert.match(legacyItems[0]?.id ?? '', /^[0-9a-f-]{36}$/i)
+
+const backupPrograms = programs.map((program, slot) => (
+    slot === 12 ? { name: 'CHIME', data: program.data } : program
+))
+const backupSequences = Array.from({ length: NUM_OF_SEQUENCES }, (_, slot) => ({
+    ...createEmptySequenceState(),
+    programNo: slot === 3 ? 12 : 0,
+}))
+const backupFile = encodeLibraryFile(
+    'backup',
+    'Device',
+    buildDeviceBackupPayload(backupPrograms, backupSequences),
+)
+const decodedBackup = decodeLibraryFile(backupFile, 'Device.vfm2_backup')
+assert.equal(decodedBackup.kind, 'backup')
+assert.equal(decodedBackup.payload.items, undefined)
+assert.equal(parseDeviceBackupPrograms(decodedBackup.payload)[12].name, 'CHIME')
+assert.equal(parseDeviceBackupSequences(decodedBackup.payload)[3].programNo, 12)
+assert.equal(catalogItemsFromPayload(decodedBackup.payload).length, 0)
+
+assert.throws(() => decodeLibraryFile(encodeLibraryFile('backup', 'Bad', {
+    programs: serializeSoundList(backupPrograms),
+    sequences: backupSequences.slice(0, 15),
+}), 'Bad.vfm2_backup'))
+
+const backupId = '44444444-4444-4444-8444-444444444444'
+const bundleWithBackup = encodeLibraryFile('bundle', 'With Backup', {
+    items: [
+        ...catalogItems,
+        {
+            id: backupId,
+            kind: 'backup' as const,
+            name: 'Device',
+            createdAt: 1_700_000_000_600,
+            updatedAt: 1_700_000_000_700,
+            payload: decodedBackup.payload,
+        },
+    ],
+})
+const decodedBundleWithBackup = decodeLibraryFile(bundleWithBackup, 'With Backup.vfm2_bundle')
+assert.equal(decodedBundleWithBackup.payload.items?.length, 4)
+assert.equal(decodedBundleWithBackup.payload.items?.[3]?.kind, 'backup')
+assert.equal(decodedBundleWithBackup.payload.items?.[3]?.id, backupId)
+assert.equal(parseDeviceBackupPrograms(decodedBundleWithBackup.payload.items?.[3]?.payload ?? {})[12].name, 'CHIME')
 
 console.log('Library file format verification passed.')

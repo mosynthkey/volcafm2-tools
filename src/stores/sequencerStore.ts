@@ -7,7 +7,7 @@ import {
     createSequenceNote, MOTION_PARAM_COUNT, NUM_OF_STEPS, NUM_OF_VOICES_PER_STEP,
     normalizeSequenceState, type SequenceNote, type SequenceState,
 } from '../types/sequence';
-import { decodeSequenceData, encodeCurrentSequenceDump } from '../utils/sequenceCodec';
+import { buildSequenceDataBytes, decodeSequenceData, encodeCurrentSequenceDump } from '../utils/sequenceCodec';
 import { createRandomStepOrder, createReversedStepOrder, createShiftedStepOrder, reorderSequenceSteps, type SequenceReorderScope } from '../utils/sequenceRandomizer';
 import { clearSequenceStep, copySequenceNoteEuclid, copySequenceStep, copySequenceStepsEuclid, tieSequenceStep } from '../utils/sequenceStepEditing';
 import { moveSequenceNotes, resizeSequenceNotes, sameNoteKey, clampedNoteMove, type NoteKey } from '../utils/sequenceNoteEditing';
@@ -393,6 +393,16 @@ export const useSequencerStore = defineStore('sequencer', () => {
         useMidiStore().sendCurrentSequenceDump(buildSysEx());
     };
 
+    let slotWriting = false;
+    const writeToSlot = async (slot: number) => {
+        slotWriting = true;
+        try {
+            return await useMidiStore().writeSequenceSlot(slot, buildSequenceDataBytes(toState()));
+        } finally {
+            slotWriting = false;
+        }
+    };
+
     const requestFromDevice = async (options?: { silent?: boolean }) => {
         const midi = useMidiStore();
         showReceiveErrorDialog.value = false;
@@ -408,6 +418,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
 
     const sendRetry = createSendRetry(sendToDevice);
     watch(() => useMidiStore().sequenceWriteState, state => {
+        if (slotWriting) return;
         sendRetry.handleWriteState(state);
         if (state === 'ok') markSynced();
     });
@@ -598,6 +609,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
         copyNoteEuclid,
         buildSysEx,
         sendToDevice,
+        writeToSlot,
         requestFromDevice,
         handleStepNote,
         toggleStepInput,

@@ -1,7 +1,14 @@
 <template>
   <aside class="sound-panel operator-nav">
     <div class="algorithm-control">
-      <AlgorithmDiagram pickable />
+      <div class="algorithm-stage">
+        <button type="button" class="algorithm-picker-button"
+          :title="t('sound.selectAlgorithm')" :aria-label="t('sound.selectAlgorithm')"
+          @click="soundStore.showAlgorithmPicker = true">
+          <LayoutGrid :size="16" />
+        </button>
+        <AlgorithmDiagram pickable />
+      </div>
       <div class="algorithm-legend" :aria-label="t('sound.algorithmLegend')">
         <span><i class="route"></i>{{ t('sound.modulator') }}</span>
         <span><i class="feedback"></i>{{ t('sound.feedback') }}</span>
@@ -36,6 +43,7 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
+import { LayoutGrid } from '@lucide/vue'
 import { useI18n } from 'vue-i18n';
 import KnobControl from '@/components/KnobControl.vue';
 import AlgorithmDiagram from '@/features/sound/components/AlgorithmDiagram.vue';
@@ -53,7 +61,15 @@ const NumberControl = KnobControl;
 <style scoped>
 .operator-nav { padding-bottom: 10px; }
 .algorithm-control { display: grid; grid-template-columns: 1fr; justify-items: center; gap: 8px; margin: 8px 12px 10px; }
-.algorithm-control > :deep(.algorithm-diagram) { width: min(100%, 248px); height: 148px; justify-self: center; }
+.algorithm-stage { position: relative; width: min(100%, 248px); justify-self: center; }
+.algorithm-stage :deep(.algorithm-diagram) { width: 100%; height: 148px; }
+.algorithm-picker-button {
+  position: absolute; top: 6px; right: 6px; z-index: 2; display: grid; place-items: center;
+  width: 28px; height: 28px; margin: 0; padding: 0;
+  border: 1px solid rgba(206,179,147,.28); border-radius: 7px; background: #251c1e; color: var(--volca-muted); cursor: pointer;
+}
+.algorithm-picker-button:hover { border-color: rgba(206,179,147,.65); color: var(--volca-text); }
+.algorithm-picker-button:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
 .algorithm-legend { display: flex; grid-column: 1 / -1; justify-content: center; gap: 10px; color: #ad9e96; font-size: var(--volca-type-label); }
 .algorithm-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .algorithm-legend i { width: 13px; height: 2px; display: inline-block; background: #f1e9e1; }

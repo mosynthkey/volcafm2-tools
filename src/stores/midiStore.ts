@@ -21,10 +21,14 @@ import { isDesktopApp } from '@/utils/runtime';
 import { formatMidiBytes, MidiTransport } from '@/midi/midiTransport';
 import {
     createCurrentSequenceRequest, createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry,
-    createProgramDump, createProgramRequest, decodeCurrentSequence, decodeCurrentVoice, decodeProgramDump,
-    isCurrentSequenceDump, isCurrentVoiceDump, isDeviceInquiryReply, isProgramDump, isStatusReply, statusLabel,
+    createProgramDump, createProgramRequest, createSequenceDump, createSequenceRequest, decodeCurrentSequence, decodeCurrentVoice,
+    decodeProgramDump, decodeSequenceDump, isCurrentSequenceDump, isCurrentVoiceDump, isDeviceInquiryReply,
+    isProgramDump, isSequenceDump, isStatusReply, statusLabel,
 } from '@/midi/volcaFm2Protocol';
 import { loadProgramReferences, matchCurrentVoice } from '@/midi/programLoader';
+import { decodeSequenceData } from '@/utils/sequenceCodec';
+import { NUM_OF_SEQUENCES } from '@/types/sequence';
+import type { DeviceBackupProgress } from '@/utils/deviceBackup';
 
 type MIDIAccess = globalThis.MIDIAccess;
 type MIDIInput = globalThis.MIDIInput;
@@ -33,8 +37,11 @@ type MIDIMessageEvent = globalThis.MIDIMessageEvent;
 
 const REPLY_TIMEOUT_MS = 4000;
 const SEQUENCE_DUMP_TIMEOUT_MS = 8000;
-const PROGRAM_WRITE_RETRY_COUNT = 5;
-const PROGRAM_WRITE_RETRY_DELAY_MS = 800;
+const BACKUP_PROGRAM_TIMEOUT_MS = 120;
+const BACKUP_SEQUENCE_TIMEOUT_MS = 500;
+const BACKUP_RETRY_COUNT = 4;
+const PROGRAM_WRITE_RETRY_COUNT = 10;
+const PROGRAM_WRITE_RETRY_DELAY_MS = 2000;
 
 export { MIDIConnectionState };
 
@@ -68,10 +75,14 @@ export const useMidiStore = defineStore('midi', () => {
     let currentVoiceWaiter: ((ok: boolean) => void) | null = null;
     let sequenceReadPromise: Promise<boolean> | null = null;
     let sequenceReadWaiter: ((ok: boolean) => void) | null = null;
+    let sequenceWriteWaiter: ((ok: boolean) => void) | null = null;
     let programWriteWaiter: ((ok: boolean) => void) | null = null;
     let detectGeneration = 0;
     let rescanTimer: ReturnType<typeof setTimeout> | null = null;
     let sessionTail = Promise.resolve();
+    let backupProgramSlots: (Uint8Array | undefined)[] = [];
+    let backupSequenceSlots: (Uint8Array | undefined)[] = [];
+    let backupNack = false;
 
     const receivedProgramCount = computed(() => programData.value.filter(Boolean).length);
     const isDeviceReady = computed(() => isDeviceReadyState(connectionState.value));
@@ -83,6 +94,9 @@ export const useMidiStore = defineStore('midi', () => {
     const isFetchingCurrentProgram = computed(() =>
         currentProgramFetchState.value === 'loading-programs'
         || currentProgramFetchState.value === 'requesting');
+    const backupProgress = ref<DeviceBackupProgress | null>(null);
+    const backupFetching = computed(() => backupProgress.value !== null);
+    const backupRestoring = ref(false);
 
     const log = (message: string) => {
         const ts = new Date().toTimeString().slice(0, 8) + '.' + String(new Date().getMilliseconds()).padStart(3, '0');
@@ -280,6 +294,7 @@ export const useMidiStore = defineStore('midi', () => {
             programData.value[programNo] = programDataArray;
             lastReceivedProgram.value = { programNo, name: programName.trim() };
             currentProgramFetchProgress.value = receivedProgramCount.value;
+            if (backupFetching.value) backupProgramSlots[programNo] = programDataArray;
             log(`Program dump received: #${programNo} "${programName}"`);
             if (receivedProgramCount.value === 64) {
                 connectionState.value = MIDIConnectionState.RECEIVED;
@@ -327,8 +342,21 @@ export const useMidiStore = defineStore('midi', () => {
                 }
                 log(`Current sequence dump decode failed: ${error}`);
             }
+        } else if (isSequenceDump(data)) {
+            try {
+                const sequenceNo = data[7] & 0x0f;
+                const sequenceData = decodeSequenceDump(data);
+                if (backupFetching.value) backupSequenceSlots[sequenceNo] = sequenceData;
+                log(`Sequence dump received: #${sequenceNo} (${sequenceData.length} bytes).`);
+            } catch (error) {
+                log(`Sequence dump decode failed: ${error}`);
+            }
         } else if (isStatusReply(data)) {
             log(`Status reply: 0x${data[6].toString(16)} (${statusLabel(data[6])})`);
+            if (backupFetching.value && data[6] !== 0x23) {
+                backupNack = true;
+                return;
+            }
             if (programWriteState.value === 'sending') {
                 const ok = data[6] === 0x23;
                 programWriteState.value = ok ? 'ok' : 'nak';
@@ -337,7 +365,11 @@ export const useMidiStore = defineStore('midi', () => {
                 return;
             }
             if (sequenceWriteState.value === 'sending') {
-                sequenceWriteState.value = data[6] === 0x23 ? 'ok' : 'nak';
+                const ok = data[6] === 0x23;
+                sequenceWriteState.value = ok ? 'ok' : 'nak';
+                sequenceWriteWaiter?.(ok);
+                sequenceWriteWaiter = null;
+                return;
             }
             if (sequenceReadState.value === 'requesting') {
                 sequenceReadState.value = 'error';
@@ -561,6 +593,7 @@ export const useMidiStore = defineStore('midi', () => {
     });
 
     const writeProgramSlot = async (slot: number) => {
+        if (programWriteState.value === 'sending') return false;
         const attempts = PROGRAM_WRITE_RETRY_COUNT + 1;
         for (let attempt = 1; attempt <= attempts; attempt++) {
             programWriteState.value = 'sending';
@@ -597,6 +630,44 @@ export const useMidiStore = defineStore('midi', () => {
         programWriteState.value = 'ok';
         log('Wrote all 64 programs to internal memory.');
         return true;
+    };
+
+    const waitForSequenceWriteAck = () => new Promise<boolean>(resolve => {
+        sequenceWriteWaiter = resolve;
+        armTimeout(
+            () => sequenceWriteState.value === 'sending',
+            () => {
+                sequenceWriteState.value = 'error';
+                sequenceWriteWaiter?.(false);
+                sequenceWriteWaiter = null;
+            },
+            SEQUENCE_DUMP_TIMEOUT_MS,
+        );
+    });
+
+    const writeSequenceSlot = async (slot: number, sequenceData: Uint8Array) => {
+        if (sequenceWriteState.value === 'sending') return false;
+        const sequenceNo = slot & 0x0f;
+        const attempts = PROGRAM_WRITE_RETRY_COUNT + 1;
+        for (let attempt = 1; attempt <= attempts; attempt++) {
+            sequenceWriteState.value = 'sending';
+            const retryLabel = attempt > 1 ? ` (retry ${attempt - 1}/${PROGRAM_WRITE_RETRY_COUNT})` : '';
+            log(`Sending SEQUENCE DATA DUMP (Func 0x4C) to sequence #${sequenceNo}${retryLabel}...`);
+            if (!sendSysEx(createSequenceDump(sequenceNo, sequenceData))) {
+                sequenceWriteState.value = 'error';
+                log(`Failed to send sequence #${sequenceNo}: no MIDI output selected.`);
+                return false;
+            }
+            if (await waitForSequenceWriteAck()) return true;
+            if (sequenceWriteState.value === 'sending') sequenceWriteState.value = 'error';
+            if (attempt === attempts) {
+                log(`Sequence #${sequenceNo} write failed after ${attempts} attempts (${sequenceWriteState.value}).`);
+                return false;
+            }
+            log(`Sequence #${sequenceNo} write failed (${sequenceWriteState.value}); retrying ${attempt}/${PROGRAM_WRITE_RETRY_COUNT}...`);
+            await new Promise(resolve => setTimeout(resolve, PROGRAM_WRITE_RETRY_DELAY_MS));
+        }
+        return false;
     };
 
     const failSequenceRead = (message: string) => {
@@ -698,6 +769,87 @@ export const useMidiStore = defineStore('midi', () => {
         return transport.send(selectedMidiOut.value, bytes);
     };
 
+    const waitForBackupSlot = async (isReady: () => boolean, timeoutMs: number) => {
+        const startedAt = performance.now();
+        backupNack = false;
+        while (!isReady()) {
+            if (backupNack) return false;
+            if (performance.now() - startedAt >= timeoutMs) return false;
+            await new Promise(resolve => setTimeout(resolve, 5));
+        }
+        return true;
+    };
+
+    const requestBackupSlot = async (
+        label: string,
+        request: () => boolean,
+        isReady: () => boolean,
+        initialTimeoutMs: number,
+    ) => {
+        let timeoutMs = initialTimeoutMs;
+        for (let attempt = 1; attempt <= BACKUP_RETRY_COUNT; attempt++) {
+            if (!request()) return false;
+            if (await waitForBackupSlot(isReady, timeoutMs)) return true;
+            log(`${label} timed out after ${timeoutMs}ms (attempt ${attempt}/${BACKUP_RETRY_COUNT}); backing off.`);
+            timeoutMs *= 2;
+        }
+        return false;
+    };
+
+    const captureDeviceBackup = async () => {
+        if (backupFetching.value) return null;
+        if (!isIdleConnected.value || !selectedMidiOut.value) {
+            log('Device backup failed: volca fm2 is not connected.');
+            return null;
+        }
+        backupProgramSlots = Array.from({ length: SOUND_LIST_SLOT_COUNT });
+        backupSequenceSlots = Array.from({ length: NUM_OF_SEQUENCES });
+        backupProgress.value = { phase: 'program', current: 0, total: SOUND_LIST_SLOT_COUNT };
+        log('Capturing device backup: 64 programs and 16 sequences...');
+        try {
+            for (let slot = 0; slot < SOUND_LIST_SLOT_COUNT; slot++) {
+                backupProgress.value = { phase: 'program', current: slot + 1, total: SOUND_LIST_SLOT_COUNT };
+                backupProgramSlots[slot] = undefined;
+                const ok = await requestBackupSlot(
+                    `Backup program #${slot}`,
+                    () => sendSysEx(createProgramRequest(slot)),
+                    () => Boolean(backupProgramSlots[slot]),
+                    BACKUP_PROGRAM_TIMEOUT_MS,
+                );
+                if (!ok || !backupProgramSlots[slot]) {
+                    log(`Device backup failed: program #${slot} was not received.`);
+                    return null;
+                }
+            }
+            for (let slot = 0; slot < NUM_OF_SEQUENCES; slot++) {
+                backupProgress.value = { phase: 'sequence', current: slot + 1, total: NUM_OF_SEQUENCES };
+                backupSequenceSlots[slot] = undefined;
+                const ok = await requestBackupSlot(
+                    `Backup sequence #${slot}`,
+                    () => sendSysEx(createSequenceRequest(slot)),
+                    () => Boolean(backupSequenceSlots[slot]),
+                    BACKUP_SEQUENCE_TIMEOUT_MS,
+                );
+                if (!ok || !backupSequenceSlots[slot]) {
+                    log(`Device backup failed: sequence #${slot} was not received.`);
+                    return null;
+                }
+            }
+            const programs = backupProgramSlots.map((data, slot) => ({
+                name: packedVoiceName(data as Uint8Array),
+                data: padProgramDump(data as Uint8Array),
+            }));
+            const sequences = backupSequenceSlots.map(data => decodeSequenceData(data as Uint8Array));
+            log('Device backup complete: 64 programs and 16 sequences.');
+            return { programs, sequences };
+        } finally {
+            backupProgress.value = null;
+            backupProgramSlots = [];
+            backupSequenceSlots = [];
+            backupNack = false;
+        }
+    };
+
     return {
         connectionState,
         midiInputs,
@@ -727,6 +879,9 @@ export const useMidiStore = defineStore('midi', () => {
         isLibraryReady,
         isSearching,
         isFetchingCurrentProgram,
+        backupProgress,
+        backupFetching,
+        backupRestoring,
         initMIDI,
         bootMIDI,
         reconnectMIDI,
@@ -748,6 +903,8 @@ export const useMidiStore = defineStore('midi', () => {
         sendCurrentSequenceDump,
         requestCurrentVoiceDump,
         sendCurrentVoiceDump,
+        writeProgramSlot,
+        writeSequenceSlot,
         writeSoundListToDevice,
         addLog: log,
         clearLogs,
@@ -755,6 +912,7 @@ export const useMidiStore = defineStore('midi', () => {
         onMidiMessage,
         onProgramChange,
         sendMidiMessage,
+        captureDeviceBackup,
         reset,
     };
 });

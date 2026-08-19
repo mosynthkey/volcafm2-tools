@@ -3,7 +3,8 @@ import { createMidiMessageRouter } from '../src/midi/midiMessageRouter'
 import { createSysexAssembler } from '../src/midi/sysexAssembler'
 import { buildDx7Cartridge } from '../src/midi/dx7Cartridge'
 import { createCurrentSequenceRequest, createCurrentVoiceDump, createCurrentVoiceRequest, createDeviceInquiry, createProgramDump, createProgramRequest,
-  decodeCurrentSequence, decodeCurrentVoice, decodeProgramDump, isCurrentSequenceDump, isCurrentVoiceDump, isProgramDump, unpackProgramDump } from '../src/midi/volcaFm2Protocol'
+  createSequenceDump, createSequenceRequest, decodeCurrentSequence, decodeCurrentVoice, decodeProgramDump, decodeSequenceDump,
+  isCurrentSequenceDump, isCurrentVoiceDump, isProgramDump, isSequenceDump, unpackProgramDump } from '../src/midi/volcaFm2Protocol'
 import { encodeCurrentSequenceDump } from '../src/utils/sequenceCodec'
 import { createEmptySequenceState } from '../src/types/sequence'
 import { loadProgramReferences, matchCurrentVoice } from '../src/midi/programLoader'
@@ -63,5 +64,14 @@ assert.equal(cartridge[cartridge.length - 2], (0x100 - (1 + 2 + 3)) & 0x7f)
 const sequenceDump = encodeCurrentSequenceDump(createEmptySequenceState())
 assert.equal(isCurrentSequenceDump(sequenceDump), true)
 assert.equal(decodeCurrentSequence(sequenceDump).length, 1920)
+
+assert.deepEqual([...createSequenceRequest(15)], [0xf0, 0x42, 0x30, 0, 1, 0x2f, 0x1c, 0x0f, 0xf7])
+assert.deepEqual([...createSequenceRequest(16)], [0xf0, 0x42, 0x30, 0, 1, 0x2f, 0x1c, 0, 0xf7])
+const sequenceBytes = decodeCurrentSequence(sequenceDump)
+const slotSequenceDump = createSequenceDump(12, sequenceBytes)
+assert.equal(isSequenceDump(slotSequenceDump), true)
+assert.equal(slotSequenceDump[6], 0x4c)
+assert.equal(slotSequenceDump[7], 12)
+assert.deepEqual(decodeSequenceDump(slotSequenceDump), sequenceBytes)
 
 console.log('MIDI protocol and message router verification passed.')

@@ -1,7 +1,6 @@
 <template>
-  <svg class="algorithm-diagram" :class="{ pickable }" viewBox="0 0 152 91" :role="pickable ? 'button' : 'img'"
-    :tabindex="pickable ? 0 : undefined" :aria-label="t('sound.algorithmN', { count: algorithmIndex + 1 })"
-    @click="pickable && (sound.showAlgorithmPicker = true)" @keydown.enter.self.prevent="pickable && (sound.showAlgorithmPicker = true)">
+  <svg class="algorithm-diagram" :class="{ pickable }" viewBox="0 0 152 91" role="img"
+    :aria-label="t('sound.algorithmN', { count: algorithmIndex + 1 })">
     <g class="algorithm-routes" aria-hidden="true">
       <template v-for="operator in layout" :key="`route-${operator[0]}`">
         <path v-if="linkPath(operator)" :class="isCarrier(operator) ? 'output-line' : 'routing-line'" :d="linkPath(operator)" />
@@ -66,9 +65,6 @@ const feedbackPath = (operator: DexedAlgorithmOperator) => {
 
 <style scoped>
 .algorithm-diagram { width: 100%; height: 256px; border: 1px solid rgba(241,233,225,.18); border-radius: 8px; background: #1c1516; }
-.algorithm-diagram.pickable { cursor: pointer; }
-.algorithm-diagram.pickable:hover { border-color: rgba(206,179,147,.48); }
-.algorithm-diagram.pickable:focus-visible { outline: 2px solid #ceb393; outline-offset: 2px; }
 .routing-line,.feedback-line,.output-line { fill: none; stroke-width: 1.5; stroke-linecap: butt; stroke-linejoin: round; }
 .routing-line { stroke: #f1e9e1; }
 .feedback-line { stroke: var(--volca-teal); }

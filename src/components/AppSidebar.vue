@@ -40,15 +40,15 @@
       </button>
       <a class="sidebar-home-link" href="https://mosynthkey.github.io/"
         :aria-label="t('app.backToMelissaAudio')" :title="t('app.backToMelissaAudio')">
-        <span class="nav-icon"><ArrowLeft :size="18" /></span>
-        <span>{{ t('app.backToMelissaAudio') }}</span>
+        <span class="sidebar-home-link__label">{{ t('app.backToMelissaAudio') }}</span>
+        <span class="nav-icon"><ArrowUpRight :size="16" /></span>
       </a>
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { ArrowLeft, Library, PanelLeftClose, PanelLeftOpen } from '@lucide/vue';
+import { ArrowUpRight, Library, PanelLeftClose, PanelLeftOpen } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import LanguageSwitch from '@/components/LanguageSwitch.vue';
 import ProgramEditIcon from '@/components/icons/ProgramEditIcon.vue';

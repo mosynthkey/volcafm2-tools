@@ -7,6 +7,49 @@
         <v-btn @click="confirmReplace">{{ t('library.replaceList') }}</v-btn>
       </template>
     </AppDialog>
+    <AppProgressDialog
+      :model-value="midiStore.backupFetching"
+      :title="t('library.backupFetchTitle')"
+      :description="backupProgressCopy"
+      :value="backupProgressPercent"
+    />
+    <AppProgressDialog
+      :model-value="backupRestoreProgress !== null"
+      :title="t('library.backupLoadAllTitle')"
+      :description="backupRestoreCopy"
+      :value="backupRestorePercent"
+    />
+    <AppDialog v-model="showBackupRestoreConfirm" :title="t('library.backupLoadAllTitle')" max-width="480">
+      <p>{{ t('library.backupLoadAllDescription') }}</p>
+      <template #actions>
+        <v-btn variant="text" @click="showBackupRestoreConfirm = false">{{ t('common.cancel') }}</v-btn>
+        <v-btn @click="confirmBackupRestoreAll">{{ t('library.backupLoadAll') }}</v-btn>
+      </template>
+    </AppDialog>
+    <AppDialog :model-value="backupWritePhase !== null" :title="t('library.backupLoadWriteTitle')" max-width="480" :persistent="true" :closable="false">
+      <p>{{ backupWriteCopy }}</p>
+    </AppDialog>
+    <LibraryBackupDialog
+      v-model="showBackupBrowser"
+      :title="backupBrowserTitle"
+      :programs="backupPrograms"
+      :sequences="backupSequences"
+      :loading="backupBusy"
+      :error-message="backupBrowserError"
+      @load-program="loadBackupProgram"
+      @load-sequence="loadBackupSequence"
+      @load-with-program="openBackupSlotPicker"
+      @load-all="openBackupRestoreConfirm"
+    />
+    <LibraryBackupProgramSlotDialog
+      v-model="showBackupSlotPicker"
+      :source-slot="backupSourceSlot"
+      :source-name="backupSourceName"
+      :dest-names="midiStore.programNames"
+      :loading="backupSlotBusy"
+      :error-message="backupSlotError"
+      @confirm="confirmBackupSlot"
+    />
     <AppDialog v-model="showImportResult" :title="t('library.importResultTitle')" max-width="480">
       <p>{{ t('library.importSkipPolicy') }}</p>
       <p>{{ t('library.importResult', { added: importResult.added, skipped: importResult.skipped }) }}</p>
@@ -72,7 +115,7 @@
         </div>
       </div>
 
-      <div v-if="!isDesktopApp || activeKind === 'bundle'" class="library-notes">
+      <div v-if="!isDesktopApp || activeKind === 'bundle' || activeKind === 'backup'" class="library-notes">
         <p v-if="!isDesktopApp" class="library-storage-notice" role="note">
           <Info :size="16" aria-hidden="true" />
           <span>
@@ -86,6 +129,10 @@
             >{{ t('library.storageNoticeLink') }}</button>{{ t('library.storageNoticeAfter') }}
           </span>
         </p>
+        <p v-if="activeKind === 'backup'" class="library-bundle-note">
+          <Info :size="16" aria-hidden="true" />
+          <span>{{ t('library.backupDescription') }}</span>
+        </p>
         <p v-if="activeKind === 'bundle'" class="library-bundle-note">
           <Info :size="16" aria-hidden="true" />
           <span>{{ t('library.bundleDescription') }}</span>
@@ -96,10 +143,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Download, FileUp, FolderOpen, Info, Save, Trash2, Undo2 } from '@lucide/vue';
 import AppDialog from '@/components/dialogs/AppDialog.vue';
+import AppProgressDialog from '@/components/dialogs/AppProgressDialog.vue';
+import LibraryBackupDialog from '@/components/LibraryBackupDialog.vue';
+import LibraryBackupProgramSlotDialog from '@/components/LibraryBackupProgramSlotDialog.vue';
 import { useLibraryCurrent } from '@/composables/useLibraryCurrent';
 import { useMidiStore } from '@/stores/midiStore';
 import { useSequencerStore } from '@/stores/sequencerStore';
@@ -112,15 +162,25 @@ import {
     catalogItemsFromPayload,
     decodeLibraryFile,
     encodeLibraryFile,
+    isCatalogKind,
     libraryFilename,
     deserializeSoundList,
     type DecodedLibraryFile,
     type LibraryKind,
 } from '@/utils/libraryFormat';
-import { deleteLibrary, importLibraryRecords, listLibrary, type LibraryRecord } from '@/utils/presetLibrary';
+import { deleteLibrary, importLibraryRecords, listLibrary, saveLibrary, type LibraryRecord } from '@/utils/presetLibrary';
+import {
+    buildDeviceBackupPayload,
+    parseDeviceBackupPrograms,
+    parseDeviceBackupSequences,
+    type DeviceBackupProgress,
+} from '@/utils/deviceBackup';
+import { NUM_OF_SEQUENCES, type SequenceState } from '@/types/sequence';
+import { SOUND_LIST_SLOT_COUNT, type SoundListProgram } from '@/utils/soundListBackup';
 import { formatThrownError } from '@/utils/appError';
 import { downloadText } from '@/utils/downloadBinary';
 import { isDesktopApp } from '@/utils/runtime';
+import { buildSequenceDataBytes } from '@/utils/sequenceCodec';
 
 const ui = useUiStore();
 const soundStore = useSoundStore();
@@ -143,6 +203,58 @@ const pendingLoad = ref<LibraryRecord | null>(null);
 const showImportResult = ref(false);
 const importResult = ref({ added: 0, skipped: 0 });
 const hasDownloadableLibrary = ref(false);
+const showBackupBrowser = ref(false);
+const backupBrowserTitle = ref('');
+const backupPrograms = ref<SoundListProgram[]>([]);
+const backupSequences = ref<SequenceState[]>([]);
+const showBackupSlotPicker = ref(false);
+const pendingSequenceSlot = ref(0);
+const backupSlotBusy = ref(false);
+const backupSlotError = ref('');
+const backupBrowserError = ref('');
+const backupWritePhase = ref<'program' | 'sequence' | null>(null);
+const showBackupRestoreConfirm = ref(false);
+const backupRestoreProgress = ref<DeviceBackupProgress | null>(null);
+
+const backupBusy = computed(() => backupWritePhase.value !== null || backupRestoreProgress.value !== null);
+
+const backupWriteCopy = computed(() => {
+  if (backupWritePhase.value === 'program') return t('library.backupWritingProgram');
+  if (backupWritePhase.value === 'sequence') return t('library.backupWritingSequence');
+  return '';
+});
+
+const backupProgressCopy = computed(() => {
+  const progress = midiStore.backupProgress;
+  if (!progress) return '';
+  const key = progress.phase === 'program' ? 'library.backupFetchPrograms' : 'library.backupFetchSequences';
+  return t(key, { current: progress.current, total: progress.total });
+});
+
+const backupProgressPercent = computed(() => {
+  const progress = midiStore.backupProgress;
+  if (!progress) return 0;
+  const completed = progress.phase === 'program'
+    ? progress.current
+    : SOUND_LIST_SLOT_COUNT + progress.current;
+  return (completed / (SOUND_LIST_SLOT_COUNT + NUM_OF_SEQUENCES)) * 100;
+});
+
+const backupRestoreCopy = computed(() => {
+  const progress = backupRestoreProgress.value;
+  if (!progress) return '';
+  const key = progress.phase === 'program' ? 'library.backupFetchPrograms' : 'library.backupFetchSequences';
+  return t(key, { current: progress.current, total: progress.total });
+});
+
+const backupRestorePercent = computed(() => {
+  const progress = backupRestoreProgress.value;
+  if (!progress) return 0;
+  const completed = progress.phase === 'program'
+    ? progress.current
+    : SOUND_LIST_SLOT_COUNT + progress.current;
+  return (completed / (SOUND_LIST_SLOT_COUNT + NUM_OF_SEQUENCES)) * 100;
+});
 
 const kindLabel = (kind: LibraryKind) => t(
   kind === 'sound-list' ? 'library.kinds.soundList' : `library.kinds.${kind}`,
@@ -212,7 +324,7 @@ const refresh = async () => {
       isDesktopApp ? Promise.resolve([]) : listLibrary(),
     ]);
     records.value = kindRecords;
-    hasDownloadableLibrary.value = allRecords.some(record => record.kind !== 'bundle');
+    hasDownloadableLibrary.value = allRecords.some(record => isCatalogKind(record.kind));
   } catch (error) {
     errorMessage.value = thrown(error, 'library.loadError');
   } finally {
@@ -253,7 +365,20 @@ const saveCurrent = async () => {
   busy.value = 'save';
   errorMessage.value = '';
   try {
-    await saveKind(activeKind.value, name);
+    if (activeKind.value === 'backup') {
+      if (!midiStore.isIdleConnected) {
+        errorMessage.value = t('library.backupNotConnected');
+        return;
+      }
+      const captured = await midiStore.captureDeviceBackup();
+      if (!captured) {
+        errorMessage.value = t('library.backupFetchFailed');
+        return;
+      }
+      await saveLibrary('backup', name, buildDeviceBackupPayload(captured.programs, captured.sequences));
+    } else {
+      await saveKind(activeKind.value, name);
+    }
     await refresh();
   } catch (error) {
     errorMessage.value = thrown(error, 'library.saveError');
@@ -274,6 +399,14 @@ const loadRecord = async (record: LibraryRecord) => {
         payload: record.payload,
       }));
       await refresh();
+      return;
+    }
+    if (record.kind === 'backup') {
+      backupBrowserTitle.value = record.name;
+      backupPrograms.value = parseDeviceBackupPrograms(record.payload);
+      backupSequences.value = parseDeviceBackupSequences(record.payload);
+      backupBrowserError.value = '';
+      showBackupBrowser.value = true;
       return;
     }
     if (needsListConfirm(record.kind)) {
@@ -384,12 +517,167 @@ const removeRecord = async (id: string) => {
 const formatDate = (timestamp: number) => new Intl.DateTimeFormat(locale.value, {
   dateStyle: 'medium', timeStyle: 'short',
 }).format(timestamp);
+
+const loadBackupProgram = async (slot: number) => {
+  const program = backupPrograms.value[slot];
+  if (!program) return;
+  if (!midiStore.isIdleConnected) {
+    backupBrowserError.value = t('library.backupNotConnected');
+    return;
+  }
+  backupBrowserError.value = '';
+  backupWritePhase.value = 'program';
+  try {
+    midiStore.updateSoundListSlot(slot, program.data);
+    const ok = await midiStore.writeProgramSlot(slot);
+    if (!ok) {
+      backupBrowserError.value = t('library.backupLoadProgramSlotWriteFailed');
+      return;
+    }
+    midiStore.matchedProgramNo = slot;
+    soundStore.loadFromVoiceData(program.data);
+    soundStore.sendToDevice();
+    showBackupBrowser.value = false;
+    ui.activeTab = 'sound-edit';
+  } finally {
+    backupWritePhase.value = null;
+  }
+};
+
+const backupSourceSlot = computed(() => backupSequences.value[pendingSequenceSlot.value]?.programNo ?? 0);
+const backupSourceName = computed(() => backupPrograms.value[backupSourceSlot.value]?.name ?? '');
+
+const openBackupSlotPicker = (slot: number) => {
+  pendingSequenceSlot.value = slot;
+  backupSlotError.value = '';
+  showBackupSlotPicker.value = true;
+};
+
+const applyBackupSequence = (slot: number, programNo?: number) => {
+  const sequence = backupSequences.value[slot];
+  if (!sequence) return;
+  seqStore.loadPreset(programNo === undefined ? sequence : { ...sequence, programNo });
+  showBackupSlotPicker.value = false;
+  showBackupBrowser.value = false;
+  ui.activeTab = 'sequencer';
+};
+
+const writeBackupSequenceSlot = async (slot: number, programNo?: number) => {
+  const sequence = backupSequences.value[slot];
+  if (!sequence) return false;
+  const state = programNo === undefined ? sequence : { ...sequence, programNo };
+  return midiStore.writeSequenceSlot(slot, buildSequenceDataBytes(state));
+};
+
+const loadBackupSequence = async (slot: number) => {
+  if (!midiStore.isIdleConnected) {
+    backupBrowserError.value = t('library.backupNotConnected');
+    return;
+  }
+  backupBrowserError.value = '';
+  backupWritePhase.value = 'sequence';
+  try {
+    const ok = await writeBackupSequenceSlot(slot);
+    if (!ok) {
+      backupBrowserError.value = t('library.backupLoadSequenceSlotWriteFailed');
+      return;
+    }
+    applyBackupSequence(slot);
+  } finally {
+    backupWritePhase.value = null;
+  }
+};
+
+const openBackupRestoreConfirm = () => {
+  if (!midiStore.isIdleConnected) {
+    backupBrowserError.value = t('library.backupNotConnected');
+    return;
+  }
+  backupBrowserError.value = '';
+  showBackupRestoreConfirm.value = true;
+};
+
+const confirmBackupRestoreAll = async () => {
+  if (backupBusy.value) return;
+  if (!midiStore.isIdleConnected) {
+    backupBrowserError.value = t('library.backupNotConnected');
+    return;
+  }
+  showBackupRestoreConfirm.value = false;
+  backupBrowserError.value = '';
+  midiStore.backupRestoring = true;
+  midiStore.replaceSoundList(backupPrograms.value);
+  backupRestoreProgress.value = { phase: 'program', current: 0, total: SOUND_LIST_SLOT_COUNT };
+  try {
+    for (let slot = 0; slot < SOUND_LIST_SLOT_COUNT; slot++) {
+      backupRestoreProgress.value = { phase: 'program', current: slot + 1, total: SOUND_LIST_SLOT_COUNT };
+      const ok = await midiStore.writeProgramSlot(slot);
+      if (!ok) {
+        backupBrowserError.value = t('library.backupLoadProgramSlotWriteFailed');
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    for (let slot = 0; slot < NUM_OF_SEQUENCES; slot++) {
+      backupRestoreProgress.value = { phase: 'sequence', current: slot + 1, total: NUM_OF_SEQUENCES };
+      const ok = await writeBackupSequenceSlot(slot);
+      if (!ok) {
+        backupBrowserError.value = t('library.backupLoadSequenceSlotWriteFailed');
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    showBackupBrowser.value = false;
+  } finally {
+    backupRestoreProgress.value = null;
+    midiStore.backupRestoring = false;
+  }
+};
+
+const confirmBackupSlot = async (destSlot: number) => {
+  const sequence = backupSequences.value[pendingSequenceSlot.value];
+  if (!sequence) return;
+  const dest = Math.max(0, Math.min(63, destSlot));
+  const program = backupPrograms.value[sequence.programNo];
+  if (!midiStore.isIdleConnected) {
+    backupSlotError.value = t('library.backupNotConnected');
+    return;
+  }
+  backupSlotBusy.value = true;
+  backupSlotError.value = '';
+  try {
+    if (program) {
+      backupWritePhase.value = 'program';
+      midiStore.updateSoundListSlot(dest, program.data);
+      const programOk = await midiStore.writeProgramSlot(dest);
+      if (!programOk) {
+        backupSlotError.value = t('library.backupLoadProgramSlotWriteFailed');
+        return;
+      }
+    }
+    backupWritePhase.value = 'sequence';
+    const sequenceOk = await writeBackupSequenceSlot(pendingSequenceSlot.value, dest);
+    if (!sequenceOk) {
+      backupSlotError.value = t('library.backupLoadSequenceSlotWriteFailed');
+      return;
+    }
+    if (program) {
+      midiStore.matchedProgramNo = dest;
+      soundStore.loadFromVoiceData(program.data);
+      soundStore.sendToDevice();
+    }
+    applyBackupSequence(pendingSequenceSlot.value, dest);
+  } finally {
+    backupSlotBusy.value = false;
+    backupWritePhase.value = null;
+  }
+};
 </script>
 
 <style scoped>
 .library-container { height: 100%; box-sizing: border-box; }
 .library-card { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.library-tabs { display: flex; flex: 0 0 auto; gap: 4px; margin: 4px 0 16px; border-bottom: 1px solid var(--volca-line); }
+.library-tabs { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 4px; margin: 4px 0 16px; border-bottom: 1px solid var(--volca-line); }
 .library-tab {
   height: 40px; padding: 0 16px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
   background: transparent; color: var(--volca-muted); font: inherit; font-size: var(--volca-type-body);

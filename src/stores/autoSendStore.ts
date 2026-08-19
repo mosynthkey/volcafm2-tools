@@ -50,7 +50,9 @@ export const useAutoSendStore = defineStore('autoSend', () => {
         || sequence.sendRetrying
         || sound.sendRetrying
         || midi.connectionState === MIDIConnectionState.RECEIVING
-        || sequence.showCaptureDialog;
+        || sequence.showCaptureDialog
+        || midi.backupFetching
+        || midi.backupRestoring;
 
     const soundDirty = () => sound.hasUnsavedChanges;
     const sequenceDirty = () => sequenceSignature() !== lastSentSequence;
