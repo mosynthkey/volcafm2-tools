@@ -112,6 +112,55 @@ export const previewResizedNotes = (
         ));
 };
 
+export type NoteMovePlan = {
+    moving: SequenceNote[];
+    dPitch: number;
+    dStep: number;
+    placements: SequenceNote[];
+}
+
+/** Wrap a note's start so it stays in range and keeps its length (step 16 + 1 → step 1). */
+export const wrappedStartStep = (startStep: number, length: number, stepDelta: number) => {
+    const maxStart = Math.max(0, NUM_OF_STEPS - Math.max(1, length));
+    const span = maxStart + 1;
+    return ((startStep + Math.round(stepDelta)) % span + span) % span;
+};
+
+export const planNoteMove = (
+    notes: SequenceNote[],
+    keys: NoteKey[],
+    pitchDelta: number,
+    stepDelta: number,
+    pitchMin: number,
+    pitchMax: number,
+    wrapSteps = false,
+): NoteMovePlan => {
+    const keySet = new Set(keys.map(noteKeyOf));
+    const moving = notes.filter(note => keySet.has(noteKeyOf(note)));
+    if (!moving.length) return { moving, dPitch: 0, dStep: 0, placements: [] };
+
+    const minPitch = Math.min(...moving.map(note => note.pitch));
+    const maxPitch = Math.max(...moving.map(note => note.pitch));
+    const dPitch = Math.max(pitchMin - minPitch, Math.min(pitchMax - maxPitch, Math.round(pitchDelta)));
+    const rawStepDelta = Math.round(stepDelta);
+    const minStart = Math.min(...moving.map(note => note.startStep));
+    const maxEnd = Math.max(...moving.map(note => note.startStep + note.length - 1));
+    const dStep = wrapSteps
+        ? rawStepDelta
+        : Math.max(-minStart, Math.min(NUM_OF_STEPS - 1 - maxEnd, rawStepDelta));
+
+    const placements = moving.map(note => createSequenceNote(
+        note.pitch + dPitch,
+        wrapSteps
+            ? wrappedStartStep(note.startStep, note.length, rawStepDelta)
+            : note.startStep + dStep,
+        note.length,
+        note.velocity,
+        note.gatePercent,
+    ));
+    return { moving, dPitch, dStep, placements };
+};
+
 export const clampedNoteMove = (
     notes: SequenceNote[],
     keys: NoteKey[],
@@ -120,18 +169,42 @@ export const clampedNoteMove = (
     pitchMin: number,
     pitchMax: number,
 ) => {
+    const { moving, dPitch, dStep } = planNoteMove(notes, keys, pitchDelta, stepDelta, pitchMin, pitchMax);
+    return { moving, dPitch, dStep };
+};
+
+export const movedNoteKeys = (keys: NoteKey[], plan: NoteMovePlan): NoteKey[] => {
+    const byOldKey = new Map(plan.moving.map((note, noteIndex) => [noteKeyOf(note), plan.placements[noteIndex]]));
+    return keys.map(key => {
+        const next = byOldKey.get(noteKeyOf(key));
+        return next ? { pitch: next.pitch, startStep: next.startStep } : key;
+    });
+};
+
+export const applyPlannedNoteMove = (
+    notes: SequenceNote[],
+    keys: NoteKey[],
+    plan: NoteMovePlan,
+): SequenceNote[] | null => {
+    const { moving, placements } = plan;
+    if (!moving.length) return notes;
+    const stepChanged = placements.some((note, noteIndex) => note.startStep !== moving[noteIndex].startStep);
+    if (!plan.dPitch && !stepChanged) return notes;
+
+    for (let noteIndex = 0; noteIndex < placements.length; noteIndex++) {
+        for (let otherIndex = noteIndex + 1; otherIndex < placements.length; otherIndex++) {
+            if (notesOverlapOnPitch(placements[noteIndex], placements[otherIndex])) return null;
+        }
+    }
+
     const keySet = new Set(keys.map(noteKeyOf));
-    const moving = notes.filter(note => keySet.has(noteKeyOf(note)));
-    if (!moving.length) return { moving, dPitch: 0, dStep: 0 };
-    const minStart = Math.min(...moving.map(note => note.startStep));
-    const maxEnd = Math.max(...moving.map(note => note.startStep + note.length - 1));
-    const minPitch = Math.min(...moving.map(note => note.pitch));
-    const maxPitch = Math.max(...moving.map(note => note.pitch));
-    return {
-        moving,
-        dStep: Math.max(-minStart, Math.min(NUM_OF_STEPS - 1 - maxEnd, Math.round(stepDelta))),
-        dPitch: Math.max(pitchMin - minPitch, Math.min(pitchMax - maxPitch, Math.round(pitchDelta))),
-    };
+    let next = notes.filter(note => !keySet.has(noteKeyOf(note)));
+    for (const note of placements) next = replaceOverlappingPitch(next, note);
+    for (const note of placements) {
+        if (!canPlace(next, note.startStep, note.length)) return null;
+        next = [...next, note];
+    }
+    return next;
 };
 
 export const moveSequenceNotes = (
@@ -141,28 +214,14 @@ export const moveSequenceNotes = (
     stepDelta: number,
     pitchMin: number,
     pitchMax: number,
+    wrapSteps = false,
 ): SequenceNote[] | null => {
     if (!keys.length) return notes;
-    const { moving, dPitch, dStep } = clampedNoteMove(notes, keys, pitchDelta, stepDelta, pitchMin, pitchMax);
-    if (!moving.length) return notes;
-    if (!dPitch && !dStep) return notes;
-
-    const keySet = new Set(keys.map(noteKeyOf));
-    const staying = notes.filter(note => !keySet.has(noteKeyOf(note)));
-    const moved = moving.map(note => createSequenceNote(
-        note.pitch + dPitch,
-        note.startStep + dStep,
-        note.length,
-        note.velocity,
-        note.gatePercent,
-    ));
-    let next = staying;
-    for (const note of moved) next = replaceOverlappingPitch(next, note);
-    for (const note of moved) {
-        if (!canPlace(next, note.startStep, note.length)) return null;
-        next = [...next, note];
-    }
-    return next;
+    return applyPlannedNoteMove(
+        notes,
+        keys,
+        planNoteMove(notes, keys, pitchDelta, stepDelta, pitchMin, pitchMax, wrapSteps),
+    );
 };
 
 export const previewMovedNotes = (
