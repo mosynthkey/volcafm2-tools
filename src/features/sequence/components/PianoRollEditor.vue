@@ -284,12 +284,17 @@ const onRollKeydown = (event: KeyboardEvent) => {
     const tag = target.tagName
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return
   }
-  if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
+  if ((event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+    && !event.altKey && !event.metaKey && !event.ctrlKey) {
     if (!sequence.selectedNoteKeys.length) return
     event.preventDefault()
-    const delta = event.key === 'ArrowUp' ? 12 : -12
-    if (sequence.moveSelectedNotes(delta, 0, PITCH_MIN, PITCH_MAX)) {
-      audition(sequence.selectedNoteKeys.map(key => key.pitch))
+    const pitchDelta = event.key === 'ArrowUp' ? (event.shiftKey ? 12 : 1)
+      : event.key === 'ArrowDown' ? (event.shiftKey ? -12 : -1)
+        : 0
+    const stepDelta = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0
+    // Horizontal nudges wrap around the 16-step loop; pitch stays clamped.
+    if (sequence.moveSelectedNotes(pitchDelta, stepDelta, PITCH_MIN, PITCH_MAX, stepDelta !== 0)) {
+      if (pitchDelta) audition(sequence.selectedNoteKeys.map(key => key.pitch))
     }
     return
   }

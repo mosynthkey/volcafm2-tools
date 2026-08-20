@@ -9,7 +9,7 @@ const messages = {
       changelog: [
         'volca fm2本体の16 SequenceとProgramをバックアップ／リストアする機能を追加しました。',
         'ピアノロールで、ノートのない場所をドラッグしてもノートを選択できるようになりました。矩形選択モードはなくなりました。',
-        'ノートを選択した状態で Shift + ↑↓ により Octave を変更できるようになりました。',
+        'ノートを選択した状態で、↑↓で半音、Shift + ↑↓でオクターブ、←→でステップ移動（端で折り返し）できるようになりました。',
         'Program / Sequence の書き込みボタンを追加しました。',
       ],
       expandSidebar: '左ペインを広げる', collapseSidebar: '左ペインを折りたたむ',
@@ -199,7 +199,7 @@ const messages = {
       changelog: [
         'Added backup and restore for Programs and the 16 Sequences on the volca fm2.',
         'Dragging from empty space on the piano roll now selects notes. Rectangle selection mode has been removed.',
-        'With notes selected, Shift + ↑↓ now changes the Octave.',
+        'With notes selected, ↑↓ move by a semitone, Shift + ↑↓ change the octave, and ←→ move by a step (wrapping at the edges).',
         'Added Write buttons for Program and Sequence.',
       ],
       language: 'Language',

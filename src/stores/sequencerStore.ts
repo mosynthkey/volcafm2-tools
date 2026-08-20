@@ -10,7 +10,7 @@ import {
 import { buildSequenceDataBytes, decodeSequenceData, encodeCurrentSequenceDump } from '../utils/sequenceCodec';
 import { createRandomStepOrder, createReversedStepOrder, createShiftedStepOrder, reorderSequenceSteps, type SequenceReorderScope } from '../utils/sequenceRandomizer';
 import { clearSequenceStep, copySequenceNoteEuclid, copySequenceStep, copySequenceStepsEuclid, tieSequenceStep } from '../utils/sequenceStepEditing';
-import { moveSequenceNotes, resizeSequenceNotes, sameNoteKey, clampedNoteMove, type NoteKey } from '../utils/sequenceNoteEditing';
+import { resizeSequenceNotes, sameNoteKey, planNoteMove, applyPlannedNoteMove, movedNoteKeys, type NoteKey } from '../utils/sequenceNoteEditing';
 import { extractStepNotes, parseSmf } from '../utils/smfImport';
 import { formatThrownError } from '../utils/appError';
 import { getPref, setPref } from '../utils/appPrefs';
@@ -270,12 +270,18 @@ export const useSequencerStore = defineStore('sequencer', () => {
         return applyNotes(next, keys);
     };
 
-    const moveSelectedNotes = (pitchDelta: number, stepDelta: number, pitchMin: number, pitchMax: number) => {
+    const moveSelectedNotes = (
+        pitchDelta: number,
+        stepDelta: number,
+        pitchMin: number,
+        pitchMax: number,
+        wrapSteps = false,
+    ) => {
         const keys = selectedNoteKeys.value;
-        const next = moveSequenceNotes(notes.value, keys, pitchDelta, stepDelta, pitchMin, pitchMax);
+        const plan = planNoteMove(notes.value, keys, pitchDelta, stepDelta, pitchMin, pitchMax, wrapSteps);
+        const next = applyPlannedNoteMove(notes.value, keys, plan);
         if (!next) return false;
-        const { dPitch, dStep } = clampedNoteMove(notes.value, keys, pitchDelta, stepDelta, pitchMin, pitchMax);
-        return applyNotes(next, keys.map(key => ({ pitch: key.pitch + dPitch, startStep: key.startStep + dStep })));
+        return applyNotes(next, movedNoteKeys(keys, plan));
     };
 
     const removeSelectedNotes = () => {

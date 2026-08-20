@@ -19,7 +19,7 @@ import {
 import { MOTION_PARAM_COUNT, NUM_OF_STEPS, createEmptySequenceState, createMotionPoints, createSequenceNote, type SequenceNote, type SequenceState } from '../src/types/sequence';
 import { createReversedStepOrder, createShiftedStepOrder, reorderSequenceSteps } from '../src/utils/sequenceRandomizer';
 import { clearSequenceStep, copySequenceStep, tieSequenceStep } from '../src/utils/sequenceStepEditing';
-import { moveSequenceNotes, notesIntersectingRect, resizeSequenceNote, resizeSequenceNotes } from '../src/utils/sequenceNoteEditing';
+import { moveSequenceNotes, notesIntersectingRect, resizeSequenceNote, resizeSequenceNotes, wrappedStartStep } from '../src/utils/sequenceNoteEditing';
 import { createMotionPattern } from '../src/utils/motionPatterns';
 
 let failCount = 0;
@@ -293,6 +293,68 @@ const blockedMove = moveSequenceNotes(
     96,
 );
 check('move rejects a full destination step', blockedMove === null);
+check('wrap step 16 to step 1', wrappedStartStep(15, 1, 1) === 0);
+check('wrap step 1 to step 16', wrappedStartStep(0, 1, -1) === 15);
+const wrappedRight = moveSequenceNotes(
+    [createSequenceNote(60, 15, 1, 100, 80)],
+    [{ pitch: 60, startStep: 15 }],
+    0,
+    1,
+    36,
+    96,
+    true,
+);
+check('keyboard wrap moves step 16 to step 1', !!wrappedRight && wrappedRight.some(note => note.pitch === 60 && note.startStep === 0 && note.length === 1));
+const wrappedLeft = moveSequenceNotes(
+    [createSequenceNote(60, 0, 1, 100, 80)],
+    [{ pitch: 60, startStep: 0 }],
+    0,
+    -1,
+    36,
+    96,
+    true,
+);
+check('keyboard wrap moves step 1 to step 16', !!wrappedLeft && wrappedLeft.some(note => note.pitch === 60 && note.startStep === 15 && note.length === 1));
+const wrappedLong = moveSequenceNotes(
+    [createSequenceNote(64, 14, 2, 90, 70)],
+    [{ pitch: 64, startStep: 14 }],
+    0,
+    1,
+    36,
+    96,
+    true,
+);
+check('keyboard wrap keeps note length at the loop edge', !!wrappedLong && wrappedLong.some(note => note.pitch === 64 && note.startStep === 0 && note.length === 2));
+const clampedEdge = moveSequenceNotes(
+    [createSequenceNote(60, 15, 1, 100, 80)],
+    [{ pitch: 60, startStep: 15 }],
+    0,
+    1,
+    36,
+    96,
+);
+check('drag move still clamps at the last step', !!clampedEdge && clampedEdge.some(note => note.pitch === 60 && note.startStep === 15));
+const semitoneUp = moveSequenceNotes(
+    [createSequenceNote(60, 4, 1, 100, 80)],
+    [{ pitch: 60, startStep: 4 }],
+    1,
+    0,
+    36,
+    96,
+);
+check('pitch nudge moves one semitone', !!semitoneUp && semitoneUp.some(note => note.pitch === 61 && note.startStep === 4));
+const independentWrap = moveSequenceNotes(
+    [createSequenceNote(60, 14, 1, 100, 80), createSequenceNote(64, 15, 1, 90, 70)],
+    [{ pitch: 60, startStep: 14 }, { pitch: 64, startStep: 15 }],
+    0,
+    1,
+    36,
+    96,
+    true,
+);
+check('only notes at the edge wrap independently', !!independentWrap
+    && independentWrap.some(note => note.pitch === 60 && note.startStep === 15)
+    && independentWrap.some(note => note.pitch === 64 && note.startStep === 0));
 
 // ---------------------------------------------------------------------------
 console.log('');
