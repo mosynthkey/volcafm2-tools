@@ -37,16 +37,25 @@ assert.equal(isCatalogKind('bundle'), false)
 const sound = createInitialSoundProgram()
 sound.name = 'BRASS 1'
 const soundId = '11111111-1111-4111-8111-111111111111'
-const soundFile = encodeLibraryFile('sound', 'Brass', { sound }, 1_700_000_000_000, soundId)
+const soundFile = encodeLibraryFile(
+    'sound',
+    'Brass',
+    { sound },
+    1_700_000_000_000,
+    soundId,
+    'Warm brass lead\nUsed in intro',
+)
 const decodedSound = decodeLibraryFile(soundFile, 'Brass.vfm2_sound')
 assert.equal(decodedSound.kind, 'sound')
 assert.equal(decodedSound.name, 'Brass')
 assert.equal(decodedSound.id, soundId)
+assert.equal(decodedSound.memo, 'Warm brass lead\nUsed in intro')
 assert.equal((decodedSound.payload.sound as { name: string }).name, 'BRASS 1')
 assert.equal(encodeSoundProgram(decodedSound.payload.sound as Parameters<typeof encodeSoundProgram>[0]).length, 140)
 
 const soundFileWithoutId = encodeLibraryFile('sound', 'Brass', { sound })
 assert.equal(decodeLibraryFile(soundFileWithoutId, 'Brass.vfm2_sound').id, undefined)
+assert.equal(decodeLibraryFile(soundFileWithoutId, 'Brass.vfm2_sound').memo, undefined)
 
 const sequence = { programNo: 3, notes: [], velocity: 100 }
 const seqFile = encodeLibraryFile('sequence', 'Groove', { sequence })
@@ -84,6 +93,7 @@ const catalogItems = [
         id: soundId,
         kind: 'sound' as const,
         name: 'Brass',
+        memo: 'Catalog brass memo',
         createdAt: 1_700_000_000_000,
         updatedAt: 1_700_000_000_100,
         payload: { sound },
@@ -110,7 +120,9 @@ const decodedBundle = decodeLibraryFile(bundleFile, 'Session.vfm2_bundle')
 assert.equal(decodedBundle.kind, 'bundle')
 assert.equal(decodedBundle.payload.items?.length, 3)
 assert.equal(decodedBundle.payload.items?.[0]?.id, soundId)
+assert.equal(decodedBundle.payload.items?.[0]?.memo, 'Catalog brass memo')
 assert.equal(decodedBundle.payload.items?.[1]?.kind, 'sequence')
+assert.equal(decodedBundle.payload.items?.[1]?.memo, undefined)
 assert.equal(decodedBundle.payload.sound, undefined)
 assert.equal(decodedBundle.payload.sequence, undefined)
 assert.equal(decodedBundle.payload.soundList, undefined)

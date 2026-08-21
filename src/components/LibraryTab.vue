@@ -66,6 +66,26 @@
         <v-btn @click="showImportResult = false">{{ t('common.ok') }}</v-btn>
       </template>
     </AppDialog>
+    <AppDialog v-model="showMemoEditor" :title="t('library.memoEditTitle')" max-width="520">
+      <p class="memo-editor-label">{{ t('library.memoEditLabel', { name: memoTargetName }) }}</p>
+      <v-textarea
+        v-model="memoDraft"
+        :label="t('library.memo')"
+        :placeholder="t('library.memoPlaceholder')"
+        rows="5"
+        auto-grow
+        density="compact"
+        hide-details
+        autofocus
+      />
+      <p v-if="memoErrorMessage" class="dialog-error memo-editor-error">{{ memoErrorMessage }}</p>
+      <template #actions>
+        <v-btn variant="text" @click="closeMemoEditor">{{ t('common.cancel') }}</v-btn>
+        <v-btn :loading="busy === 'memo'" @click="saveMemoEdit">
+          <StickyNote :size="16" class="mr-1" />{{ t('library.memoSave') }}
+        </v-btn>
+      </template>
+    </AppDialog>
 
     <v-card class="library-card pa-4">
       <header class="editor-toolbar">
@@ -82,16 +102,27 @@
         </button>
       </div>
 
-      <div class="save-row">
-        <v-text-field v-model="saveName" :label="t('library.name')" maxlength="40" density="compact" hide-details
-          @keydown.enter.prevent="saveCurrent" />
-        <v-btn :disabled="!saveName.trim()" :loading="busy === 'save'" @click="saveCurrent">
-          <Save :size="16" class="mr-1" />{{ t('common.save') }}
-        </v-btn>
-        <v-btn :loading="busy === 'import'" @click="fileInput?.click()">
-          <FileUp :size="16" class="mr-1" />{{ t('library.import') }}
-        </v-btn>
-        <input ref="fileInput" type="file" :accept="LIBRARY_FILE_ACCEPT" hidden @change="importFile" />
+      <div class="save-block">
+        <div class="save-row">
+          <v-text-field v-model="saveName" :label="t('library.name')" maxlength="40" density="compact" hide-details
+            @keydown.enter.prevent="saveCurrent" />
+          <v-btn :disabled="!saveName.trim()" :loading="busy === 'save'" @click="saveCurrent">
+            <Save :size="16" class="mr-1" />{{ t('common.save') }}
+          </v-btn>
+          <v-btn :loading="busy === 'import'" @click="fileInput?.click()">
+            <FileUp :size="16" class="mr-1" />{{ t('library.import') }}
+          </v-btn>
+          <input ref="fileInput" type="file" :accept="LIBRARY_FILE_ACCEPT" hidden @change="importFile" />
+        </div>
+        <v-textarea
+          v-model="saveMemo"
+          :label="t('library.memo')"
+          :placeholder="t('library.memoPlaceholder')"
+          rows="2"
+          auto-grow
+          density="compact"
+          hide-details
+        />
       </div>
 
       <p v-if="errorMessage" class="dialog-error">{{ errorMessage }}</p>
@@ -103,7 +134,11 @@
           <div class="library-meta">
             <strong>{{ record.name }}</strong>
             <small>{{ formatDate(record.updatedAt) }}</small>
+            <p v-if="record.memo" class="library-memo">{{ record.memo }}</p>
           </div>
+          <v-btn :aria-label="t('library.memoEditLabel', { name: record.name })" @click="openMemoEditor(record)">
+            <StickyNote :size="16" class="mr-1" />{{ t('library.memo') }}
+          </v-btn>
           <v-btn @click="loadRecord(record)">
             <FolderOpen :size="16" class="mr-1" />{{ t('common.load') }}
           </v-btn>
@@ -154,7 +189,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Download, FileUp, FolderOpen, Info, Save, Trash2, Undo2 } from '@lucide/vue';
+import { Download, FileUp, FolderOpen, Info, Save, StickyNote, Trash2, Undo2 } from '@lucide/vue';
 import AppDialog from '@/components/dialogs/AppDialog.vue';
 import AppProgressDialog from '@/components/dialogs/AppProgressDialog.vue';
 import LibraryBackupDialog from '@/components/LibraryBackupDialog.vue';
@@ -177,7 +212,7 @@ import {
     type DecodedLibraryFile,
     type LibraryKind,
 } from '@/utils/libraryFormat';
-import { deleteLibrary, importLibraryRecords, listLibrary, saveLibrary, type LibraryRecord } from '@/utils/presetLibrary';
+import { deleteLibrary, importLibraryRecords, listLibrary, saveLibrary, updateLibraryMemo, type LibraryRecord } from '@/utils/presetLibrary';
 import {
     buildDeviceBackupPayload,
     parseDeviceBackupPrograms,
@@ -203,10 +238,16 @@ const kindTabs = LIBRARY_KINDS;
 const activeKind = ref<LibraryKind>('sound');
 const records = ref<LibraryRecord[]>([]);
 const saveName = ref('');
+const saveMemo = ref('');
 const busy = ref<string | null>(null);
 const errorMessage = ref('');
 const deleteTarget = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
+const showMemoEditor = ref(false);
+const memoTargetId = ref<string | null>(null);
+const memoTargetName = ref('');
+const memoDraft = ref('');
+const memoErrorMessage = ref('');
 const showReplaceConfirm = ref(false);
 const pendingLoad = ref<LibraryRecord | null>(null);
 const showImportResult = ref(false);
@@ -298,6 +339,7 @@ const recordsFromDecoded = (decoded: DecodedLibraryFile): LibraryRecord[] => {
       id: item.id,
       kind: item.kind,
       name: item.name,
+      memo: item.memo ?? '',
       payload: item.payload,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
@@ -308,6 +350,7 @@ const recordsFromDecoded = (decoded: DecodedLibraryFile): LibraryRecord[] => {
     id: decoded.id ?? crypto.randomUUID(),
     kind: decoded.kind,
     name: decoded.name,
+    memo: decoded.memo ?? '',
     payload: decoded.payload,
     createdAt: now,
     updatedAt: decoded.savedAt || now,
@@ -358,6 +401,7 @@ const selectKind = (kind: LibraryKind) => {
   ui.libraryFocus = kind;
   activeKind.value = kind;
   saveName.value = suggestedNameFor(kind);
+  saveMemo.value = '';
   deleteTarget.value = null;
   void refresh();
 };
@@ -365,6 +409,7 @@ const selectKind = (kind: LibraryKind) => {
 const openLibrary = () => {
   activeKind.value = ui.libraryFocus;
   saveName.value = suggestedNameFor(activeKind.value);
+  saveMemo.value = '';
   deleteTarget.value = null;
   errorMessage.value = '';
   showReplaceConfirm.value = false;
@@ -397,13 +442,55 @@ const saveCurrent = async () => {
         errorMessage.value = t('library.backupFetchFailed');
         return;
       }
-      await saveLibrary('backup', name, buildDeviceBackupPayload(captured.programs, captured.sequences));
+      await saveLibrary(
+        'backup',
+        name,
+        buildDeviceBackupPayload(captured.programs, captured.sequences),
+        saveMemo.value,
+      );
     } else {
-      await saveKind(activeKind.value, name);
+      await saveKind(activeKind.value, name, saveMemo.value);
     }
+    saveMemo.value = '';
     await refresh();
   } catch (error) {
     errorMessage.value = thrown(error, 'library.saveError');
+  } finally {
+    busy.value = null;
+  }
+};
+
+const openMemoEditor = (record: LibraryRecord) => {
+  memoTargetId.value = record.id;
+  memoTargetName.value = record.name;
+  memoDraft.value = record.memo;
+  memoErrorMessage.value = '';
+  showMemoEditor.value = true;
+};
+
+const closeMemoEditor = () => {
+  showMemoEditor.value = false;
+  memoTargetId.value = null;
+  memoTargetName.value = '';
+  memoDraft.value = '';
+  memoErrorMessage.value = '';
+};
+
+const saveMemoEdit = async () => {
+  const id = memoTargetId.value;
+  if (!id) return;
+  busy.value = 'memo';
+  memoErrorMessage.value = '';
+  try {
+    const updated = await updateLibraryMemo(id, memoDraft.value);
+    if (!updated) {
+      memoErrorMessage.value = t('library.memoSaveError');
+      return;
+    }
+    closeMemoEditor();
+    await refresh();
+  } catch (error) {
+    memoErrorMessage.value = thrown(error, 'library.memoSaveError');
   } finally {
     busy.value = null;
   }
@@ -494,6 +581,7 @@ const exportRecord = (record: LibraryRecord) => {
         record.payload,
         record.updatedAt,
         record.kind === 'bundle' ? undefined : record.id,
+        record.memo,
       ),
       libraryFilename(record.name, record.kind),
     );
@@ -740,13 +828,21 @@ const confirmBackupSlot = async (destSlot: number) => {
 .library-tab:hover { color: var(--volca-text); }
 .library-tab.is-on { color: var(--volca-accent-bright); border-bottom-color: var(--volca-accent); }
 .library-tab:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
-.save-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; margin-bottom: 12px; }
+.save-block { display: grid; gap: 10px; margin-bottom: 12px; }
+.save-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
 .library-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
 .library-empty { display: grid; min-height: 180px; place-items: center; color: var(--volca-muted); font-size: var(--volca-type-body); }
 .library-item { min-height: 64px; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--volca-line); }
 .library-meta { min-width: 0; flex: 1; display: grid; gap: 2px; padding: 10px 0; }
 .library-meta strong { overflow: hidden; color: var(--volca-text); font-size: var(--volca-type-body); text-overflow: ellipsis; white-space: nowrap; }
 .library-meta small { color: var(--volca-muted); font-size: var(--volca-type-label); }
+.library-memo {
+  margin: 2px 0 0; color: var(--volca-muted); font-size: var(--volca-type-label); line-height: 1.45;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+}
+.memo-editor-label { margin: 0 0 10px; color: var(--volca-muted); font-size: var(--volca-type-body); }
+.memo-editor-error { margin-top: 12px; }
 .library-notes {
   display: grid; gap: 12px; flex: 0 0 auto; margin: 14px 0 0; padding-top: 14px;
   border-top: 1px solid var(--volca-line);

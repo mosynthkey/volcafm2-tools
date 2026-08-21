@@ -36,6 +36,7 @@ export const useLibraryCurrent = () => {
         id: record.id,
         kind: record.kind as CatalogKind,
         name: record.name,
+        ...(record.memo ? { memo: record.memo } : {}),
         createdAt: record.createdAt,
         updatedAt: record.updatedAt,
         payload: cloneJson(record.payload),
@@ -57,7 +58,7 @@ export const useLibraryCurrent = () => {
     }
   }
 
-  const saveCurrent = async (kind: LibraryKind, name: string) => {
+  const saveCurrent = async (kind: LibraryKind, name: string, memo = '') => {
     const trimmed = name.trim()
     if (!trimmed) return
     if (kind === 'backup') {
@@ -65,7 +66,7 @@ export const useLibraryCurrent = () => {
     }
     const payload = await currentPayload(kind)
     if (kind === 'sound') stampSoundName(payload, trimmed)
-    await saveLibrary(kind, trimmed, payload)
+    await saveLibrary(kind, trimmed, payload, memo)
   }
 
   return { suggestedNameFor, currentPayload, stampSoundName, saveCurrent }
