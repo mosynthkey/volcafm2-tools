@@ -832,7 +832,7 @@ const confirmBackupSlot = async (destSlot: number) => {
 .save-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
 .library-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
 .library-empty { display: grid; min-height: 180px; place-items: center; color: var(--volca-muted); font-size: var(--volca-type-body); }
-.library-item { min-height: 64px; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--volca-line); }
+.library-item { min-height: 64px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 1px solid var(--volca-line); }
 .library-meta { min-width: 0; flex: 1; display: grid; gap: 2px; padding: 10px 0; }
 .library-meta strong { overflow: hidden; color: var(--volca-text); font-size: var(--volca-type-body); text-overflow: ellipsis; white-space: nowrap; }
 .library-meta small { color: var(--volca-muted); font-size: var(--volca-type-label); }
