@@ -13,8 +13,8 @@
         :aria-label="`${t('sequence.writeSlot')} ${displaySlot}`"
         @click="writeSlot = displaySlot - 1"
       >
-        <span class="write-slot-btn__led" aria-hidden="true" />
         <span class="write-slot-btn__index">{{ displaySlot }}</span>
+        <span class="write-slot-btn__led" aria-hidden="true" />
       </button>
     </div>
     <label class="app-skip-confirm">
@@ -207,35 +207,28 @@ const selectFile = (event: Event) => {
   border: 1px solid var(--volca-line-strong); border-radius: 10px; background: #1a1314;
 }
 .write-slot-btn {
-  display: flex; flex: 1 1 0; flex-direction: column; align-items: center; justify-content: flex-end;
-  gap: 0; min-width: 0; height: 72px; padding: 6px 2px 8px;
-  border: 1px solid rgba(0, 0, 0, .55); border-radius: 5px;
-  background:
-    linear-gradient(180deg, #3a3032 0%, #2a2424 38%, #1c1415 100%);
-  box-shadow:
-    inset 0 1px rgba(255, 255, 255, .1),
-    inset 0 -2px rgba(0, 0, 0, .35),
-    0 2px 4px rgba(0, 0, 0, .35);
-  color: #c9bbb2; cursor: pointer;
-}
-.write-slot-btn__led {
-  width: 7px; height: 7px; margin-bottom: auto; border-radius: 50%;
-  background: #2a1f20; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .55);
+  display: flex; flex: 1 1 0; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: 0; min-width: 0; height: 72px; padding: 8px 2px 6px;
+  border: 1px solid rgba(51, 40, 42, .35); border-radius: 5px;
+  background: var(--volca-accent);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .28), 0 2px 4px rgba(0, 0, 0, .28);
+  color: var(--volca-ink); cursor: pointer;
 }
 .write-slot-btn__index {
   font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1;
 }
-.write-slot-btn:hover { border-color: rgba(206, 179, 147, .35); color: var(--volca-text); }
-.write-slot-btn:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
+.write-slot-btn__led {
+  width: 7px; height: 7px; margin-top: auto; border-radius: 50%;
+  background: rgba(51, 40, 42, .35); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+}
+.write-slot-btn:hover { background: var(--volca-accent-bright); }
+.write-slot-btn:focus-visible { outline: 2px solid var(--volca-accent-bright); outline-offset: 2px; }
 .write-slot-btn.selected {
-  border-color: rgba(80, 221, 213, .55); color: var(--volca-text);
-  background:
-    linear-gradient(180deg, #4a3436 0%, #322526 42%, #211718 100%);
+  border-color: rgba(80, 221, 213, .65);
   box-shadow:
-    inset 0 1px rgba(255, 255, 255, .12),
-    inset 0 -2px rgba(0, 0, 0, .3),
-    0 0 0 1px rgba(80, 221, 213, .18),
-    0 2px 6px rgba(0, 0, 0, .4);
+    inset 0 1px rgba(255, 255, 255, .28),
+    0 0 0 1px rgba(80, 221, 213, .22),
+    0 2px 6px rgba(0, 0, 0, .35);
 }
 .write-slot-btn.selected .write-slot-btn__led {
   background: var(--volca-teal);
