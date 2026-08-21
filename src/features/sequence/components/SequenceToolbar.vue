@@ -1,8 +1,22 @@
 <template>
-  <AppDialog v-model="showWriteConfirm" :title="t('sequence.writeTitle')" max-width="480">
+  <AppDialog v-model="showWriteConfirm" :title="t('sequence.writeTitle')" max-width="640">
     <p>{{ t('sequence.writeDescription') }}</p>
-    <v-text-field v-model.number="writeSlot" type="number" min="0" :max="sequenceCount - 1"
-      :label="t('sequence.writeSlot')" density="compact" hide-details class="write-slot-input" />
+    <div class="write-slot-picker" role="radiogroup" :aria-label="t('sequence.writeSlot')">
+      <button
+        v-for="displaySlot in sequenceCount"
+        :key="displaySlot"
+        type="button"
+        class="write-slot-btn"
+        :class="{ selected: writeSlot === displaySlot - 1 }"
+        role="radio"
+        :aria-checked="writeSlot === displaySlot - 1"
+        :aria-label="`${t('sequence.writeSlot')} ${displaySlot}`"
+        @click="writeSlot = displaySlot - 1"
+      >
+        <span class="write-slot-btn__led" aria-hidden="true" />
+        <span class="write-slot-btn__index">{{ displaySlot }}</span>
+      </button>
+    </div>
     <label class="app-skip-confirm">
       <input v-model="dontShowWriteAgain" type="checkbox" />
       <span>{{ t('common.dontShowAgain') }}</span>
@@ -172,7 +186,7 @@ const runWrite = async () => {
   setPref(SEQUENCE_WRITE_SLOT_PREF, slot).catch(() => undefined)
   const ok = await sequence.writeToSlot(slot)
   if (!ok) {
-    writeError.value = t('sequence.writeError', { slot: String(slot).padStart(2, '0') })
+    writeError.value = t('sequence.writeError', { slot: String(slot + 1).padStart(2, '0') })
     showWriteError.value = true
   }
 }
@@ -188,7 +202,45 @@ const selectFile = (event: Event) => {
 <style scoped>
 .step-input-status { color: var(--volca-accent-bright); font-weight: 750; font-variant-numeric: tabular-nums; }
 .program-no-input { width: 72px; flex: 0 0 72px; }
-.write-slot-input { margin-top: 12px; }
+.write-slot-picker {
+  display: flex; gap: 4px; margin-top: 14px; padding: 10px 8px;
+  border: 1px solid var(--volca-line-strong); border-radius: 10px; background: #1a1314;
+}
+.write-slot-btn {
+  display: flex; flex: 1 1 0; flex-direction: column; align-items: center; justify-content: flex-end;
+  gap: 0; min-width: 0; height: 72px; padding: 6px 2px 8px;
+  border: 1px solid rgba(0, 0, 0, .55); border-radius: 5px;
+  background:
+    linear-gradient(180deg, #3a3032 0%, #2a2424 38%, #1c1415 100%);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, .1),
+    inset 0 -2px rgba(0, 0, 0, .35),
+    0 2px 4px rgba(0, 0, 0, .35);
+  color: #c9bbb2; cursor: pointer;
+}
+.write-slot-btn__led {
+  width: 7px; height: 7px; margin-bottom: auto; border-radius: 50%;
+  background: #2a1f20; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .55);
+}
+.write-slot-btn__index {
+  font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1;
+}
+.write-slot-btn:hover { border-color: rgba(206, 179, 147, .35); color: var(--volca-text); }
+.write-slot-btn:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
+.write-slot-btn.selected {
+  border-color: rgba(80, 221, 213, .55); color: var(--volca-text);
+  background:
+    linear-gradient(180deg, #4a3436 0%, #322526 42%, #211718 100%);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, .12),
+    inset 0 -2px rgba(0, 0, 0, .3),
+    0 0 0 1px rgba(80, 221, 213, .18),
+    0 2px 6px rgba(0, 0, 0, .4);
+}
+.write-slot-btn.selected .write-slot-btn__led {
+  background: var(--volca-teal);
+  box-shadow: 0 0 8px rgba(80, 221, 213, .75), inset 0 1px rgba(255, 255, 255, .35);
+}
 .sequence-more-menu { min-width: 220px; border: 1px solid rgba(206,179,147,.28); border-radius: 10px; background: #2b2022; color: var(--volca-text); }
 .randomize-split { display: inline-flex; align-items: stretch; }
 .randomize-split :deep(.randomize-main) { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
