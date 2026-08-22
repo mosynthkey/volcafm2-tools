@@ -284,6 +284,11 @@ const onRollKeydown = (event: KeyboardEvent) => {
     const tag = target.tagName
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return
   }
+  if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'a') {
+    event.preventDefault()
+    sequence.setNoteSelection(sequence.notes.map(note => ({ pitch: note.pitch, startStep: note.startStep })))
+    return
+  }
   if ((event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight')
     && !event.altKey && !event.metaKey && !event.ctrlKey) {
     if (!sequence.selectedNoteKeys.length) return
