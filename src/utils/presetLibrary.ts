@@ -7,6 +7,7 @@ export interface LibraryRecord {
     id: string;
     kind: LibraryKind;
     name: string;
+    memo: string;
     payload: LibraryPayload;
     createdAt: number;
     updatedAt: number;
@@ -48,12 +49,15 @@ const runRequest = async <T>(mode: IDBTransactionMode, operation: (store: IDBObj
 
 const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
+const normalizeMemo = (value: unknown) => (typeof value === 'string' ? value : '');
+
 const normalizeRecord = (raw: StoredRecord): LibraryRecord => {
     if (raw.payload && typeof raw.payload === 'object') {
         return {
             id: raw.id,
             kind: raw.kind,
             name: raw.name,
+            memo: normalizeMemo(raw.memo),
             payload: raw.payload,
             createdAt: raw.createdAt,
             updatedAt: raw.updatedAt,
@@ -67,6 +71,7 @@ const normalizeRecord = (raw: StoredRecord): LibraryRecord => {
         id: raw.id,
         kind: raw.kind,
         name: raw.name,
+        memo: normalizeMemo(raw.memo),
         payload,
         createdAt: raw.createdAt,
         updatedAt: raw.updatedAt,
@@ -85,15 +90,33 @@ export const getLibrary = async (id: string): Promise<LibraryRecord | null> => {
     return raw ? normalizeRecord(raw) : null;
 };
 
-export const saveLibrary = async (kind: LibraryKind, name: string, payload: LibraryPayload): Promise<LibraryRecord> => {
+export const saveLibrary = async (
+    kind: LibraryKind,
+    name: string,
+    payload: LibraryPayload,
+    memo = '',
+): Promise<LibraryRecord> => {
     const now = Date.now();
     const record: LibraryRecord = {
         id: crypto.randomUUID(),
         kind,
         name: name.trim(),
+        memo: memo.trim(),
         payload: cloneJson(payload),
         createdAt: now,
         updatedAt: now,
+    };
+    await runRequest('readwrite', store => store.put(record));
+    return record;
+};
+
+export const updateLibraryMemo = async (id: string, memo: string): Promise<LibraryRecord | null> => {
+    const existing = await getLibrary(id);
+    if (!existing) return null;
+    const record: LibraryRecord = {
+        ...existing,
+        memo: memo.trim(),
+        updatedAt: Date.now(),
     };
     await runRequest('readwrite', store => store.put(record));
     return record;

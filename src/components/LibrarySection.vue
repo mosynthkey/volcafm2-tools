@@ -23,6 +23,16 @@
   <AppDialog v-model="showSave" :title="t('library.saveToLibrary')" max-width="440">
     <v-text-field v-model="saveName" :label="t('library.name')" maxlength="40" density="compact" hide-details autofocus
       @keydown.enter.prevent="confirmSave" />
+    <v-textarea
+      v-model="saveMemo"
+      class="save-memo"
+      :label="t('library.memo')"
+      :placeholder="t('library.memoPlaceholder')"
+      rows="3"
+      auto-grow
+      density="compact"
+      hide-details
+    />
     <p v-if="errorMessage" class="dialog-error save-error">{{ errorMessage }}</p>
     <template #actions>
       <v-btn variant="text" @click="showSave = false">{{ t('common.cancel') }}</v-btn>
@@ -52,11 +62,13 @@ const ui = useUiStore()
 const { suggestedNameFor, saveCurrent } = useLibraryCurrent()
 const showSave = ref(false)
 const saveName = ref('')
+const saveMemo = ref('')
 const saving = ref(false)
 const errorMessage = ref('')
 
 const openSave = () => {
   saveName.value = suggestedNameFor(props.kind)
+  saveMemo.value = ''
   errorMessage.value = ''
   showSave.value = true
 }
@@ -66,7 +78,7 @@ const confirmSave = async () => {
   saving.value = true
   errorMessage.value = ''
   try {
-    await saveCurrent(props.kind, saveName.value)
+    await saveCurrent(props.kind, saveName.value, saveMemo.value)
     showSave.value = false
   } catch (error) {
     errorMessage.value = formatThrownError(error, 'library.saveError', key => String(t(key)))
@@ -77,5 +89,6 @@ const confirmSave = async () => {
 </script>
 
 <style scoped>
+.save-memo { margin-top: 12px; }
 .save-error { margin-top: 12px; }
 </style>

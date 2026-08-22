@@ -43,6 +43,7 @@ export type LibraryItemSnapshot = {
     id: string;
     kind: CatalogKind;
     name: string;
+    memo?: string;
     createdAt: number;
     updatedAt: number;
     payload: LibraryPayload;
@@ -63,6 +64,7 @@ export type LibraryFile = {
     name: string;
     savedAt: number;
     id?: string;
+    memo?: string;
 } & LibraryPayload;
 
 export type DecodedLibraryFile = {
@@ -70,6 +72,7 @@ export type DecodedLibraryFile = {
     name: string;
     savedAt: number;
     id?: string;
+    memo?: string;
     payload: LibraryPayload;
 };
 
@@ -137,19 +140,27 @@ const kindFromFileKind = (kind: string): LibraryKind | null => {
 
 const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
+const normalizeMemo = (value: unknown) => {
+    if (typeof value !== 'string') return '';
+    return value.trim();
+};
+
 export const encodeLibraryFile = (
     kind: LibraryKind,
     name: string,
     payload: LibraryPayload,
     savedAt = Date.now(),
     id?: string,
+    memo?: string,
 ): string => {
+    const trimmedMemo = normalizeMemo(memo);
     const file: LibraryFile = {
         version: LIBRARY_FILE_VERSION,
         kind: LIBRARY_FILE_KIND[kind],
         name: name.trim(),
         savedAt,
         ...(id ? { id } : {}),
+        ...(trimmedMemo ? { memo: trimmedMemo } : {}),
         ...cloneJson(payload),
     };
     return `${JSON.stringify(file, null, 2)}\n`;
@@ -161,10 +172,12 @@ export const isCatalogKind = (kind: unknown): kind is CatalogKind =>
 const snapshotFromUnknown = (value: unknown): LibraryItemSnapshot | null => {
     if (!isRecord(value) || !isCatalogKind(value.kind) || typeof value.id !== 'string' || !value.id.trim()) return null;
     const payload = isRecord(value.payload) ? value.payload as LibraryPayload : {};
+    const memo = normalizeMemo(value.memo);
     return {
         id: value.id.trim(),
         kind: value.kind,
         name: typeof value.name === 'string' && value.name.trim() ? value.name.trim() : 'untitled',
+        ...(memo ? { memo } : {}),
         createdAt: typeof value.createdAt === 'number' ? value.createdAt : Date.now(),
         updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now(),
         payload,
@@ -231,6 +244,7 @@ export const decodeLibraryFile = (json: string, filename = ''): DecodedLibraryFi
         : filename.replace(/\.[^.]+$/, '') || 'untitled';
     const savedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : Date.now();
     const id = typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id.trim() : undefined;
+    const memo = normalizeMemo(parsed.memo) || undefined;
     const payload = payloadFromFile(parsed, kind);
     if (kind === 'sound' && payload.sound === undefined) throw new Error('Sound file is missing sound data.');
     if (kind === 'sequence' && payload.sequence === undefined) throw new Error('Sequence file is missing sequence data.');
@@ -242,5 +256,5 @@ export const decodeLibraryFile = (json: string, filename = ''): DecodedLibraryFi
         }
         payload.sequences = payload.sequences.map(sequence => normalizeSequenceState(sequence as Parameters<typeof normalizeSequenceState>[0]));
     }
-    return { kind, name, savedAt, id, payload };
+    return { kind, name, savedAt, id, memo, payload };
 };
