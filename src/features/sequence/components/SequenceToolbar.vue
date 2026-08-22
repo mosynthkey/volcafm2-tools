@@ -1,14 +1,24 @@
 <template>
-  <AppDialog v-model="showWriteConfirm" :title="t('sequence.writeTitle')" max-width="480">
+  <AppDialog v-model="showWriteConfirm" :title="t('sequence.writeTitle')" max-width="640">
     <p>{{ t('sequence.writeDescription') }}</p>
-    <v-text-field v-model.number="writeSlot" type="number" min="0" :max="sequenceCount - 1"
-      :label="t('sequence.writeSlot')" density="compact" hide-details class="write-slot-input" />
-    <label class="app-skip-confirm">
-      <input v-model="dontShowWriteAgain" type="checkbox" />
-      <span>{{ t('common.dontShowAgain') }}</span>
-    </label>
+    <div class="write-slot-picker" role="radiogroup" :aria-label="t('sequence.writeSlot')">
+      <button
+        v-for="displaySlot in sequenceCount"
+        :key="displaySlot"
+        type="button"
+        class="write-slot-btn"
+        :class="{ selected: writeSlot === displaySlot - 1 }"
+        role="radio"
+        :aria-checked="writeSlot === displaySlot - 1"
+        :aria-label="`${t('sequence.writeSlot')} ${displaySlot}`"
+        @click="writeSlot = displaySlot - 1"
+      >
+        <span class="write-slot-btn__index">{{ displaySlot }}</span>
+        <span class="write-slot-btn__led" aria-hidden="true" />
+      </button>
+    </div>
     <template #actions>
-      <v-btn variant="text" @click="cancelWrite()">{{ t('common.cancel') }}</v-btn>
+      <v-btn variant="text" @click="showWriteConfirm = false">{{ t('common.cancel') }}</v-btn>
       <v-btn @click="confirmWrite()">{{ t('common.write') }}</v-btn>
     </template>
   </AppDialog>
@@ -123,7 +133,6 @@ import AppDialog from '@/components/dialogs/AppDialog.vue'
 import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue'
 import LibrarySection from '@/components/LibrarySection.vue'
 import ToolbarIconButton from '@/components/ToolbarIconButton.vue'
-import { SKIP_DEVICE_WRITE_PREF, useSkipConfirm } from '@/composables/useSkipConfirm'
 import { useMidiStore } from '@/stores/midiStore'
 import { useSequencerStore } from '@/stores/sequencerStore'
 import { useSoundStore } from '@/stores/soundStore'
@@ -139,15 +148,9 @@ const sound = useSoundStore()
 const fileInput = ref<HTMLInputElement | null>(null)
 const sequenceCount = NUM_OF_SEQUENCES
 const writeSlot = ref(0)
+const showWriteConfirm = ref(false)
 const showWriteError = ref(false)
 const writeError = ref('')
-const {
-  show: showWriteConfirm,
-  dontShowAgain: dontShowWriteAgain,
-  request: requestWriteConfirm,
-  confirm: confirmWrite,
-  cancel: cancelWrite,
-} = useSkipConfirm(SKIP_DEVICE_WRITE_PREF)
 const canSend = computed(() => midi.isIdleConnected)
 const canWrite = computed(() => midi.isIdleConnected && midi.sequenceWriteState !== 'sending')
 const currentProgramName = computed(() => {
@@ -163,7 +166,12 @@ const clampedWriteSlot = () => Math.max(0, Math.min(NUM_OF_SEQUENCES - 1, Number
 
 const requestWrite = () => {
   if (!canWrite.value) return
-  requestWriteConfirm(() => { void runWrite() })
+  showWriteConfirm.value = true
+}
+
+const confirmWrite = () => {
+  showWriteConfirm.value = false
+  void runWrite()
 }
 
 const runWrite = async () => {
@@ -172,7 +180,7 @@ const runWrite = async () => {
   setPref(SEQUENCE_WRITE_SLOT_PREF, slot).catch(() => undefined)
   const ok = await sequence.writeToSlot(slot)
   if (!ok) {
-    writeError.value = t('sequence.writeError', { slot: String(slot).padStart(2, '0') })
+    writeError.value = t('sequence.writeError', { slot: String(slot + 1).padStart(2, '0') })
     showWriteError.value = true
   }
 }
@@ -188,7 +196,38 @@ const selectFile = (event: Event) => {
 <style scoped>
 .step-input-status { color: var(--volca-accent-bright); font-weight: 750; font-variant-numeric: tabular-nums; }
 .program-no-input { width: 72px; flex: 0 0 72px; }
-.write-slot-input { margin-top: 12px; }
+.write-slot-picker {
+  display: flex; gap: 4px; margin-top: 14px; padding: 10px 8px;
+  border: 1px solid var(--volca-line-strong); border-radius: 10px; background: #1a1314;
+}
+.write-slot-btn {
+  display: flex; flex: 1 1 0; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: 0; min-width: 0; height: 56px; padding: 6px 2px 5px;
+  border: 1px solid rgba(51, 40, 42, .35); border-radius: 5px;
+  background: var(--volca-accent);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .28), 0 2px 4px rgba(0, 0, 0, .28);
+  color: var(--volca-ink); cursor: pointer;
+}
+.write-slot-btn__index {
+  font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1;
+}
+.write-slot-btn__led {
+  width: 7px; height: 7px; margin-top: auto; border-radius: 50%;
+  background: rgba(51, 40, 42, .35); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+}
+.write-slot-btn:hover { background: var(--volca-accent-bright); }
+.write-slot-btn:focus-visible { outline: 2px solid var(--volca-accent-bright); outline-offset: 2px; }
+.write-slot-btn.selected {
+  border-color: rgba(80, 221, 213, .65);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, .28),
+    0 0 0 1px rgba(80, 221, 213, .22),
+    0 2px 6px rgba(0, 0, 0, .35);
+}
+.write-slot-btn.selected .write-slot-btn__led {
+  background: var(--volca-teal);
+  box-shadow: 0 0 8px rgba(80, 221, 213, .75), inset 0 1px rgba(255, 255, 255, .35);
+}
 .sequence-more-menu { min-width: 220px; border: 1px solid rgba(206,179,147,.28); border-radius: 10px; background: #2b2022; color: var(--volca-text); }
 .randomize-split { display: inline-flex; align-items: stretch; }
 .randomize-split :deep(.randomize-main) { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
