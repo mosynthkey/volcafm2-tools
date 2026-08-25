@@ -209,7 +209,13 @@ check('sine cycle count changes the phase', sineTwoCycles[4] === 100 && sineTwoC
 const sineOffset = createMotionPattern('sine', { min: 24, max: 104, cycles: 1, offset: 8 });
 check('sine offset shifts phase by steps', sineOffset[0] === 104 && sineOffset[8] === 24);
 const reversedRange = createMotionPattern('linearUp', { min: 110, max: 30 });
-check('reversed min/max are normalized', reversedRange[0] === 30 && reversedRange[15] === 110);
+check('reversed min/max are normalized', reversedRange[0] === 30 && reversedRange[15] === 105);
+const linearTwoCycles = createMotionPattern('linearUp', { min: 0, max: 80, cycles: 2 });
+check('linear up repeats the ramp per cycle', linearTwoCycles[0] === 0 && linearTwoCycles[8] === 0 && linearTwoCycles[4] === 40);
+const linearOffset = createMotionPattern('linearUp', { min: 0, max: 80, cycles: 1, offset: 8 });
+check('linear up offset shifts phase by steps', linearOffset[0] === 40 && linearOffset[8] === 0);
+const linearDownTwoCycles = createMotionPattern('linearDown', { min: 0, max: 80, cycles: 2 });
+check('linear down repeats the ramp per cycle', linearDownTwoCycles[0] === 80 && linearDownTwoCycles[8] === 80 && linearDownTwoCycles[4] === 40);
 
 // ---------------------------------------------------------------------------
 // 6) Step InputのRest/Tie

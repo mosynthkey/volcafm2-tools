@@ -71,7 +71,6 @@
       <v-textarea
         v-model="memoDraft"
         :label="t('library.memo')"
-        :placeholder="t('library.memoPlaceholder')"
         rows="5"
         auto-grow
         density="compact"
@@ -117,7 +116,6 @@
         <v-textarea
           v-model="saveMemo"
           :label="t('library.memo')"
-          :placeholder="t('library.memoPlaceholder')"
           rows="2"
           auto-grow
           density="compact"

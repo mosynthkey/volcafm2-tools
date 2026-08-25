@@ -137,7 +137,7 @@ const messages = {
       parseError: 'DX7 SysExを解析できませんでした。format 0またはformat 9の.syxファイルを指定してください。',
     },
     library: {
-      title: 'Library', sectionLabel: 'Library', name: '名前', memo: 'メモ', memoPlaceholder: '音色の概要やシーケンスの内容など',
+      title: 'Library', sectionLabel: 'Library', name: '名前', memo: 'メモ',
       memoEditTitle: 'メモを編集', memoEditLabel: '{name}のメモ', memoSave: 'メモを保存',
       empty: '保存データはまだありません。',
       loadError: '保存データを読み込めませんでした。', saveError: '保存できませんでした。', deleteError: '削除できませんでした。',
@@ -256,7 +256,7 @@ const messages = {
       parseError: 'Could not parse DX7 SysEx. Choose a format 0 or format 9 .syx file.',
     },
     library: {
-      title: 'Library', sectionLabel: 'Library', name: 'Name', memo: 'Memo', memoPlaceholder: 'Sound overview, sequence contents, and so on',
+      title: 'Library', sectionLabel: 'Library', name: 'Name', memo: 'Memo',
       memoEditTitle: 'Edit memo', memoEditLabel: 'Memo for {name}', memoSave: 'Save memo',
       empty: 'No saved data yet.',
       loadError: 'Could not load saved data.', saveError: 'Could not save.', deleteError: 'Could not delete.',

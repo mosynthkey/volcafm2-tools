@@ -27,7 +27,6 @@
       v-model="saveMemo"
       class="save-memo"
       :label="t('library.memo')"
-      :placeholder="t('library.memoPlaceholder')"
       rows="3"
       auto-grow
       density="compact"

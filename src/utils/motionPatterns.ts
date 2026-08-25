@@ -24,8 +24,8 @@ export const createMotionPattern = (
   const values = Array.from({ length: NUM_OF_STEPS }, (_, step) => {
     const position = cyclePosition(step, cycles);
     switch (key) {
-      case 'linearUp': return scale(step / (NUM_OF_STEPS - 1), min, max);
-      case 'linearDown': return scale(1 - step / (NUM_OF_STEPS - 1), min, max);
+      case 'linearUp': return scale(position, min, max);
+      case 'linearDown': return scale(1 - position, min, max);
       // Start at the minimum so the loop boundary (step 16 -> step 1) stays smooth.
       case 'sine': return scale((1 - Math.cos(position * Math.PI * 2)) / 2, min, max);
       case 'triangle': return scale(position < .5 ? position * 2 : 2 - position * 2, min, max);
