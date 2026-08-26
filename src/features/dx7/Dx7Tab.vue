@@ -86,7 +86,6 @@
                 dragging: dragActive && draggingSlot === slot.slot,
                 active: midiStore.matchedProgramNo === slot.slot,
               }"
-              role="button"
               :tabindex="reorderEnabled ? -1 : 0"
               :aria-label="slotAria(slot)"
               @click="onSlotClick(slot.slot)"
@@ -100,6 +99,13 @@
               </span>
               <span class="slot-number">{{ String(slot.slot).padStart(2, '0') }}</span>
               <span class="slot-name">{{ slot.name.trim() || '—' }}</span>
+              <ProgramPreviewButton
+                v-if="!reorderEnabled"
+                compact
+                class="slot-preview"
+                :preview-id="`program-list-${slot.slot}`"
+                :voice="midiStore.programBytesAt(slot.slot)"
+              />
               <div v-if="reorderEnabled" class="slot-move">
                 <v-btn icon variant="text" size="small" :disabled="slot.slot === 0" :aria-label="t('dx7.moveUp')"
                   @click.stop="midiStore.reorderSoundList(slot.slot, slot.slot - 1)">
@@ -134,6 +140,7 @@ import { ArrowUpDown, ChevronDown, ChevronUp, Download, FileUp, GripVertical, Ha
 import AppDialog from '@/components/dialogs/AppDialog.vue';
 import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue';
 import LibrarySection from '@/components/LibrarySection.vue';
+import ProgramPreviewButton from '@/components/ProgramPreviewButton.vue';
 import ToolbarIconButton from '@/components/ToolbarIconButton.vue';
 import Dx7VoiceImportDialog from '@/features/dx7/Dx7VoiceImportDialog.vue';
 import { SKIP_DEVICE_WRITE_PREF, useSkipConfirm } from '@/composables/useSkipConfirm';
@@ -390,6 +397,14 @@ const onHandlePointerUp = () => {
 .slot-name {
   min-width: 0; flex: 1; overflow: hidden; color: var(--volca-accent-bright);
   font-weight: 650; text-overflow: ellipsis; white-space: nowrap;
+}
+:deep(.slot-preview.v-btn) {
+  width: 28px; min-width: 28px; height: 28px; min-height: 28px; border: 0;
+  background: transparent !important; color: var(--volca-muted) !important; box-shadow: none !important;
+}
+:deep(.slot-preview.v-btn:hover),
+:deep(.slot-preview.v-btn.is-playing) {
+  background: rgba(255,255,255,.07) !important; color: var(--volca-accent-bright) !important;
 }
 .slot-move { display: flex; align-items: center; }
 .sound-list-menu { min-width: 200px; border: 1px solid rgba(206,179,147,.28); border-radius: 10px; background: #2b2022; color: var(--volca-text); }

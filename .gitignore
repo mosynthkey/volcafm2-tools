@@ -15,4 +15,5 @@ packages/template-compiler/browser.js
 dist
 dist-desktop
 temp
+native/dexed-preview/build
 types/v3-generated.d.ts

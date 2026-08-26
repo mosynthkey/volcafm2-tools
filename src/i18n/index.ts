@@ -4,13 +4,14 @@ const messages = {
   ja: {
     common: { ok: 'OK', cancel: 'キャンセル', close: '閉じる', save: '保存', load: '読み込む', delete: '削除', back: '戻る', loading: '読み込み中…', send: '送信', write: '書き込み', more: 'その他', library: 'Library', autoSend: '自動', autoSendHint: '変更後、少し待ってからvolca fm2へ転送します', on: 'ON', off: 'OFF', clear: 'クリア', toggle: '切り替え', dontShowAgain: '今後このダイアログを表示しない', indexedDbOpenFailed: 'IndexedDBを開けませんでした。', indexedDbOpFailed: 'IndexedDBの操作に失敗しました。', indexedDbAborted: 'IndexedDBの操作が中断されました。', sendFailedTitle: '送信できませんでした', sendNak: '送信しましたがvolca fm2がエラーを返しました（NAK）。', sendError: '送信できませんでした。接続を確認してください。' },
     app: {
-      showLog: 'ログを表示', log: 'ログ', tools: 'ツール', about: 'volca fm2 tools', version: 'バージョン {version}', license: 'MIT ライセンス', copyright: 'Copyright (C) 2026 Masaki Ono / Melissa Audio', backToMelissaAudio: 'Melissa Audio',
+      showLog: 'ログを表示', log: 'ログ', tools: 'ツール', about: 'volca fm2 tools', version: 'バージョン {version}', license: 'MIT ライセンス', copyright: 'Copyright (C) 2026 Masaki Ono / Melissa Audio', backToMelissaAudio: 'Melissa Audio', dexedPreview: '音色プレビューは Dexed のFMエンジン（Apache 2.0）を使っています。',
       changelogLabel: 'Ver 2.1 の変更点',
       changelog: [
         'volca fm2本体の16 SequenceとProgramをバックアップ／リストアする機能を追加しました。',
         'ピアノロールで、ノートのない場所をドラッグしてもノートを選択できるようになりました。矩形選択モードはなくなりました。',
         'ノートを選択した状態で、↑↓で半音、Shift + ↑↓でオクターブ、←→でステップ移動（端で折り返し）できるようになりました。',
         'Program / Sequence の書き込みボタンを追加しました。',
+        'Programのプレビュー再生を追加しました。',
       ],
       expandSidebar: '左ペインを広げる', collapseSidebar: '左ペインを折りたたむ',
       language: '言語',
@@ -150,7 +151,7 @@ const messages = {
       replaceListDescription: '現在の64 Program一覧を、この保存データの内容で置き換えます。この操作は取り消せません。',
       replaceList: '置き換える', suggestedSoundList: 'Program list', suggestedBundle: 'Bundle', suggestedBackup: 'Backup',
       bundleDescription: 'BundleはこのエディタのLibraryに保存したものすべてのデータを集めたものです。',
-      backupDescription: 'volca fm2本体の64 ProgramとSequenceのバックアップデータです。',
+      backupDescription: 'volca fm2に保存されている64個のProgramと16個のSequenceのデータです。',
       backupFetchTitle: '本体から取得しています',
       backupFetchPrograms: 'Program {current} / {total}',
       backupFetchSequences: 'Sequence {current} / {total}',
@@ -186,6 +187,13 @@ const messages = {
       storageNoticeAfter: 'からデータを一括ダウンロードできます。',
       storageNoticeLinkTitle: '保存データを1つのBundleファイルとしてダウンロード',
     },
+    preview: {
+      play: 'プレビュー',
+      stop: '停止',
+      failed: 'プレビューできませんでした',
+      sequenceHintTitle: 'Sequenceプレビュー',
+      sequenceHintDescription: 'プレビューでは、volca fm2本体どおりに再現できない部分もあります。参考程度に聴いてください。',
+    },
     hint: {
       title: 'ヒント',
       sound: 'このページでは、現在選択されているProgramを編集します。\n\nProgramは自動的に取得されます。volca fm2本体でProgramを変えたときは、取得ボタンで更新してください。\n\n編集後はvolca fm2本体で保存してください。',
@@ -197,13 +205,14 @@ const messages = {
   en: {
     common: { ok: 'OK', cancel: 'Cancel', close: 'Close', save: 'Save', load: 'Load', delete: 'Delete', back: 'Back', loading: 'Loading…', send: 'Send', write: 'Write', more: 'More', library: 'Library', autoSend: 'Auto', autoSendHint: 'Buffer edits briefly, then send them to the volca fm2', on: 'ON', off: 'OFF', clear: 'Clear', toggle: 'Toggle', dontShowAgain: "Don't show this dialog again", indexedDbOpenFailed: 'Could not open IndexedDB.', indexedDbOpFailed: 'IndexedDB operation failed.', indexedDbAborted: 'IndexedDB operation was interrupted.', sendFailedTitle: 'Send failed', sendNak: 'Sent, but volca fm2 returned an error (NAK).', sendError: 'Failed to send. Check the connection.' },
     app: {
-      showLog: 'Show log', log: 'Log', tools: 'Tools', about: 'volca fm2 tools', version: 'Version {version}', license: 'MIT License', copyright: 'Copyright (C) 2026 Masaki Ono / Melissa Audio', backToMelissaAudio: 'Melissa Audio', expandSidebar: 'Expand sidebar', collapseSidebar: 'Collapse sidebar',
+      showLog: 'Show log', log: 'Log', tools: 'Tools', about: 'volca fm2 tools', version: 'Version {version}', license: 'MIT License', copyright: 'Copyright (C) 2026 Masaki Ono / Melissa Audio', backToMelissaAudio: 'Melissa Audio', dexedPreview: 'Program preview uses the Dexed FM engine (Apache 2.0).', expandSidebar: 'Expand sidebar', collapseSidebar: 'Collapse sidebar',
       changelogLabel: "What's new in 2.1",
       changelog: [
         'Added backup and restore for Programs and the 16 Sequences on the volca fm2.',
         'Dragging from empty space on the piano roll now selects notes. Rectangle selection mode has been removed.',
         'With notes selected, ↑↓ move by a semitone, Shift + ↑↓ change the octave, and ←→ move by a step (wrapping at the edges).',
         'Added Write buttons for Program and Sequence.',
+        'Added Program preview playback.',
       ],
       language: 'Language',
       nav: { soundLabel: 'Program', sequenceLabel: 'Sequence', dx7Label: 'Program list', libraryLabel: 'Library', sound: 'Edit the current Program', sequence: 'Edit the sequence', dx7: 'Manage Programs', library: 'Manage saved data' },
@@ -269,7 +278,7 @@ const messages = {
       replaceListDescription: 'Replace the current 64-Program list with this saved data. This cannot be undone.',
       replaceList: 'Replace', suggestedSoundList: 'Program list', suggestedBundle: 'Bundle', suggestedBackup: 'Backup',
       bundleDescription: 'A Bundle collects all data saved in this editor’s Library.',
-      backupDescription: 'Backup data of the 64 Programs and Sequences on the volca fm2.',
+      backupDescription: 'Data for the 64 Programs and 16 Sequences stored on the volca fm2.',
       backupFetchTitle: 'Reading from the device',
       backupFetchPrograms: 'Program {current} / {total}',
       backupFetchSequences: 'Sequence {current} / {total}',
@@ -304,6 +313,13 @@ const messages = {
       storageNoticeLink: 'Download all data from here',
       storageNoticeAfter: '.',
       storageNoticeLinkTitle: 'Download saved data as one Bundle file',
+    },
+    preview: {
+      play: 'Preview',
+      stop: 'Stop',
+      failed: 'Preview failed',
+      sequenceHintTitle: 'Sequence preview',
+      sequenceHintDescription: 'This preview cannot reproduce every Sequence feature of the volca fm2. Treat it as a rough reference.',
     },
     hint: {
       title: 'Hint',

@@ -7,6 +7,7 @@
             <span>{{ t('app.version', { version: '2.1.1' }) }}</span>
             <span>{{ t('app.license') }}</span>
             <small>{{ t('app.copyright') }}</small>
+            <small>{{ t('app.dexedPreview') }}</small>
           </div>
           <ChangelogList />
           <div class="about-log-toggle">
@@ -47,6 +48,7 @@
     <MidiTroubleshootDialog v-model="showTroubleshoot" />
 
     <PageHintDialog />
+    <SequencePreviewHintDialog />
 
     <v-main>
       <div class="app-layout">
@@ -73,6 +75,7 @@ import ChangelogList from './components/ChangelogList.vue';
 import AppSidebar from './components/AppSidebar.vue';
 import LibraryTab from './components/LibraryTab.vue';
 import PageHintDialog from './components/PageHintDialog.vue';
+import SequencePreviewHintDialog from './components/SequencePreviewHintDialog.vue';
 import AppDialog from './components/dialogs/AppDialog.vue';
 import AppProgressDialog from './components/dialogs/AppProgressDialog.vue';
 import LogPanel from './components/LogPanel.vue';

@@ -3,6 +3,7 @@ import { getPref, setPref } from '@/utils/appPrefs'
 
 export const SKIP_DEVICE_WRITE_PREF = 'skipDeviceMemoryWriteDialog'
 export const SKIP_PROGRAM_NAME_HINT_PREF = 'skipProgramNameHintDialog'
+export const SKIP_SEQUENCE_PREVIEW_HINT_PREF = 'skipSequencePreviewHintDialog'
 
 export const useSkipConfirm = (prefKey: string) => {
   const skip = ref(false)

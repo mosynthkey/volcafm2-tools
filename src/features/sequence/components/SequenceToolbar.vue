@@ -49,7 +49,7 @@
         <ToolbarIconButton :label="t('sequence.capturePerformanceButton')">
           <v-btn icon :disabled="!canSend" :title="t('sequence.capturePerformanceButton')"
             :aria-label="t('sequence.capturePerformanceButton')" @click="sequence.showCaptureDialog = true">
-            <Play :size="16" />
+            <ListMusic :size="16" />
           </v-btn>
         </ToolbarIconButton>
         <div class="send-auto-split">
@@ -74,6 +74,7 @@
             <Trash2 :size="16" />
           </v-btn>
         </ToolbarIconButton>
+        <ProgramPreviewButton toolbar preview-id="sequence-edit" :sequence="previewSequence" :voice="sound.program" />
         <ToolbarIconButton :label="t('sequence.stepInput')">
           <v-btn icon :title="t('sequence.stepInput')" :aria-label="t('sequence.stepInput')" @click="sequence.toggleStepInput()">
             <Piano :size="16" />
@@ -127,11 +128,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, Dices, FileUp, HardDrive, HardDriveDownload, HardDriveUpload, MoreHorizontal, Piano, Play, Trash2, X } from '@lucide/vue'
+import { ChevronDown, Dices, FileUp, HardDrive, HardDriveDownload, HardDriveUpload, ListMusic, MoreHorizontal, Piano, Trash2, X } from '@lucide/vue'
 import AutoSendToggle from '@/components/AutoSendToggle.vue'
 import AppDialog from '@/components/dialogs/AppDialog.vue'
 import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue'
 import LibrarySection from '@/components/LibrarySection.vue'
+import ProgramPreviewButton from '@/components/ProgramPreviewButton.vue'
 import ToolbarIconButton from '@/components/ToolbarIconButton.vue'
 import { useMidiStore } from '@/stores/midiStore'
 import { useSequencerStore } from '@/stores/sequencerStore'
@@ -157,6 +159,7 @@ const currentProgramName = computed(() => {
   const slot = Number(sequence.programNo)
   return programDisplayName(slot, midi.matchedProgramNo, sound.program.name, midi.programNames[slot]?.name ?? '')
 })
+const previewSequence = computed(() => sequence.toState())
 
 getPref<number>(SEQUENCE_WRITE_SLOT_PREF).then(value => {
   if (typeof value === 'number' && value >= 0 && value < NUM_OF_SEQUENCES) writeSlot.value = value

@@ -64,6 +64,7 @@
           <RotateCcw :size="16" />
         </v-btn>
       </ToolbarIconButton>
+      <ProgramPreviewButton toolbar preview-id="program-edit" :voice="program" />
     </div>
     <div class="editor-toolbar-spacer"></div>
     <LibrarySection kind="sound" page="sound" />
@@ -79,6 +80,7 @@ import AutoSendToggle from '@/components/AutoSendToggle.vue'
 import AppDialog from '@/components/dialogs/AppDialog.vue'
 import AppErrorDialog from '@/components/dialogs/AppErrorDialog.vue'
 import LibrarySection from '@/components/LibrarySection.vue'
+import ProgramPreviewButton from '@/components/ProgramPreviewButton.vue'
 import ToolbarIconButton from '@/components/ToolbarIconButton.vue'
 import { SKIP_DEVICE_WRITE_PREF, SKIP_PROGRAM_NAME_HINT_PREF, useSkipConfirm } from '@/composables/useSkipConfirm'
 import { useMidiStore } from '@/stores/midiStore'

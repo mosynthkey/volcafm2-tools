@@ -134,6 +134,17 @@
             <small>{{ formatDate(record.updatedAt) }}</small>
             <p v-if="record.memo" class="library-memo">{{ record.memo }}</p>
           </div>
+          <ProgramPreviewButton
+            v-if="record.kind === 'sound'"
+            :preview-id="`library-${record.id}`"
+            :voice="record.payload.sound"
+          />
+          <ProgramPreviewButton
+            v-else-if="record.kind === 'sequence'"
+            :preview-id="`library-${record.id}`"
+            :sequence="normalizeSequenceState(record.payload.sequence as SequenceState)"
+            :voice="soundStore.program"
+          />
           <v-btn :aria-label="t('library.memoEditLabel', { name: record.name })" @click="openMemoEditor(record)">
             <StickyNote :size="16" class="mr-1" />{{ t('library.memo') }}
           </v-btn>
@@ -191,7 +202,8 @@ import { Download, FileUp, FolderOpen, Info, Save, StickyNote, Trash2, Undo2 } f
 import AppDialog from '@/components/dialogs/AppDialog.vue';
 import AppProgressDialog from '@/components/dialogs/AppProgressDialog.vue';
 import LibraryBackupDialog from '@/components/LibraryBackupDialog.vue';
-import LibraryBackupProgramSlotDialog from '@/components/LibraryBackupProgramSlotDialog.vue';
+import LibraryBackupProgramSlotDialog from '@/components/LibraryBackupProgramSlotDialog.vue'
+import ProgramPreviewButton from '@/components/ProgramPreviewButton.vue';
 import { useLibraryCurrent } from '@/composables/useLibraryCurrent';
 import { useMidiStore } from '@/stores/midiStore';
 import { useSequencerStore } from '@/stores/sequencerStore';
@@ -217,7 +229,7 @@ import {
     parseDeviceBackupSequences,
     type DeviceBackupProgress,
 } from '@/utils/deviceBackup';
-import { NUM_OF_SEQUENCES, type SequenceState } from '@/types/sequence';
+import { NUM_OF_SEQUENCES, normalizeSequenceState, type SequenceState } from '@/types/sequence';
 import { SOUND_LIST_SLOT_COUNT, type SoundListProgram } from '@/utils/soundListBackup';
 import { formatThrownError } from '@/utils/appError';
 import { downloadText } from '@/utils/downloadBinary';

@@ -1,0 +1,2 @@
+export const PREVIEW_SAMPLE_RATE = 44100
+export const PREVIEW_BLOCK_FRAMES = 64

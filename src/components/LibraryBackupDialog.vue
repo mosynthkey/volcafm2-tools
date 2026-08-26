@@ -10,6 +10,11 @@
             <small>{{ linkedLabel(selectedSequence?.programNo ?? 0) }}</small>
           </div>
           <div class="backup-actions">
+            <ProgramPreviewButton
+              :preview-id="`backup-sequence-selected-${selectedSequenceSlot}`"
+              :sequence="selectedSequence"
+              :voice="linkedProgramData(selectedSequence?.programNo)"
+            />
             <v-btn :disabled="loading || !selectedSequence" class="text-none" @click="emit('load-sequence', selectedSequenceSlot)">
               {{ t('common.load') }}
             </v-btn>
@@ -19,22 +24,30 @@
           </div>
         </div>
         <div class="backup-list" role="listbox" :aria-label="t('library.backupSequences')">
-          <button
+          <div
             v-for="(sequence, slot) in sequences"
             :key="`seq-${slot}`"
-            type="button"
             class="backup-row"
-            :class="{ selected: slot === selectedSequenceSlot }"
             role="option"
+            tabindex="0"
+            :class="{ selected: slot === selectedSequenceSlot }"
             :aria-selected="slot === selectedSequenceSlot"
-            :disabled="loading"
-            @click="selectedSequenceSlot = slot"
+            :aria-disabled="loading"
+            @click="!loading && (selectedSequenceSlot = slot)"
+            @keydown.enter.prevent="!loading && (selectedSequenceSlot = slot)"
           >
             <span class="backup-meta">
               <strong>{{ sequenceTitle(slot) }}</strong>
               <small>{{ linkedLabel(sequence.programNo) }}</small>
             </span>
-          </button>
+            <ProgramPreviewButton
+              compact
+              class="backup-preview"
+              :preview-id="`backup-sequence-${slot}`"
+              :sequence="sequence"
+              :voice="linkedProgramData(sequence.programNo)"
+            />
+          </div>
         </div>
       </section>
       <section class="backup-pane">
@@ -45,28 +58,39 @@
             <small>{{ programName(selectedProgramSlot) }}</small>
           </div>
           <div class="backup-actions">
+            <ProgramPreviewButton
+              :preview-id="`backup-program-selected-${selectedProgramSlot}`"
+              :voice="selectedProgram?.data"
+            />
             <v-btn :disabled="loading || !selectedProgram" class="text-none" @click="emit('load-program', selectedProgramSlot)">
               {{ t('common.load') }}
             </v-btn>
           </div>
         </div>
         <div class="backup-list backup-programs" role="listbox" :aria-label="t('library.backupPrograms')">
-          <button
+          <div
             v-for="(program, slot) in programs"
             :key="`prog-${slot}`"
-            type="button"
             class="backup-row"
-            :class="{ selected: slot === selectedProgramSlot }"
             role="option"
+            tabindex="0"
+            :class="{ selected: slot === selectedProgramSlot }"
             :aria-selected="slot === selectedProgramSlot"
-            :disabled="loading"
-            @click="selectedProgramSlot = slot"
+            :aria-disabled="loading"
+            @click="!loading && (selectedProgramSlot = slot)"
+            @keydown.enter.prevent="!loading && (selectedProgramSlot = slot)"
           >
             <span class="backup-meta">
               <strong>{{ programTitle(slot) }}</strong>
               <small>{{ program.name.trim() || t('library.backupEmptyProgram') }}</small>
             </span>
-          </button>
+            <ProgramPreviewButton
+              compact
+              class="backup-preview"
+              :preview-id="`backup-program-${slot}`"
+              :voice="program.data"
+            />
+          </div>
         </div>
       </section>
     </div>
@@ -81,6 +105,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppDialog from '@/components/dialogs/AppDialog.vue'
+import ProgramPreviewButton from '@/components/ProgramPreviewButton.vue'
 import type { SequenceState } from '@/types/sequence'
 import type { SoundListProgram } from '@/utils/soundListBackup'
 
@@ -124,6 +149,8 @@ const linkedLabel = (programNo: number) => {
   const name = props.programs[programNo]?.name.trim() || t('library.backupEmptyProgram')
   return t('library.backupLinkedProgram', { slot: String(programNo).padStart(2, '0'), name })
 }
+const linkedProgramData = (programNo: number | undefined) =>
+  programNo == null ? undefined : props.programs[programNo]?.data
 
 watch(() => props.modelValue, openDialog => {
   if (!openDialog) return
@@ -160,8 +187,13 @@ watch(() => props.modelValue, openDialog => {
 .backup-row:hover { background: rgba(206,179,147,.08); }
 .backup-row.selected { background: rgba(206,179,147,.16); }
 .backup-row:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: -2px; }
-.backup-row:disabled { cursor: default; }
 .backup-meta { min-width: 0; flex: 1; display: grid; gap: 2px; padding: 6px 0; }
 .backup-meta strong { overflow: hidden; color: var(--volca-text); font-size: var(--volca-type-body); text-overflow: ellipsis; white-space: nowrap; }
 .backup-meta small { overflow: hidden; color: var(--volca-muted); font-size: var(--volca-type-label); text-overflow: ellipsis; white-space: nowrap; }
+:deep(.backup-preview.v-btn) {
+  width: 28px; min-width: 28px; height: 28px; min-height: 28px; flex: 0 0 auto;
+  color: var(--volca-muted) !important;
+}
+:deep(.backup-preview.v-btn:hover),
+:deep(.backup-preview.v-btn.is-playing) { color: var(--volca-accent-bright) !important; }
 </style>
