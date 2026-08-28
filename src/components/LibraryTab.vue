@@ -7,6 +7,42 @@
         <v-btn @click="confirmReplace">{{ t('library.replaceList') }}</v-btn>
       </template>
     </AppDialog>
+    <AppDialog
+      v-model="showDeleteConfirm"
+      :title="t('library.deleteTitle')"
+      max-width="480"
+      :persistent="busy === pendingDelete?.id"
+      :closable="busy !== pendingDelete?.id"
+    >
+      <p>{{ t('library.deleteDescription', { name: pendingDelete?.name ?? '' }) }}</p>
+      <template #actions>
+        <v-btn variant="text" :disabled="busy === pendingDelete?.id" @click="showDeleteConfirm = false">{{ t('common.cancel') }}</v-btn>
+        <v-btn class="dialog-danger-button" :loading="busy === pendingDelete?.id" @click="confirmDelete">
+          <Trash2 :size="16" class="mr-1" />{{ t('common.delete') }}
+        </v-btn>
+      </template>
+    </AppDialog>
+    <AppDialog v-model="showSequenceLoad" :title="t('library.sequenceLoadTitle')" max-width="480">
+      <p>{{ sequenceLoadCopy }}</p>
+      <div class="sequence-load-choices">
+        <button type="button" class="sequence-load-choice" @click="confirmSequenceLoad(false)">
+          <strong>{{ t('library.sequenceLoadSequenceOnly') }}</strong>
+        </button>
+        <button type="button" class="sequence-load-choice" @click="confirmSequenceLoad(true)">
+          <strong>{{ t('library.sequenceLoadWithProgram') }}</strong>
+        </button>
+      </div>
+      <template #actions>
+        <v-btn variant="text" @click="cancelSequenceLoad">{{ t('common.cancel') }}</v-btn>
+      </template>
+    </AppDialog>
+    <LibrarySequenceProgramMismatchDialog
+      v-model="showSequenceProgramMismatch"
+      :program-slot="sequenceProgramMismatch?.slot ?? 0"
+      :program-name="sequenceProgramMismatch?.name ?? ''"
+      @keep="keepSequenceProgramMismatch"
+      @load="loadSequenceProgramMismatch"
+    />
     <AppProgressDialog
       :model-value="midiStore.backupFetching"
       :title="t('library.backupFetchTitle')"
@@ -101,6 +137,8 @@
         </button>
       </div>
 
+      <p class="library-kind-label">{{ kindDescription }}</p>
+
       <div class="save-block">
         <div class="save-row">
           <v-text-field v-model="saveName" :label="t('library.name')" maxlength="40" density="compact" hide-details
@@ -132,6 +170,7 @@
           <div class="library-meta">
             <strong>{{ record.name }}</strong>
             <small>{{ formatDate(record.updatedAt) }}</small>
+            <small v-if="linkedSound(record)">{{ t('library.linkedProgram', { name: linkedSoundName(record) }) }}</small>
             <p v-if="record.memo" class="library-memo">{{ record.memo }}</p>
           </div>
           <ProgramPreviewButton
@@ -143,33 +182,25 @@
             v-else-if="record.kind === 'sequence'"
             :preview-id="`library-${record.id}`"
             :sequence="normalizeSequenceState(record.payload.sequence as SequenceState)"
-            :voice="soundStore.program"
+            :voice="linkedSound(record) ?? soundStore.program"
           />
           <v-btn :aria-label="t('library.memoEditLabel', { name: record.name })" @click="openMemoEditor(record)">
             <StickyNote :size="16" class="mr-1" />{{ t('library.memo') }}
           </v-btn>
           <v-btn @click="loadRecord(record)">
-            <FolderOpen :size="16" class="mr-1" />{{ t('common.load') }}
+            <FileInput :size="16" class="mr-1" />{{ t('common.load') }}
           </v-btn>
           <v-btn @click="exportRecord(record)">
             <Download :size="16" class="mr-1" />{{ t('library.export') }}
           </v-btn>
-          <template v-if="deleteTarget === record.id">
-            <v-btn @click="deleteTarget = null">
-              <Undo2 :size="16" class="mr-1" />{{ t('common.back') }}
-            </v-btn>
-            <v-btn class="dialog-danger-button" :loading="busy === record.id" @click="removeRecord(record.id)">
-              <Trash2 :size="16" class="mr-1" />{{ t('common.delete') }}
-            </v-btn>
-          </template>
-          <v-btn v-else :aria-label="t('library.deleteLabel', { name: record.name })" @click="deleteTarget = record.id">
+          <v-btn :aria-label="t('library.deleteLabel', { name: record.name })" @click="openDelete(record)">
             <Trash2 :size="16" class="mr-1" />{{ t('common.delete') }}
           </v-btn>
         </div>
       </div>
 
-      <div v-if="!isDesktopApp || activeKind === 'bundle' || activeKind === 'backup'" class="library-notes">
-        <p v-if="!isDesktopApp" class="library-storage-notice" role="note">
+      <div v-if="!isDesktopApp" class="library-notes">
+        <p class="library-storage-notice" role="note">
           <Info :size="16" aria-hidden="true" />
           <span>
             {{ t('library.storageNotice') }}<br />
@@ -182,14 +213,6 @@
             >{{ t('library.storageNoticeLink') }}</button>{{ t('library.storageNoticeAfter') }}
           </span>
         </p>
-        <p v-if="activeKind === 'backup'" class="library-bundle-note">
-          <Info :size="16" aria-hidden="true" />
-          <span>{{ t('library.backupDescription') }}</span>
-        </p>
-        <p v-if="activeKind === 'bundle'" class="library-bundle-note">
-          <Info :size="16" aria-hidden="true" />
-          <span>{{ t('library.bundleDescription') }}</span>
-        </p>
       </div>
     </v-card>
   </v-container>
@@ -198,11 +221,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Download, FileUp, FolderOpen, Info, Save, StickyNote, Trash2, Undo2 } from '@lucide/vue';
+import { Download, FileInput, FileUp, Info, Save, StickyNote, Trash2 } from '@lucide/vue';
 import AppDialog from '@/components/dialogs/AppDialog.vue';
 import AppProgressDialog from '@/components/dialogs/AppProgressDialog.vue';
 import LibraryBackupDialog from '@/components/LibraryBackupDialog.vue';
 import LibraryBackupProgramSlotDialog from '@/components/LibraryBackupProgramSlotDialog.vue'
+import LibrarySequenceProgramMismatchDialog from '@/components/LibrarySequenceProgramMismatchDialog.vue'
 import ProgramPreviewButton from '@/components/ProgramPreviewButton.vue';
 import { useLibraryCurrent } from '@/composables/useLibraryCurrent';
 import { useMidiStore } from '@/stores/midiStore';
@@ -233,6 +257,7 @@ import { NUM_OF_SEQUENCES, normalizeSequenceState, type SequenceState } from '@/
 import { SOUND_LIST_SLOT_COUNT, type SoundListProgram } from '@/utils/soundListBackup';
 import { formatThrownError } from '@/utils/appError';
 import { downloadText } from '@/utils/downloadBinary';
+import { isSoundProgram } from '@/utils/programPreviewVoice';
 import { isDesktopApp } from '@/utils/runtime';
 import { buildSequenceDataBytes } from '@/utils/sequenceCodec';
 
@@ -242,7 +267,7 @@ const seqStore = useSequencerStore();
 const midiStore = useMidiStore();
 const { t, locale } = useI18n();
 const thrown = (error: unknown, fallback: string) => formatThrownError(error, fallback, key => String(t(key)));
-const { suggestedNameFor, stampSoundName, saveCurrent: saveKind, currentPayload } = useLibraryCurrent();
+const { suggestedNameFor, stampSoundName, saveCurrent: saveKind, currentPayload, showSequenceProgramMismatch, sequenceProgramMismatch, keepSequenceProgramMismatch, loadSequenceProgramMismatch } = useLibraryCurrent();
 
 const kindTabs = LIBRARY_KINDS;
 const activeKind = ref<LibraryKind>('sound');
@@ -251,7 +276,7 @@ const saveName = ref('');
 const saveMemo = ref('');
 const busy = ref<string | null>(null);
 const errorMessage = ref('');
-const deleteTarget = ref<string | null>(null);
+const pendingDelete = ref<LibraryRecord | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const showMemoEditor = ref(false);
 const memoTargetId = ref<string | null>(null);
@@ -259,7 +284,12 @@ const memoTargetName = ref('');
 const memoDraft = ref('');
 const memoErrorMessage = ref('');
 const showReplaceConfirm = ref(false);
+const showSequenceLoad = ref(false);
 const pendingLoad = ref<LibraryRecord | null>(null);
+const showDeleteConfirm = computed({
+  get: () => pendingDelete.value !== null,
+  set: open => { if (!open) pendingDelete.value = null },
+});
 const showImportResult = ref(false);
 const importResult = ref({ added: 0, skipped: 0 });
 const hasDownloadableLibrary = ref(false);
@@ -329,9 +359,24 @@ const backupRestoreFailedCopy = computed(() => {
   });
 });
 
-const kindLabel = (kind: LibraryKind) => t(
-  kind === 'sound-list' ? 'library.kinds.soundList' : `library.kinds.${kind}`,
-);
+const kindI18nKey = (kind: LibraryKind) => (kind === 'sound-list' ? 'soundList' : kind)
+
+const kindLabel = (kind: LibraryKind) => t(`library.kinds.${kindI18nKey(kind)}`)
+
+const kindDescription = computed(() => t(`library.kindDescription.${kindI18nKey(activeKind.value)}`))
+
+const linkedSound = (record: LibraryRecord) =>
+  isSoundProgram(record.payload.sound) ? record.payload.sound : null
+
+const linkedSoundName = (record: LibraryRecord) => {
+  const sound = linkedSound(record)
+  if (!sound) return ''
+  return sound.name.trim() || t('sound.untitled')
+}
+
+const sequenceLoadCopy = computed(() => t('library.sequenceLoadDescription', {
+  name: pendingLoad.value ? linkedSoundName(pendingLoad.value) : '',
+}))
 
 const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
@@ -374,7 +419,7 @@ const mergeRecords = async (incoming: LibraryRecord[]) => {
   return result;
 };
 
-const applyRecord = (record: LibraryRecord) => {
+const applyRecord = (record: LibraryRecord, options: { withProgram?: boolean } = {}) => {
   const payload = cloneJson(record.payload);
   if (record.kind === 'sound' && payload.sound) {
     stampSoundName(payload, record.name);
@@ -383,6 +428,10 @@ const applyRecord = (record: LibraryRecord) => {
   }
   if (record.kind === 'sequence' && payload.sequence) {
     seqStore.loadPreset(payload.sequence);
+    if (options.withProgram && isSoundProgram(payload.sound)) {
+      soundStore.loadPreset(payload.sound);
+      soundStore.sendToDevice();
+    }
   }
   if (record.kind === 'sound-list' && payload.soundList) {
     midiStore.replaceSoundList(deserializeSoundList(payload.soundList));
@@ -412,7 +461,7 @@ const selectKind = (kind: LibraryKind) => {
   activeKind.value = kind;
   saveName.value = suggestedNameFor(kind);
   saveMemo.value = '';
-  deleteTarget.value = null;
+  pendingDelete.value = null;
   void refresh();
 };
 
@@ -420,9 +469,10 @@ const openLibrary = () => {
   activeKind.value = ui.libraryFocus;
   saveName.value = suggestedNameFor(activeKind.value);
   saveMemo.value = '';
-  deleteTarget.value = null;
+  pendingDelete.value = null;
   errorMessage.value = '';
   showReplaceConfirm.value = false;
+  showSequenceLoad.value = false;
   pendingLoad.value = null;
   void refresh();
 };
@@ -459,7 +509,8 @@ const saveCurrent = async () => {
         saveMemo.value,
       );
     } else {
-      await saveKind(activeKind.value, name, saveMemo.value);
+      const saved = await saveKind(activeKind.value, name, saveMemo.value);
+      if (!saved) return;
     }
     saveMemo.value = '';
     await refresh();
@@ -535,6 +586,11 @@ const loadRecord = async (record: LibraryRecord) => {
       showReplaceConfirm.value = true;
       return;
     }
+    if (record.kind === 'sequence' && linkedSound(record)) {
+      pendingLoad.value = record;
+      showSequenceLoad.value = true;
+      return;
+    }
     applyRecord(record);
   } catch (error) {
     errorMessage.value = thrown(error, 'library.loadError');
@@ -558,6 +614,23 @@ const confirmReplace = () => {
 const cancelReplace = () => {
   pendingLoad.value = null;
   showReplaceConfirm.value = false;
+};
+
+const confirmSequenceLoad = (withProgram: boolean) => {
+  const record = pendingLoad.value;
+  pendingLoad.value = null;
+  showSequenceLoad.value = false;
+  if (!record) return;
+  try {
+    applyRecord(record, { withProgram });
+  } catch (error) {
+    errorMessage.value = thrown(error, 'library.loadError');
+  }
+};
+
+const cancelSequenceLoad = () => {
+  pendingLoad.value = null;
+  showSequenceLoad.value = false;
 };
 
 const downloadAllLibrary = async () => {
@@ -627,13 +700,25 @@ const removeRecord = async (id: string) => {
   errorMessage.value = '';
   try {
     await deleteLibrary(id);
-    deleteTarget.value = null;
+    pendingDelete.value = null;
     await refresh();
   } catch (error) {
     errorMessage.value = thrown(error, 'library.deleteError');
+    pendingDelete.value = null;
   } finally {
     busy.value = null;
   }
+};
+
+const confirmDelete = () => {
+  const record = pendingDelete.value;
+  if (!record) return;
+  void removeRecord(record.id);
+};
+
+const openDelete = (record: LibraryRecord) => {
+  errorMessage.value = '';
+  pendingDelete.value = record;
 };
 
 const formatDate = (timestamp: number) => new Intl.DateTimeFormat(locale.value, {
@@ -829,7 +914,7 @@ const confirmBackupSlot = async (destSlot: number) => {
 <style scoped>
 .library-container { height: 100%; box-sizing: border-box; }
 .library-card { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.library-tabs { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 4px; margin: 4px 0 16px; border-bottom: 1px solid var(--volca-line); }
+.library-tabs { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 4px; margin: 4px 0 12px; border-bottom: 1px solid var(--volca-line); }
 .library-tab {
   height: 40px; padding: 0 16px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
   background: transparent; color: var(--volca-muted); font: inherit; font-size: var(--volca-type-body);
@@ -838,6 +923,18 @@ const confirmBackupSlot = async (destSlot: number) => {
 .library-tab:hover { color: var(--volca-text); }
 .library-tab.is-on { color: var(--volca-accent-bright); border-bottom-color: var(--volca-accent); }
 .library-tab:focus-visible { outline: 2px solid var(--volca-accent); outline-offset: 2px; }
+.library-kind-label {
+  flex: 0 0 auto; margin: 0 0 12px;
+  color: var(--volca-muted); font-size: var(--volca-type-body); line-height: 1.55;
+}
+.sequence-load-choices { display: grid; gap: 8px; margin: 14px 0 0; }
+.sequence-load-choice {
+  display: grid; min-height: 48px; padding: 12px 14px; place-items: start;
+  border: 1px solid rgba(206,179,147,.18); border-radius: 8px; background: #2b2022; color: #d8ccc4;
+  text-align: left; cursor: pointer;
+}
+.sequence-load-choice:hover { border-color: rgba(206,179,147,.48); background: #35282a; }
+.sequence-load-choice strong { color: var(--volca-text); font-size: var(--volca-type-body); }
 .save-block { display: grid; gap: 10px; margin-bottom: 12px; }
 .save-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
 .library-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
@@ -857,13 +954,11 @@ const confirmBackupSlot = async (destSlot: number) => {
   display: grid; gap: 12px; flex: 0 0 auto; margin: 14px 0 0; padding-top: 14px;
   border-top: 1px solid var(--volca-line);
 }
-.library-storage-notice,
-.library-bundle-note {
+.library-storage-notice {
   display: flex; align-items: flex-start; gap: 8px; margin: 0;
   color: var(--volca-muted); font-size: var(--volca-type-body); line-height: 1.55;
 }
-.library-storage-notice svg,
-.library-bundle-note svg { flex: 0 0 auto; margin-top: 2px; color: var(--volca-teal); }
+.library-storage-notice svg { flex: 0 0 auto; margin-top: 2px; color: var(--volca-teal); }
 .library-storage-notice__link {
   display: inline; padding: 0; border: 0; background: none; color: var(--volca-accent);
   font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer;

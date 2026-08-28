@@ -16,6 +16,17 @@
       <p>{{ t('dx7.writeProgress', { count: midiStore.programWriteProgress, total: 64 }) }}</p>
       <v-progress-linear :model-value="writePercent" height="8" rounded />
     </AppDialog>
+    <AppDialog v-model="showReorderSequences" :title="t('dx7.reorderSequencesTitle')" max-width="480" persistent
+      :closable="false">
+      <p>{{ t('dx7.reorderSequencesDescription') }}</p>
+      <p v-if="pendingReorder?.sequenceLabels" class="reorder-seq-list">{{ pendingReorder.sequenceLabels }}</p>
+      <p v-if="pendingReorder?.editorAffected">{{ t('dx7.reorderSequencesCurrent') }}</p>
+      <template #actions>
+        <v-btn variant="text" @click="cancelReorderSequences()">{{ t('common.cancel') }}</v-btn>
+        <v-btn variant="text" @click="confirmReorderSequences(false)">{{ t('dx7.reorderSequencesKeep') }}</v-btn>
+        <v-btn @click="confirmReorderSequences(true)">{{ t('dx7.reorderSequencesUpdate') }}</v-btn>
+      </template>
+    </AppDialog>
     <Dx7VoiceImportDialog v-model="showVoicePicker" :voices="parsedVoices" :initial-start-slot="firstEmptySlot"
       @import="applyDx7Import" />
 
@@ -99,6 +110,7 @@
               </span>
               <span class="slot-number">{{ String(slot.slot).padStart(2, '0') }}</span>
               <span class="slot-name">{{ slot.name.trim() || '—' }}</span>
+              <span v-if="slot.sequenceUsage" class="slot-seq" :title="slot.sequenceUsage">{{ slot.sequenceUsage }}</span>
               <ProgramPreviewButton
                 v-if="!reorderEnabled"
                 compact
@@ -108,11 +120,11 @@
               />
               <div v-if="reorderEnabled" class="slot-move">
                 <v-btn icon variant="text" size="small" :disabled="slot.slot === 0" :aria-label="t('dx7.moveUp')"
-                  @click.stop="midiStore.reorderSoundList(slot.slot, slot.slot - 1)">
+                  @click.stop="requestReorder(slot.slot, slot.slot - 1)">
                   <ChevronUp :size="16" />
                 </v-btn>
                 <v-btn icon variant="text" size="small" :disabled="slot.slot === 63" :aria-label="t('dx7.moveDown')"
-                  @click.stop="midiStore.reorderSoundList(slot.slot, slot.slot + 1)">
+                  @click.stop="requestReorder(slot.slot, slot.slot + 1)">
                   <ChevronDown :size="16" />
                 </v-btn>
               </div>
@@ -146,12 +158,16 @@ import Dx7VoiceImportDialog from '@/features/dx7/Dx7VoiceImportDialog.vue';
 import { SKIP_DEVICE_WRITE_PREF, useSkipConfirm } from '@/composables/useSkipConfirm';
 import { parseDx7Sysex, type Dx7PackedVoice } from '@/midi/dx7Cartridge';
 import { MIDIConnectionState, useMidiStore } from '@/stores/midiStore';
+import { useSequencerStore } from '@/stores/sequencerStore';
 import { useSoundStore } from '@/stores/soundStore';
 import { useUiStore } from '@/stores/uiStore';
 import { downloadBinary } from '@/utils/downloadBinary';
 import { programDisplayName } from '@/utils/programDisplayName';
+import { remapSlotAfterReorder } from '@/utils/soundListBackup';
+import { formatSequenceUsageList, formatSequenceUsagePill } from '@/utils/sequenceUsage';
 
 const midiStore = useMidiStore();
+const sequencerStore = useSequencerStore();
 const soundStore = useSoundStore();
 const ui = useUiStore();
 const { t } = useI18n();
@@ -160,6 +176,9 @@ const LIST_COLUMN_COUNT = 4;
 const LIST_COLUMN_SIZE = 16;
 const listColumns = Array.from({ length: LIST_COLUMN_COUNT }, (_, index) => index);
 const reorderEnabled = ref(false);
+const remapSequencesChoice = ref<boolean | null>(null);
+const showReorderSequences = ref(false);
+const pendingReorder = ref<{ fromSlot: number; toSlot: number; sequenceLabels: string; editorAffected: boolean } | null>(null);
 const draggingSlot = ref<number | null>(null);
 const dropInsertBefore = ref<number | null>(null);
 const dragActive = ref(false);
@@ -180,12 +199,19 @@ const {
 } = useSkipConfirm(SKIP_DEVICE_WRITE_PREF);
 
 watch([() => ui.activeTab, () => midiStore.isDeviceReady], ([tab, ready]) => {
-  if (tab === 'dx7' && ready) void midiStore.ensureAllProgramDumps();
+  if (tab === 'dx7' && ready) {
+    void midiStore.ensureAllProgramDumps().then(() => midiStore.ensureAllSequenceDumps());
+  }
 }, { immediate: true });
+
+watch(reorderEnabled, enabled => {
+  if (!enabled) remapSequencesChoice.value = null;
+});
 
 const listedPrograms = computed(() => midiStore.soundList.map(slot => ({
   ...slot,
   name: programDisplayName(slot.slot, midiStore.matchedProgramNo, soundStore.program.name, slot.name),
+  sequenceUsage: formatSequenceUsagePill(midiStore.sequenceUsageByProgram[slot.slot] ?? []),
 })));
 
 const firstEmptySlot = computed(() => {
@@ -200,9 +226,11 @@ const writePercent = computed(() => (midiStore.programWriteProgress / 64) * 100)
 
 const columnSlots = (column: number) => listedPrograms.value.slice(column * LIST_COLUMN_SIZE, column * LIST_COLUMN_SIZE + LIST_COLUMN_SIZE);
 
-const slotAria = (slot: { slot: number; name: string }) => {
+const slotAria = (slot: { slot: number; name: string; sequenceUsage: string }) => {
   const name = slot.name.trim() || t('dx7.unnamedVoice');
-  return `${String(slot.slot).padStart(2, '0')} ${name}`;
+  return slot.sequenceUsage
+    ? `${String(slot.slot).padStart(2, '0')} ${name} ${slot.sequenceUsage}`
+    : `${String(slot.slot).padStart(2, '0')} ${name}`;
 };
 
 const fail = (message: string) => {
@@ -251,8 +279,16 @@ const confirmWrite = async () => {
   const ok = await midiStore.writeSoundListToDevice();
   showWriteProgress.value = false;
   if (!ok) {
-    const slot = midiStore.programWriteSlot;
-    fail(slot === null ? t('dx7.writeErrorUnknown') : t('dx7.writeError', { slot: String(slot).padStart(2, '0') }));
+    const error = midiStore.soundListWriteError;
+    if (error?.kind === 'sequence') {
+      fail(t('dx7.writeSequenceError', { slot: String(error.slot + 1).padStart(2, '0') }));
+      return;
+    }
+    if (error?.kind === 'program') {
+      fail(t('dx7.writeError', { slot: String(error.slot).padStart(2, '0') }));
+      return;
+    }
+    fail(t('dx7.writeErrorUnknown'));
   }
 };
 
@@ -266,6 +302,48 @@ const onSlotClick = (slot: number) => {
   if (reorderEnabled.value) return;
   soundStore.loadLibrarianSlot(slot);
   ui.activeTab = 'sound-edit';
+};
+
+const applyReorder = (fromSlot: number, toSlot: number, remapSequences: boolean) => {
+  midiStore.reorderSoundList(fromSlot, toSlot, { remapSequences });
+  if (!remapSequences) return;
+  const remappedProgramNo = remapSlotAfterReorder(sequencerStore.programNo, fromSlot, toSlot);
+  if (remappedProgramNo !== null) sequencerStore.setProgramNo(remappedProgramNo);
+};
+
+const requestReorder = (fromSlot: number, toSlot: number) => {
+  if (fromSlot === toSlot || showReorderSequences.value) return;
+  const affectedSlots = midiStore.sequencesAffectedByReorder(fromSlot, toSlot);
+  const editorAffected = remapSlotAfterReorder(sequencerStore.programNo, fromSlot, toSlot) !== sequencerStore.programNo;
+  if (affectedSlots.length === 0 && !editorAffected) {
+    applyReorder(fromSlot, toSlot, false);
+    return;
+  }
+  if (remapSequencesChoice.value !== null) {
+    applyReorder(fromSlot, toSlot, remapSequencesChoice.value);
+    return;
+  }
+  pendingReorder.value = {
+    fromSlot,
+    toSlot,
+    sequenceLabels: formatSequenceUsageList(affectedSlots.map(sequenceSlot => sequenceSlot + 1)),
+    editorAffected,
+  };
+  showReorderSequences.value = true;
+};
+
+const confirmReorderSequences = (remapSequences: boolean) => {
+  const pending = pendingReorder.value;
+  showReorderSequences.value = false;
+  pendingReorder.value = null;
+  remapSequencesChoice.value = remapSequences;
+  if (!pending) return;
+  applyReorder(pending.fromSlot, pending.toSlot, remapSequences);
+};
+
+const cancelReorderSequences = () => {
+  showReorderSequences.value = false;
+  pendingReorder.value = null;
 };
 
 const destinationFromInsert = (fromSlot: number, insertBefore: number) =>
@@ -330,7 +408,7 @@ const onHandlePointerMove = (event: PointerEvent) => {
 
 const onHandlePointerUp = () => {
   if (dragActive.value && draggingSlot.value !== null && dropInsertBefore.value !== null) {
-    midiStore.reorderSoundList(
+    requestReorder(
       draggingSlot.value,
       destinationFromInsert(draggingSlot.value, dropInsertBefore.value),
     );
@@ -398,6 +476,15 @@ const onHandlePointerUp = () => {
   min-width: 0; flex: 1; overflow: hidden; color: var(--volca-accent-bright);
   font-weight: 650; text-overflow: ellipsis; white-space: nowrap;
 }
+.slot-seq {
+  flex: 0 1 auto; max-width: 46%; min-width: 0;
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--volca-teal-soft); color: var(--volca-teal);
+  font-size: 11px; font-weight: 700; letter-spacing: .02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
+.reorder-seq-list { color: var(--volca-teal); font-weight: 650; }
 :deep(.slot-preview.v-btn) {
   width: 28px; min-width: 28px; height: 28px; min-height: 28px; border: 0;
   background: transparent !important; color: var(--volca-muted) !important; box-shadow: none !important;

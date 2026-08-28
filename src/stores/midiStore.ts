@@ -2,7 +2,7 @@ import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 import { MIDIConnectionState, isDeviceReadyState, isIdleConnectedState } from '@/midi/connectionState';
 import { buildDx7Cartridge, buildDx7SingleVoice, packedVoiceName } from '@/midi/dx7Cartridge';
-import { SOUND_LIST_SLOT_COUNT, mapImportedVoiceSlots, padPackedProgram, padProgramDump, remapSlotAfterReorder } from '@/utils/soundListBackup';
+import { SOUND_LIST_SLOT_COUNT, mapImportedVoiceSlots, padPackedProgram, padProgramDump, remapSlotAfterReorder, sequenceSlotsAffectedByReorder } from '@/utils/soundListBackup';
 import { writePackedVoiceName } from '@/utils/soundProgramCodec';
 import { createMidiMessageRouter } from '@/midi/midiMessageRouter';
 import { createSysexAssembler } from '@/midi/sysexAssembler';
@@ -26,7 +26,7 @@ import {
     isProgramDump, isSequenceDump, isStatusReply, statusLabel,
 } from '@/midi/volcaFm2Protocol';
 import { loadProgramReferences, matchCurrentVoice } from '@/midi/programLoader';
-import { decodeSequenceData } from '@/utils/sequenceCodec';
+import { decodeSequenceData, sequenceDumpProgramNo, withSequenceDumpProgramNo } from '@/utils/sequenceCodec';
 import { NUM_OF_SEQUENCES } from '@/types/sequence';
 import type { DeviceBackupProgress } from '@/utils/deviceBackup';
 
@@ -83,6 +83,7 @@ export const useMidiStore = defineStore('midi', () => {
     let backupProgramSlots: (Uint8Array | undefined)[] = [];
     let backupSequenceSlots: (Uint8Array | undefined)[] = [];
     let backupNack = false;
+    let programDumpWaiter: ((programNo: number) => void) | null = null;
 
     const receivedProgramCount = computed(() => programData.value.filter(Boolean).length);
     const isDeviceReady = computed(() => isDeviceReadyState(connectionState.value));
@@ -97,6 +98,21 @@ export const useMidiStore = defineStore('midi', () => {
     const backupProgress = ref<DeviceBackupProgress | null>(null);
     const backupFetching = computed(() => backupProgress.value !== null);
     const backupRestoring = ref(false);
+    const fetchingProgramDump = ref(false);
+    const fetchingSequenceDumps = ref(false);
+    const soundListWriteError = ref<{ kind: 'program' | 'sequence'; slot: number } | null>(null);
+    const emptySequenceSlots = () => Array.from({ length: NUM_OF_SEQUENCES }, () => undefined as Uint8Array | undefined);
+    const sequenceSlotData = ref<(Uint8Array | undefined)[]>(emptySequenceSlots());
+    const remappedSequenceSlots = new Set<number>();
+    let sequenceLoadPromise: Promise<boolean> | null = null;
+    let sequenceDumpWaiter: ((sequenceNo: number) => void) | null = null;
+
+    const cacheSequenceSlotDump = (slot: number, sequenceData: Uint8Array) => {
+        const sequenceNo = slot & 0x0f;
+        const next = Array.from({ length: NUM_OF_SEQUENCES }, (_, sequenceSlot) => sequenceSlotData.value[sequenceSlot]);
+        next[sequenceNo] = sequenceData.slice();
+        sequenceSlotData.value = next;
+    };
 
     const log = (message: string) => {
         const ts = new Date().toTimeString().slice(0, 8) + '.' + String(new Date().getMilliseconds()).padStart(3, '0');
@@ -295,6 +311,7 @@ export const useMidiStore = defineStore('midi', () => {
             lastReceivedProgram.value = { programNo, name: programName.trim() };
             currentProgramFetchProgress.value = receivedProgramCount.value;
             if (backupFetching.value) backupProgramSlots[programNo] = programDataArray;
+            programDumpWaiter?.(programNo);
             log(`Program dump received: #${programNo} "${programName}"`);
             if (receivedProgramCount.value === 64) {
                 connectionState.value = MIDIConnectionState.RECEIVED;
@@ -346,7 +363,9 @@ export const useMidiStore = defineStore('midi', () => {
             try {
                 const sequenceNo = data[7] & 0x0f;
                 const sequenceData = decodeSequenceDump(data);
+                cacheSequenceSlotDump(sequenceNo, sequenceData);
                 if (backupFetching.value) backupSequenceSlots[sequenceNo] = sequenceData;
+                sequenceDumpWaiter?.(sequenceNo);
                 log(`Sequence dump received: #${sequenceNo} (${sequenceData.length} bytes).`);
             } catch (error) {
                 log(`Sequence dump decode failed: ${error}`);
@@ -457,8 +476,13 @@ export const useMidiStore = defineStore('midi', () => {
         programData.value = [];
         lastReceivedProgram.value = null;
         currentProgramFetchProgress.value = 0;
+        sequenceSlotData.value = emptySequenceSlots();
+        remappedSequenceSlots.clear();
         programLoadPromise = loadAllProgramDumps().finally(() => { programLoadPromise = null; });
-        return programLoadPromise;
+        return programLoadPromise.then(ok => {
+            void ensureAllSequenceDumps();
+            return ok;
+        });
     };
 
     const requestProgramDump = async () => ensureAllProgramDumps();
@@ -526,7 +550,39 @@ export const useMidiStore = defineStore('midi', () => {
             data: programBytesAt(slot),
         }));
 
-    const reorderSoundList = (fromSlot: number, toSlot: number) => {
+    const sequenceProgramNos = computed(() =>
+        Array.from({ length: NUM_OF_SEQUENCES }, (_, slot) => {
+            const data = sequenceSlotData.value[slot];
+            return data ? sequenceDumpProgramNo(data) : null;
+        }),
+    );
+
+    const sequenceUsageByProgram = computed(() => {
+        const usage = Array.from({ length: SOUND_LIST_SLOT_COUNT }, () => [] as number[]);
+        sequenceProgramNos.value.forEach((programNo, sequenceSlot) => {
+            if (programNo == null || programNo < 0 || programNo >= SOUND_LIST_SLOT_COUNT) return;
+            usage[programNo].push(sequenceSlot + 1);
+        });
+        return usage;
+    });
+
+    const sequencesAffectedByReorder = (fromSlot: number, toSlot: number) =>
+        sequenceSlotsAffectedByReorder(sequenceProgramNos.value, fromSlot, toSlot);
+
+    const remapCachedSequenceProgramNos = (fromSlot: number, toSlot: number) => {
+        const next = Array.from({ length: NUM_OF_SEQUENCES }, (_, slot) => sequenceSlotData.value[slot]);
+        next.forEach((data, sequenceSlot) => {
+            if (!data) return;
+            const programNo = sequenceDumpProgramNo(data);
+            const remapped = remapSlotAfterReorder(programNo, fromSlot, toSlot);
+            if (remapped === null || remapped === programNo) return;
+            next[sequenceSlot] = withSequenceDumpProgramNo(data, remapped);
+            remappedSequenceSlots.add(sequenceSlot);
+        });
+        sequenceSlotData.value = next;
+    };
+
+    const reorderSoundList = (fromSlot: number, toSlot: number, options?: { remapSequences?: boolean }) => {
         if (fromSlot === toSlot) return;
         if (fromSlot < 0 || toSlot < 0 || fromSlot >= SOUND_LIST_SLOT_COUNT || toSlot >= SOUND_LIST_SLOT_COUNT) return;
         const names = Array.from({ length: SOUND_LIST_SLOT_COUNT }, (_, slot) => programNames.value[slot] ?? { name: '' });
@@ -538,6 +594,7 @@ export const useMidiStore = defineStore('midi', () => {
         matchedProgramNo.value = remapSlotAfterReorder(matchedProgramNo.value, fromSlot, toSlot);
         programNames.value = names;
         programData.value = data;
+        if (options?.remapSequences) remapCachedSequenceProgramNos(fromSlot, toSlot);
     };
 
     const importPackedVoices = (voices: Uint8Array[], startSlot: number) => {
@@ -566,6 +623,8 @@ export const useMidiStore = defineStore('midi', () => {
         programNames.value = emptyNames();
         programData.value = [];
         lastReceivedProgram.value = null;
+        sequenceSlotData.value = emptySequenceSlots();
+        remappedSequenceSlots.clear();
     };
 
     const updateSoundListSlot = (slot: number, data: Uint8Array) => {
@@ -618,15 +677,34 @@ export const useMidiStore = defineStore('midi', () => {
 
     const writeSoundListToDevice = async () => {
         if (programWriteState.value === 'sending') return false;
+        soundListWriteError.value = null;
         programWriteProgress.value = 0;
         programWriteSlot.value = 0;
         for (let slot = 0; slot < SOUND_LIST_SLOT_COUNT; slot++) {
             programWriteSlot.value = slot;
-            if (!await writeProgramSlot(slot)) return false;
+            if (!await writeProgramSlot(slot)) {
+                soundListWriteError.value = { kind: 'program', slot };
+                return false;
+            }
             programWriteProgress.value = slot + 1;
             await new Promise(resolve => setTimeout(resolve, 20));
         }
         programWriteSlot.value = null;
+        const sequenceSlotsToWrite = Array.from(remappedSequenceSlots).sort(
+            (leftSlot, rightSlot) => leftSlot - rightSlot,
+        );
+        for (const sequenceSlot of sequenceSlotsToWrite) {
+            const sequenceData = sequenceSlotData.value[sequenceSlot];
+            if (!sequenceData) {
+                remappedSequenceSlots.delete(sequenceSlot);
+                continue;
+            }
+            if (!await writeSequenceSlot(sequenceSlot, sequenceData)) {
+                soundListWriteError.value = { kind: 'sequence', slot: sequenceSlot };
+                programWriteState.value = 'error';
+                return false;
+            }
+        }
         programWriteState.value = 'ok';
         log('Wrote all 64 programs to internal memory.');
         return true;
@@ -658,7 +736,11 @@ export const useMidiStore = defineStore('midi', () => {
                 log(`Failed to send sequence #${sequenceNo}: no MIDI output selected.`);
                 return false;
             }
-            if (await waitForSequenceWriteAck()) return true;
+            if (await waitForSequenceWriteAck()) {
+                cacheSequenceSlotDump(sequenceNo, sequenceData);
+                remappedSequenceSlots.delete(sequenceNo);
+                return true;
+            }
             if (sequenceWriteState.value === 'sending') sequenceWriteState.value = 'error';
             if (attempt === attempts) {
                 log(`Sequence #${sequenceNo} write failed after ${attempts} attempts (${sequenceWriteState.value}).`);
@@ -796,6 +878,87 @@ export const useMidiStore = defineStore('midi', () => {
         return false;
     };
 
+    const receivedSequenceCount = computed(() => sequenceSlotData.value.filter(Boolean).length);
+
+    const loadAllSequenceDumps = async () => {
+        if (!selectedMidiOut.value || backupFetching.value) return false;
+        fetchingSequenceDumps.value = true;
+        log('Loading sequence Program No. references...');
+        try {
+            for (let slot = 0; slot < NUM_OF_SEQUENCES; slot++) {
+                if (sequenceSlotData.value[slot]) continue;
+                if (backupFetching.value) return receivedSequenceCount.value === NUM_OF_SEQUENCES;
+                let received = false;
+                sequenceDumpWaiter = incomingSlot => {
+                    if (incomingSlot === slot) received = true;
+                };
+                const ok = await requestBackupSlot(
+                    `Sequence #${slot}`,
+                    () => {
+                        received = false;
+                        return sendSysEx(createSequenceRequest(slot));
+                    },
+                    () => received || Boolean(sequenceSlotData.value[slot]),
+                    BACKUP_SEQUENCE_TIMEOUT_MS,
+                );
+                sequenceDumpWaiter = null;
+                if (!ok && !sequenceSlotData.value[slot]) {
+                    log(`Sequence #${slot} was not received.`);
+                }
+            }
+            log(`Sequence references: ${receivedSequenceCount.value}/${NUM_OF_SEQUENCES} received.`);
+            return receivedSequenceCount.value === NUM_OF_SEQUENCES;
+        } finally {
+            fetchingSequenceDumps.value = false;
+            sequenceDumpWaiter = null;
+        }
+    };
+
+    const ensureAllSequenceDumps = async () => {
+        if (receivedSequenceCount.value === NUM_OF_SEQUENCES) return true;
+        if (programLoadPromise) await programLoadPromise;
+        if (receivedSequenceCount.value === NUM_OF_SEQUENCES) return true;
+        if (!sequenceLoadPromise) {
+            sequenceLoadPromise = loadAllSequenceDumps().finally(() => { sequenceLoadPromise = null; });
+        }
+        return sequenceLoadPromise;
+    };
+
+    const fetchProgramDump = async (slot: number): Promise<Uint8Array | null> => {
+        if (backupFetching.value || programDumpWaiter || fetchingProgramDump.value) return null;
+        if (!isIdleConnected.value || !selectedMidiOut.value) {
+            log('Program fetch failed: volca fm2 is not connected.');
+            return null;
+        }
+        fetchingProgramDump.value = true;
+        const programNo = Math.max(0, Math.min(SOUND_LIST_SLOT_COUNT - 1, Math.round(Number(slot)) || 0));
+        let received: Uint8Array | undefined;
+        programDumpWaiter = incomingSlot => {
+            if (incomingSlot === programNo) received = programData.value[programNo];
+        };
+        log(`Fetching program #${programNo} from the device...`);
+        try {
+            const ok = await requestBackupSlot(
+                `Program #${programNo}`,
+                () => {
+                    received = undefined;
+                    return sendSysEx(createProgramRequest(programNo));
+                },
+                () => Boolean(received),
+                BACKUP_PROGRAM_TIMEOUT_MS,
+            );
+            if (!ok || !received) {
+                log(`Program fetch failed: program #${programNo} was not received.`);
+                return null;
+            }
+            log(`Program fetch complete: #${programNo}.`);
+            return padProgramDump(received);
+        } finally {
+            programDumpWaiter = null;
+            fetchingProgramDump.value = false;
+        }
+    };
+
     const captureDeviceBackup = async () => {
         if (backupFetching.value) return null;
         if (!isIdleConnected.value || !selectedMidiOut.value) {
@@ -882,6 +1045,10 @@ export const useMidiStore = defineStore('midi', () => {
         backupProgress,
         backupFetching,
         backupRestoring,
+        fetchingProgramDump,
+        fetchingSequenceDumps,
+        soundListWriteError,
+        sequenceUsageByProgram,
         initMIDI,
         bootMIDI,
         reconnectMIDI,
@@ -889,9 +1056,12 @@ export const useMidiStore = defineStore('midi', () => {
         detectVolcaFM2,
         requestProgramDump,
         ensureAllProgramDumps,
+        ensureAllSequenceDumps,
         reloadAllProgramDumps,
         cloneSoundList,
         reorderSoundList,
+        sequencesAffectedByReorder,
+        cacheSequenceSlotDump,
         importPackedVoices,
         replaceSoundList,
         updateSoundListSlot,
@@ -913,6 +1083,7 @@ export const useMidiStore = defineStore('midi', () => {
         onProgramChange,
         sendMidiMessage,
         captureDeviceBackup,
+        fetchProgramDump,
         reset,
     };
 });

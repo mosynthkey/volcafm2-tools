@@ -70,6 +70,20 @@ export const remapSlotAfterReorder = (slot: number | null, fromSlot: number, toS
     return slot;
 };
 
+export const sequenceSlotsAffectedByReorder = (
+    sequenceProgramNos: (number | null | undefined)[],
+    fromSlot: number,
+    toSlot: number,
+): number[] => {
+    const affected: number[] = [];
+    sequenceProgramNos.forEach((programNo, sequenceSlot) => {
+        if (programNo == null) return;
+        const remapped = remapSlotAfterReorder(programNo, fromSlot, toSlot);
+        if (remapped !== null && remapped !== programNo) affected.push(sequenceSlot);
+    });
+    return affected;
+};
+
 export const mapImportedVoiceSlots = (
     voiceCount: number,
     startSlot: number,

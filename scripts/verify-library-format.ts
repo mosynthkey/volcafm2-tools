@@ -62,6 +62,12 @@ const seqFile = encodeLibraryFile('sequence', 'Groove', { sequence })
 const decodedSeq = decodeLibraryFile(seqFile, 'Groove.vfm2_seq')
 assert.equal(decodedSeq.kind, 'sequence')
 assert.equal((decodedSeq.payload.sequence as { programNo: number }).programNo, 3)
+assert.equal(decodedSeq.payload.sound, undefined)
+
+const seqWithSoundFile = encodeLibraryFile('sequence', 'Groove', { sequence, sound })
+const decodedSeqWithSound = decodeLibraryFile(seqWithSoundFile, 'Groove.vfm2_seq')
+assert.equal((decodedSeqWithSound.payload.sequence as { programNo: number }).programNo, 3)
+assert.equal((decodedSeqWithSound.payload.sound as { name: string }).name, 'BRASS 1')
 
 const programs = Array.from({ length: SOUND_LIST_SLOT_COUNT }, (_, slot) => ({
     name: slot === 2 ? 'BRASS 1' : '',
@@ -143,6 +149,7 @@ const legacyItems = catalogItemsFromPayload(decodedLegacyBundle.payload)
 assert.equal(legacyItems.length, 3)
 assert.equal(legacyItems[0]?.kind, 'sound')
 assert.equal(legacyItems[1]?.kind, 'sequence')
+assert.equal((legacyItems[1]?.payload.sound as { name: string } | undefined)?.name, 'BRASS 1')
 assert.equal(legacyItems[2]?.kind, 'sound-list')
 assert.match(legacyItems[0]?.id ?? '', /^[0-9a-f-]{36}$/i)
 

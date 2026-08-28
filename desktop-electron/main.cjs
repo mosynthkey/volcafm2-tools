@@ -2,7 +2,7 @@
 
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
-const { app, BrowserWindow, Menu, dialog, net, protocol, session } = require('electron')
+const { app, BrowserWindow, Menu, dialog, net, protocol, session, shell } = require('electron')
 
 const APP_SCHEME = 'app'
 const APP_HOST = 'volcafm2'
@@ -69,7 +69,10 @@ async function createWindow() {
     },
   })
 
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://')) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
   win.webContents.on('will-navigate', (event, navigationUrl) => {
     if (!navigationUrl.startsWith(`${APP_SCHEME}://${APP_HOST}/`)) event.preventDefault()
   })

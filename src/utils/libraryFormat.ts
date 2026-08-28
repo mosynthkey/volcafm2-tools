@@ -197,7 +197,16 @@ export const catalogItemsFromPayload = (payload: LibraryPayload): LibraryItemSna
         items.push({ id: crypto.randomUUID(), kind: 'sound', name: 'Program', createdAt: now, updatedAt: now, payload: { sound: payload.sound } });
     }
     if (payload.sequence !== undefined) {
-        items.push({ id: crypto.randomUUID(), kind: 'sequence', name: 'Sequence', createdAt: now, updatedAt: now, payload: { sequence: payload.sequence } });
+        items.push({
+            id: crypto.randomUUID(),
+            kind: 'sequence',
+            name: 'Sequence',
+            createdAt: now,
+            updatedAt: now,
+            payload: payload.sound !== undefined
+                ? { sequence: payload.sequence, sound: payload.sound }
+                : { sequence: payload.sequence },
+        });
     }
     if (payload.soundList) {
         items.push({ id: crypto.randomUUID(), kind: 'sound-list', name: 'Program list', createdAt: now, updatedAt: now, payload: { soundList: payload.soundList } });

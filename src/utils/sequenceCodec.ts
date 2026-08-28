@@ -6,6 +6,15 @@ import {
 
 const SEQ_DATA_SIZE = 1920;
 export const SEQUENCE_DATA_SIZE = SEQ_DATA_SIZE;
+
+export const sequenceDumpProgramNo = (data: Uint8Array) => data[9] & 0x7f;
+
+export const withSequenceDumpProgramNo = (data: Uint8Array, programNo: number) => {
+    const next = data.slice();
+    next[9] = programNo & 0x7f;
+    return next;
+};
+
 const STEP_DATA_SIZE = 112;
 const STEP_DATA_OFFSET = 80;
 const TIE = 0x7f;

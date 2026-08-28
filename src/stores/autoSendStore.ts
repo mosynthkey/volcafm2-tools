@@ -42,6 +42,8 @@ export const useAutoSendStore = defineStore('autoSend', () => {
         !midi.isDeviceReady
         || midi.isSearching
         || midi.isFetchingCurrentProgram
+        || midi.fetchingProgramDump
+        || midi.fetchingSequenceDumps
         || midi.soundEditState === 'sending'
         || midi.soundEditState === 'requesting'
         || midi.sequenceWriteState === 'sending'
@@ -126,5 +128,5 @@ export const useAutoSendStore = defineStore('autoSend', () => {
         if (data) sound.loadFromVoiceData(data);
     });
 
-    return { enabled, queue, cancel };
+    return { enabled, queue, cancel, midiBusy };
 });

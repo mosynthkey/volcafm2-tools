@@ -8,8 +8,9 @@
             <span>{{ t('app.license') }}</span>
             <small>{{ t('app.copyright') }}</small>
             <small>{{ t('app.dexedPreview') }}</small>
+            <a class="about-changelog" href="https://github.com/mosynthkey/volcafm2-tools/releases"
+              target="_blank" rel="noopener noreferrer">{{ t('app.changelogLink') }}</a>
           </div>
-          <ChangelogList />
           <div class="about-log-toggle">
             <span>{{ t('app.showLog') }}</span>
             <AppToggle v-model="ui.showLog" :aria-label="t('app.showLog')" />
@@ -71,7 +72,6 @@
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AppToggle from './components/AppToggle.vue';
-import ChangelogList from './components/ChangelogList.vue';
 import AppSidebar from './components/AppSidebar.vue';
 import LibraryTab from './components/LibraryTab.vue';
 import PageHintDialog from './components/PageHintDialog.vue';

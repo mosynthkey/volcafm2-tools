@@ -16,7 +16,7 @@
               :voice="linkedProgramData(selectedSequence?.programNo)"
             />
             <v-btn :disabled="loading || !selectedSequence" class="text-none" @click="emit('load-sequence', selectedSequenceSlot)">
-              {{ t('common.load') }}
+              <FileInput :size="16" class="mr-1" />{{ t('common.load') }}
             </v-btn>
             <v-btn :disabled="loading || !selectedSequence" class="text-none" @click="emit('load-with-program', selectedSequenceSlot)">
               {{ t('library.backupLoadWithProgram') }}
@@ -63,7 +63,7 @@
               :voice="selectedProgram?.data"
             />
             <v-btn :disabled="loading || !selectedProgram" class="text-none" @click="emit('load-program', selectedProgramSlot)">
-              {{ t('common.load') }}
+              <FileInput :size="16" class="mr-1" />{{ t('common.load') }}
             </v-btn>
           </div>
         </div>
@@ -104,6 +104,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { FileInput } from '@lucide/vue'
 import AppDialog from '@/components/dialogs/AppDialog.vue'
 import ProgramPreviewButton from '@/components/ProgramPreviewButton.vue'
 import type { SequenceState } from '@/types/sequence'

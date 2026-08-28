@@ -54,7 +54,8 @@
         </ToolbarIconButton>
         <div class="send-auto-split">
           <ToolbarIconButton :label="t('common.send')">
-            <v-btn icon :disabled="!canSend" :title="t('common.send')" :aria-label="t('common.send')"
+            <v-btn icon class="send-button" :class="{ 'needs-send': sequence.hasUnsavedChanges }"
+              :disabled="!canSend" :title="t('common.send')" :aria-label="t('common.send')"
               @click="sequence.sendToDevice()">
               <HardDriveDownload :size="16" />
             </v-btn>

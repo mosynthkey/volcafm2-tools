@@ -149,12 +149,4 @@ const runWrite = async () => {
   min-width: 2.4rem; color: var(--volca-accent-bright); font-variant-numeric: tabular-nums; font-weight: 700;
 }
 .program-slot.is-empty { color: #8f8180; font-weight: 500; }
-.send-button.needs-send:not(:disabled) { animation: send-attention 2.8s cubic-bezier(.45, 0, .55, 1) infinite; }
-@keyframes send-attention {
-  0%, 100% { filter: brightness(1); box-shadow: 0 2px 8px rgba(206,179,147,.08); }
-  50% { filter: brightness(1.14); box-shadow: 0 4px 18px rgba(225,202,176,.42); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .send-button.needs-send:not(:disabled) { animation: none; box-shadow: 0 3px 12px rgba(225,202,176,.3); filter: brightness(1.1); }
-}
 </style>

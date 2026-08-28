@@ -58,6 +58,18 @@ input, textarea, [contenteditable="true"] { user-select: text; -webkit-user-sele
 .editor-identity__label { white-space: nowrap; }
 .editor-identity__name { max-width: 140px; min-width: 72px; overflow: hidden; color: var(--volca-accent-bright); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .editor-identity__name.is-empty { color: #8f8180; font-weight: 500; }
+.editor-toolbar .v-btn.needs-send:not(:disabled) {
+  animation: send-attention 2.8s cubic-bezier(.45, 0, .55, 1) infinite;
+}
+@keyframes send-attention {
+  0%, 100% { filter: brightness(1); box-shadow: 0 2px 8px rgba(206,179,147,.08); }
+  50% { filter: brightness(1.14); box-shadow: 0 4px 18px rgba(225,202,176,.42); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .editor-toolbar .v-btn.needs-send:not(:disabled) {
+    animation: none; box-shadow: 0 3px 12px rgba(225,202,176,.3); filter: brightness(1.1);
+  }
+}
 .editor-toolbar-section { display: flex; align-items: center; gap: 6px; margin-left: 12px; }
 .editor-toolbar-section::before { content: ''; align-self: stretch; width: 2px; min-height: 42px; margin-right: 10px; border-radius: 1px; background: rgba(206,179,147,.58); }
 .editor-toolbar-section__label { white-space: nowrap; }
@@ -231,6 +243,8 @@ button.midi-state:disabled { cursor: default; }
 .about-identity h2 { margin: 0; color: var(--volca-text); font-size: var(--volca-type-heading); font-weight: 700; letter-spacing: -.02em; }
 .about-identity span { color: var(--volca-muted); font-size: var(--volca-type-label); line-height: 1.6; }
 .about-identity small { margin-top: 6px; color: var(--volca-muted); font-size: var(--volca-type-label); }
+.about-changelog { margin-top: 12px; color: var(--volca-accent); font-size: var(--volca-type-label); font-weight: 650; text-underline-offset: 2px; }
+.about-changelog:hover { color: var(--volca-accent-bright); }
 @keyframes status-pulse { 50% { opacity: .45; transform: scale(.82); } }
 @media (max-width: 900px) { .sidebar { width: 76px; flex-basis: 76px; } .sidebar-heading { justify-content: center; padding-inline: 0; } .sidebar-label, .nav-item > span:last-child, .midi-state > span:last-child, .about-button span, .locale-switch > span:last-child, .sidebar-home-link__label { display: none; } .nav-item, .about-button, .locale-switch, .sidebar-home-link, .midi-state { justify-content: center; padding: 8px; } .workspace .v-container { padding: 8px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition-duration: .01ms !important; } }

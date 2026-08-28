@@ -40,13 +40,21 @@
       </v-btn>
     </template>
   </AppDialog>
+  <LibrarySequenceProgramMismatchDialog
+    v-model="showSequenceProgramMismatch"
+    :program-slot="sequenceProgramMismatch?.slot ?? 0"
+    :program-name="sequenceProgramMismatch?.name ?? ''"
+    @keep="keepSequenceProgramMismatch"
+    @load="loadSequenceProgramMismatch"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { FolderOpen, Save } from '@lucide/vue'
 import AppDialog from '@/components/dialogs/AppDialog.vue'
+import LibrarySequenceProgramMismatchDialog from '@/components/LibrarySequenceProgramMismatchDialog.vue'
 import PageHintButton from '@/components/PageHintButton.vue'
 import ToolbarIconButton from '@/components/ToolbarIconButton.vue'
 import { useLibraryCurrent } from '@/composables/useLibraryCurrent'
@@ -58,7 +66,7 @@ import type { LibraryKind } from '@/utils/libraryFormat'
 const props = defineProps<{ kind: LibraryKind; page?: PageHintId }>()
 const { t } = useI18n()
 const ui = useUiStore()
-const { suggestedNameFor, saveCurrent } = useLibraryCurrent()
+const { suggestedNameFor, saveCurrent, showSequenceProgramMismatch, sequenceProgramMismatch, keepSequenceProgramMismatch, loadSequenceProgramMismatch } = useLibraryCurrent()
 const showSave = ref(false)
 const saveName = ref('')
 const saveMemo = ref('')
@@ -77,14 +85,18 @@ const confirmSave = async () => {
   saving.value = true
   errorMessage.value = ''
   try {
-    await saveCurrent(props.kind, saveName.value, saveMemo.value)
-    showSave.value = false
+    const saved = await saveCurrent(props.kind, saveName.value, saveMemo.value)
+    if (saved) showSave.value = false
   } catch (error) {
     errorMessage.value = formatThrownError(error, 'library.saveError', key => String(t(key)))
   } finally {
     saving.value = false
   }
 }
+
+watch(showSave, open => {
+  if (!open) showSequenceProgramMismatch.value = false
+})
 </script>
 
 <style scoped>
