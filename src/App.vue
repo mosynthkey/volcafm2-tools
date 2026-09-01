@@ -26,6 +26,15 @@
       </template>
     </AppProgressDialog>
 
+    <AppProgressDialog :model-value="showSequenceLoadModal" :title="t('app.loadingSequences.title')"
+      :description="t('app.loadingSequences.description')" :value="sequenceLoadProgress">
+      <template #status>
+        <div class="program-load-status">
+          <span>{{ sequenceLoadStatus }}</span>
+        </div>
+      </template>
+    </AppProgressDialog>
+
     <AppDialog :model-value="showConnectionModal" :title="connectionTexts.title" max-width="560" persistent
       @update:model-value="onConnectionModalUpdate">
           <ol class="connection-steps">
@@ -90,5 +99,6 @@ const showTroubleshoot = ref(false);
 const {
   ui, midiStore, connectionTexts, showConnectionModal, onConnectionModalUpdate,
   showProgramLoadModal, programLoadProgress, currentProgramLoadName,
+  showSequenceLoadModal, sequenceLoadProgress, sequenceLoadStatus,
 } = useAppShell();
 </script>

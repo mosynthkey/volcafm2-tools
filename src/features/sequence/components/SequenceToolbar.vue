@@ -75,7 +75,8 @@
             <Trash2 :size="16" />
           </v-btn>
         </ToolbarIconButton>
-        <ProgramPreviewButton toolbar preview-id="sequence-edit" :sequence="previewSequence" :voice="sound.program" />
+        <ProgramPreviewButton toolbar preview-id="sequence-edit" :sequence="previewSequence"
+          :voice="sound.program" :resolve-voice="resolvePreviewVoice" />
         <ToolbarIconButton :label="t('sequence.stepInput')">
           <v-btn icon :title="t('sequence.stepInput')" :aria-label="t('sequence.stepInput')" @click="sequence.toggleStepInput()">
             <Piano :size="16" />
@@ -161,6 +162,11 @@ const currentProgramName = computed(() => {
   return programDisplayName(slot, midi.matchedProgramNo, sound.program.name, midi.programNames[slot]?.name ?? '')
 })
 const previewSequence = computed(() => sequence.toState())
+const resolvePreviewVoice = async () => {
+  const voice = await midi.fetchProgramDump(sequence.programNo)
+  if (!voice) throw new Error(`Could not fetch Program ${sequence.programNo} for Sequence preview`)
+  return voice
+}
 
 getPref<number>(SEQUENCE_WRITE_SLOT_PREF).then(value => {
   if (typeof value === 'number' && value >= 0 && value < NUM_OF_SEQUENCES) writeSlot.value = value

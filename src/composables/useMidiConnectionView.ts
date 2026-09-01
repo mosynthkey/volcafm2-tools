@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n';
 import { MIDIConnectionState } from '@/midi/connectionState';
 import { useMidiStore } from '@/stores/midiStore';
 import { useUiStore } from '@/stores/uiStore';
+import { NUM_OF_SEQUENCES } from '@/types/sequence';
 import { isDesktopApp } from '@/utils/runtime';
 
 export const useMidiConnectionView = () => {
@@ -41,6 +42,11 @@ export const useMidiConnectionView = () => {
     const currentProgramLoadName = computed(() => midiStore.lastReceivedProgram
         ? `#${String(midiStore.lastReceivedProgram.programNo).padStart(2, '0')}  ${midiStore.lastReceivedProgram.name || '---'}`
         : t('app.loadingPrograms.waiting'));
+    const showSequenceLoadModal = computed(() => midiStore.fetchingSequenceDumps);
+    const sequenceLoadProgress = computed(() =>
+        (midiStore.receivedSequenceCount / NUM_OF_SEQUENCES) * 100);
+    const sequenceLoadStatus = computed(() =>
+        `${midiStore.receivedSequenceCount}/${NUM_OF_SEQUENCES}`);
     const connectionLabel = computed(() => t({
         [MIDIConnectionState.INITIALIZING]: 'app.connection.initializing',
         [MIDIConnectionState.SEARCHING]: 'app.connection.searching',
@@ -68,6 +74,9 @@ export const useMidiConnectionView = () => {
         showProgramLoadModal,
         programLoadProgress,
         currentProgramLoadName,
+        showSequenceLoadModal,
+        sequenceLoadProgress,
+        sequenceLoadStatus,
         connectionLabel,
         connectionTone,
     };

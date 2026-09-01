@@ -10,6 +10,7 @@ const messages = {
       language: '言語',
       nav: { soundLabel: 'Program', sequenceLabel: 'Sequence', dx7Label: 'Program list', libraryLabel: 'Library', sound: 'Programを編集', sequence: 'Sequenceを編集', dx7: 'Programを管理', library: '保存データを管理' },
       loadingPrograms: { title: '音色データを取得中', description: 'volca fm2の音色を読み込んでいます。', waiting: '応答を待っています…' },
+      loadingSequences: { title: 'シーケンスデータを取得中', description: 'volca fm2のシーケンスを読み込んでいます。' },
       connection: {
         title: 'volca fm2が見つかりません。',
         errorTitle: 'MIDI接続に失敗しました。',
@@ -226,6 +227,7 @@ const messages = {
       language: 'Language',
       nav: { soundLabel: 'Program', sequenceLabel: 'Sequence', dx7Label: 'Program list', libraryLabel: 'Library', sound: 'Edit the current Program', sequence: 'Edit the sequence', dx7: 'Manage Programs', library: 'Manage saved data' },
       loadingPrograms: { title: 'Loading sound data', description: 'Receiving sounds from the volca fm2.', waiting: 'Waiting for a response…' },
+      loadingSequences: { title: 'Loading Sequence data', description: 'Receiving Sequences from the volca fm2.' },
       connection: { title: 'volca fm2 was not found.', errorTitle: 'MIDI connection failed.', step1: 'Connect both MIDI IN and MIDI OUT on the volca fm2 to the MIDI interface connected to your computer.', step2: 'Open this app in Chrome.', step2Desktop: 'Open this app in the desktop application.', step3: 'If the MIDI permission dialog appears, choose Allow.', reconnect: 'Reconnect', retry: 'Retry', troubleshoot: 'Troubleshooting', troubleshootTitle: 'MIDI troubleshooting', browser: 'Your browser', os: 'OS', browsers: { chrome: 'Chrome', other: 'Not Chrome' }, oses: { windows: 'Windows', macos: 'macOS', other: 'Other' }, useChrome: 'Use Chrome.', windowsHelp: 'Windows can have MIDI connection problems. Check Microsoft’s notes.', windowsHelpLink: 'Windows MIDI known issues and workarounds', restartBrowser: 'Restart the browser, then try connecting again.', restartDesktop: 'Restart the app, then try connecting again.', initializing: 'Initializing MIDI', searching: 'Searching', disconnected: 'Not connected', connected: 'Connected', receiving: 'Receiving', error: 'Connection error' },
     },
     sequence: {

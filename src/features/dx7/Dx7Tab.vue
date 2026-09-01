@@ -211,7 +211,9 @@ watch(reorderEnabled, enabled => {
 const listedPrograms = computed(() => midiStore.soundList.map(slot => ({
   ...slot,
   name: programDisplayName(slot.slot, midiStore.matchedProgramNo, soundStore.program.name, slot.name),
-  sequenceUsage: formatSequenceUsagePill(midiStore.sequenceUsageByProgram[slot.slot] ?? []),
+  sequenceUsage: midiStore.fetchingSequenceDumps
+    ? ''
+    : formatSequenceUsagePill(midiStore.sequenceUsageByProgram[slot.slot] ?? []),
 })));
 
 const firstEmptySlot = computed(() => {

@@ -299,7 +299,9 @@ export const useMidiStore = defineStore('midi', () => {
                 connectionState.value = MIDIConnectionState.DETECTED;
                 clearAutoReloadMidi(midiStorage());
                 log(`Device Inquiry Reply matched. in="${selectedMidiIn.value}" out="${selectedMidiOut.value}"`);
-                void ensureAllProgramDumps();
+                void ensureAllProgramDumps()
+                    .then(() => ensureAllSequenceDumps())
+                    .catch(error => log(`Device reference preload failed: ${error}`));
             }
         } else if (isProgramDump(data)) {
             connectionState.value = MIDIConnectionState.RECEIVING;
@@ -1036,6 +1038,7 @@ export const useMidiStore = defineStore('midi', () => {
         needsDocumentReload,
         autoReloading,
         receivedProgramCount,
+        receivedSequenceCount,
         soundList,
         isDeviceReady,
         isIdleConnected,

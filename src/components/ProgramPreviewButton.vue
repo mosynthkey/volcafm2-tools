@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Play, Square } from '@lucide/vue'
 import ToolbarIconButton from '@/components/ToolbarIconButton.vue'
@@ -62,26 +62,48 @@ const props = defineProps<{
   previewId: string
   voice?: PreviewVoice | unknown
   sequence?: SequenceState | null
+  resolveVoice?: () => Promise<PreviewVoice | unknown>
   toolbar?: boolean
   compact?: boolean
 }>()
 
 const { t } = useI18n()
-const { isPlaying, isBusy, previewFailed, playPreview } = useProgramPreview()
+const { isPlaying, isBusy, previewFailed, playPreview, stopPreview } = useProgramPreview()
+const resolvingVoice = ref(false)
+const voiceResolveFailed = ref(false)
 const playing = computed(() => isPlaying(props.previewId))
-const busy = computed(() => isBusy(props.previewId) && !playing.value)
+const busy = computed(() => resolvingVoice.value || (isBusy(props.previewId) && !playing.value))
 const disabled = computed(() => props.sequence == null && props.voice == null)
 const label = computed(() => {
-  if (previewFailed.value && !playing.value && !busy.value) return t('preview.failed')
+  if ((voiceResolveFailed.value || previewFailed.value) && !playing.value && !busy.value) return t('preview.failed')
   return playing.value ? t('preview.stop') : t('preview.play')
 })
 
-const toggle = () => {
-  if (props.sequence) {
-    void playPreview(props.previewId, { sequence: props.sequence, voice: props.voice })
+const toggle = async () => {
+  if (playing.value) {
+    stopPreview()
     return
   }
-  void playPreview(props.previewId, props.voice)
+  if (props.sequence) {
+    let voice = props.voice
+    if (props.resolveVoice) {
+      resolvingVoice.value = true
+      voiceResolveFailed.value = false
+      try {
+        voice = await props.resolveVoice()
+        if (voice == null) throw new Error('Preview voice was not received')
+      } catch (error) {
+        console.error('Preview voice fetch failed', error)
+        voiceResolveFailed.value = true
+        return
+      } finally {
+        resolvingVoice.value = false
+      }
+    }
+    await playPreview(props.previewId, { sequence: props.sequence, voice })
+    return
+  }
+  await playPreview(props.previewId, props.voice)
 }
 </script>
 

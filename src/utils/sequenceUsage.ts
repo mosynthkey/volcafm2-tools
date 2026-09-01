@@ -12,7 +12,7 @@ export const formatSequenceUsagePill = (displaySlots: number[]): string => {
         runStart = runEnd = sequenceNo;
     }
     parts.push(runStart === runEnd ? String(runStart) : `${runStart}–${runEnd}`);
-    return `(Seq ${parts.join(', ')})`;
+    return `Seq ${parts.join(', ')}`;
 };
 
 export const formatSequenceUsageList = (displaySlots: number[]): string =>

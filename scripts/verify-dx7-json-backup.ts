@@ -146,8 +146,8 @@ assert.equal(remapSlotAfterReorder(null, 5, 10), null)
 
 assert.deepEqual(sequenceSlotsAffectedByReorder([5, 8, 2], 5, 10), [0, 1])
 assert.deepEqual(sequenceSlotsAffectedByReorder([2, null, 11], 5, 10), [])
-assert.equal(formatSequenceUsagePill([1]), '(Seq 1)')
-assert.equal(formatSequenceUsagePill([1, 2, 3, 8]), '(Seq 1–3, 8)')
+assert.equal(formatSequenceUsagePill([1]), 'Seq 1')
+assert.equal(formatSequenceUsagePill([1, 2, 3, 8]), 'Seq 1–3, 8')
 assert.equal(formatSequenceUsageList([1, 4]), 'Seq 1, Seq 4')
 
 console.log('DX7 SysEx parse, selected-voice mapping, and JSON backup verification passed.')
