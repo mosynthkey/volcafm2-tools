@@ -1,25 +1,42 @@
-# volcafm2-dx7
+# volca fm2 tools
 
-https://mosynthkey.github.io/volcafm2-tools/
+A web and desktop editor for KORG volca fm2 Programs and Sequences, with DX7 SysEx support.
 
-Pushing to `main` or a `v*` tag (for example `v2.0.0`) builds the web app and deploys it to GitHub Pages.
+[Open the web app](https://mosynthkey.github.io/volcafm2-tools/)
 
-Program preview plays a short phrase through the Dexed FM engine compiled to WebAssembly.
-The engine sources live in the `third_party/dexed` submodule (Apache 2.0 `msfa` core). See [THIRD_PARTY.md](THIRD_PARTY.md).
+## Features
+
+- Edit volca fm2 Programs and Sequences.
+- Manage and reorder the 64 Programs stored on the device.
+- Import and export DX7 SysEx files.
+- Save Programs, Sequences, and device backups in the Library.
+- Preview Programs and Sequences with the built-in Dexed FM engine.
+
+## Requirements
+
+Use Google Chrome or the desktop app.
+To communicate with a volca fm2, connect both MIDI IN and MIDI OUT through a MIDI interface.
+
+## Development
+
+Node.js 22 and npm are required.
 
 ```bash
-git submodule update --init third_party/dexed
-npm run wasm:dexed   # requires emcc; writes public/dexed-preview.wasm
+npm ci
+npm run dev
 ```
-
-## Desktop app
-
-The Electron build uses the secure, fixed `app://volcafm2` origin so Web MIDI
-and the IndexedDB Sound/Sequence libraries remain available between launches.
 
 ```bash
-npm install
-npm run desktop:run      # Build and launch the Electron app
-npm run desktop:package  # Create installers in dist-desktop/
+npm run build       # Build the web app
+npm run verify      # Run verification scripts
+npm run desktop:run # Build and launch the Electron app
 ```
-Receive programs from KORG volca fm2 and save as DX7 SysEx
+
+## Support
+
+Report bugs and request features in [GitHub Issues](https://github.com/mosynthkey/volcafm2-tools/issues).
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+The preview engine includes Apache-2.0-licensed code from Dexed. See [THIRD_PARTY.md](THIRD_PARTY.md).
