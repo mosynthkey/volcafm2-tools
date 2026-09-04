@@ -80,10 +80,13 @@
       ],
       "category": "public.app-category.music",
       "hardenedRuntime": true,
-      "artifactName": "${productName}-macOS.${ext}"
+      "entitlements": "installer/macos/entitlements.plist",
+      "entitlementsInherit": "installer/macos/entitlements.plist",
+      "notarize": true,
+      "artifactName": "volca-fm2-tools-macos.${ext}"
     },
     "dmg": {
-      "artifactName": "${productName}-macOS.${ext}"
+      "artifactName": "volca-fm2-tools-macOS.${ext}"
     },
     "win": {
       "icon": "build/icon.ico",

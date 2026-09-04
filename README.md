@@ -14,8 +14,10 @@ A web and desktop editor for KORG volca fm2 Programs and Sequences, with DX7 Sys
 
 ## Requirements
 
-Use Google Chrome or the desktop app.
+Use Google Chrome or the [macOS desktop app](https://github.com/mosynthkey/volcafm2-tools/releases/latest).
 To communicate with a volca fm2, connect both MIDI IN and MIDI OUT through a MIDI interface.
+
+If Chrome cannot find a connected volca fm2, use the desktop app. Chrome can drop incoming MIDI SysEx.
 
 ## Development
 
@@ -29,8 +31,11 @@ npm run dev
 ```bash
 npm run build       # Build the web app
 npm run verify      # Run verification scripts
-npm run desktop:run # Build and launch the Electron app
+npm run desktop:run     # Build and launch the Electron app
+npm run desktop:package # Build a macOS .dmg / .zip into dist-desktop/
 ```
+
+Signed and notarized macOS installers are built by GitHub Actions on `v*` tags (`Release Desktop Apps`). Required secrets: `MACOS_CERTIFICATE_P12_BASE64`, `MACOS_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`.
 
 ## Support
 

@@ -1,0 +1,70 @@
+name: Release Desktop Apps
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # electron-builder imports the certificate, codesigns with hardened
+      # runtime + entitlements, notarizes, and staples in one step (see
+      # package.json "build".mac). CSC_LINK accepts the same base64 p12
+      # content used by ScreenDesc.
+      - name: Build, sign & notarize desktop app
+        env:
+          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run desktop:package -- --mac
+
+      - name: Verify notarization
+        # electron-builder's unpacked-app dir name depends on the runner's arch
+        # (mac/ vs mac-arm64/), so locate the bundle instead of hardcoding it.
+        # `spctl --assess` alone would pass for a notarized-but-unstapled app via
+        # the online check, so also validate the staple explicitly (offline-safe).
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find dist-desktop -maxdepth 2 -name "volca fm2 tools.app" -print -quit)
+          spctl --assess --type execute --verbose=2 "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: volca-fm2-tools-macos-notarized
+          path: |
+            dist-desktop/volca-fm2-tools-macos.zip
+            dist-desktop/volca-fm2-tools-macOS.dmg
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1 \
+            || gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
+          gh release upload "${{ github.ref_name }}" \
+            dist-desktop/volca-fm2-tools-macos.zip \
+            dist-desktop/volca-fm2-tools-macOS.dmg \
+            --repo "${{ github.repository }}" --clobber
