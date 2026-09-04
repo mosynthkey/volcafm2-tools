@@ -83,6 +83,7 @@
       "entitlements": "installer/macos/entitlements.plist",
       "entitlementsInherit": "installer/macos/entitlements.plist",
       "notarize": true,
+      "forceCodeSigning": true,
       "artifactName": "volca-fm2-tools-macos.${ext}"
     },
     "dmg": {
