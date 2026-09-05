@@ -229,13 +229,27 @@ button.midi-state:disabled { cursor: default; }
 .v-overlay__content .v-progress-linear .v-progress-linear__determinate,
 .v-overlay__content .v-progress-linear .v-progress-linear__indeterminate { background: var(--volca-accent) !important; }
 .connection-steps { display: grid; gap: 8px; margin: 0; padding-left: 1.4rem; }
+.connection-issue + .connection-steps { margin-top: 16px; }
 .connection-steps li { padding-left: 4px; }
-.connection-desktop { display: grid; gap: 8px; margin: 16px 0 0; }
-.connection-desktop p { margin: 0; color: var(--volca-muted); font-size: var(--volca-type-label); line-height: 1.55; }
+.connection-issue {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(206, 179, 147, 0.28);
+  border-radius: 10px;
+  background: rgba(48, 36, 38, 0.55);
+}
+.connection-issue h3 {
+  margin: 0;
+  color: var(--volca-accent-bright);
+  font-size: var(--volca-type-body);
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+.connection-issue p { margin: 0; color: var(--volca-text); line-height: 1.65; }
 .connection-desktop-link { color: var(--volca-accent); font-size: var(--volca-type-label); font-weight: 650; text-underline-offset: 2px; }
 .connection-desktop-link:hover { color: var(--volca-accent-bright); }
-.connection-note { margin: 14px 0 0; color: var(--volca-muted); font-size: var(--volca-type-label); line-height: 1.55; }
-.connection-note.is-warn { color: var(--volca-pink); }
 .dialog-error { margin: 0 0 12px; color: var(--volca-pink); }
 .sequencer-card > .dialog-error { margin: 12px 0 0; }
 .program-load-copy { margin: 0 0 16px; color: var(--volca-muted); }

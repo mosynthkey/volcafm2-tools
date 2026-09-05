@@ -37,16 +37,17 @@
 
     <AppDialog :model-value="showConnectionModal" :title="connectionTexts.title" max-width="560" persistent
       @update:model-value="onConnectionModalUpdate">
+          <section v-if="showDesktopDownload" class="connection-issue">
+            <h3>{{ t('hint.knownIssue') }}</h3>
+            <p>{{ connectionTexts.desktopHint }}</p>
+            <a class="connection-desktop-link" :href="desktopAppDownloadUrl"
+              target="_blank" rel="noopener noreferrer">{{ connectionTexts.desktopDownload }}</a>
+          </section>
           <ol class="connection-steps">
             <li>{{ connectionTexts.step1 }}</li>
             <li>{{ connectionTexts.step2 }}</li>
             <li>{{ connectionTexts.step3 }}</li>
           </ol>
-          <div v-if="showDesktopDownload" class="connection-desktop">
-            <p>{{ connectionTexts.desktopHint }}</p>
-            <a class="connection-desktop-link" :href="desktopAppDownloadUrl"
-              target="_blank" rel="noopener noreferrer">{{ connectionTexts.desktopDownload }}</a>
-          </div>
         <template #actions>
           <v-btn variant="text" @click="showTroubleshoot = true">
             {{ connectionTexts.troubleshoot }}
