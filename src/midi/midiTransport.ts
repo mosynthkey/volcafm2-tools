@@ -1,3 +1,5 @@
+import { matchingMidiOutputName } from './midiAccessSession'
+
 type Log = (message: string) => void
 type StateChangeHandler = (port: MIDIPort) => void
 
@@ -54,8 +56,39 @@ export class MidiTransport {
 
   inputNames() { return this.access ? [...this.access.inputs.values()].map(port => port.name ?? '').filter(Boolean) : [] }
   outputNames() { return this.access ? [...this.access.outputs.values()].map(port => port.name ?? '').filter(Boolean) : [] }
-  matchingOutputId(inputName: string) { return this.access ? [...this.access.outputs].find(([, output]) => output.name === inputName)?.[0] ?? null : null }
-  sendToAll(bytes: Uint8Array) { this.access?.outputs.forEach(output => output.send(bytes)) }
+  matchingOutputId(inputName: string) {
+    if (!this.access) return null
+    const outputs = [...this.access.outputs]
+    const outputName = matchingMidiOutputName(inputName, outputs.map(([, output]) => output.name ?? ''))
+    if (!outputName) return null
+    return outputs.find(([, output]) => output.name === outputName)?.[0] ?? null
+  }
+
+  async openAllPorts(onResult?: (port: MIDIPort, error: unknown | null) => void) {
+    if (!this.access) return
+    const ports = [...this.access.inputs.values(), ...this.access.outputs.values()]
+    for (const port of ports) {
+      try {
+        await port.open()
+        onResult?.(port, null)
+      } catch (error) {
+        onResult?.(port, error)
+      }
+    }
+  }
+
+  async sendToAll(bytes: Uint8Array, onResult?: (outputName: string, error: unknown | null) => void) {
+    if (!this.access) return
+    for (const output of this.access.outputs.values()) {
+      try {
+        await output.open()
+        output.send(bytes)
+        onResult?.(output.name ?? '', null)
+      } catch (error) {
+        onResult?.(output.name ?? '', error)
+      }
+    }
+  }
   send(outputName: string | null, bytes: Uint8Array) {
     if (!outputName || !this.access) return false
     const output = [...this.access.outputs.values()].find(candidate => candidate.name === outputName)

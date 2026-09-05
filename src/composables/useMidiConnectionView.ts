@@ -5,6 +5,7 @@ import { useMidiStore } from '@/stores/midiStore';
 import { useUiStore } from '@/stores/uiStore';
 import { NUM_OF_SEQUENCES } from '@/types/sequence';
 import { isDesktopApp } from '@/utils/runtime';
+import { DESKTOP_APP_DOWNLOAD_URL } from '@/utils/clientEnvironment';
 
 export const useMidiConnectionView = () => {
     const midiStore = useMidiStore();
@@ -24,7 +25,11 @@ export const useMidiConnectionView = () => {
         reconnect: t('app.connection.reconnect'),
         retry: t('app.connection.retry'),
         troubleshoot: t('app.connection.troubleshoot'),
+        desktopHint: t('app.connection.desktopHint'),
+        desktopDownload: t('app.connection.desktopDownload'),
     }));
+    const showDesktopDownload = !isDesktopApp;
+    const desktopAppDownloadUrl = DESKTOP_APP_DOWNLOAD_URL;
     const showConnectionModal = computed(() =>
         !ui.connectionModalDismissed
         && !midiStore.isDeviceReady
@@ -69,6 +74,8 @@ export const useMidiConnectionView = () => {
         sidebarToggleLabel,
         connectionTexts,
         showConnectionModal,
+        showDesktopDownload,
+        desktopAppDownloadUrl,
         onConnectionModalUpdate,
         openConnectionRecovery,
         showProgramLoadModal,

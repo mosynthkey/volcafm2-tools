@@ -35,6 +35,13 @@
       <p v-if="advice.restart">
         {{ isDesktopApp ? t('app.connection.restartDesktop') : t('app.connection.restartBrowser') }}
       </p>
+      <p v-if="!isDesktopApp">{{ t('app.connection.desktopHint') }}</p>
+      <a
+        v-if="!isDesktopApp"
+        :href="DESKTOP_APP_DOWNLOAD_URL"
+        target="_blank"
+        rel="noopener noreferrer"
+      >{{ t('app.connection.desktopDownload') }}</a>
     </div>
   </AppDialog>
 </template>
@@ -44,6 +51,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppDialog from '@/components/dialogs/AppDialog.vue'
 import {
+  DESKTOP_APP_DOWNLOAD_URL,
   WINDOWS_MIDI_HELP_URL,
   detectClientBrowser,
   detectClientOs,

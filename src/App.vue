@@ -4,7 +4,7 @@
           <div class="about-identity">
             <img src="/app-icon.png" alt="" />
             <h2>{{ t('app.about') }}</h2>
-            <span>{{ t('app.version', { version: '2.2.0' }) }}</span>
+            <span>{{ t('app.version', { version: '2.3.0' }) }}</span>
             <span>{{ t('app.license') }}</span>
             <small>{{ t('app.copyright') }}</small>
             <small>{{ t('app.dexedPreview') }}</small>
@@ -42,6 +42,11 @@
             <li>{{ connectionTexts.step2 }}</li>
             <li>{{ connectionTexts.step3 }}</li>
           </ol>
+          <div v-if="showDesktopDownload" class="connection-desktop">
+            <p>{{ connectionTexts.desktopHint }}</p>
+            <a class="connection-desktop-link" :href="desktopAppDownloadUrl"
+              target="_blank" rel="noopener noreferrer">{{ connectionTexts.desktopDownload }}</a>
+          </div>
         <template #actions>
           <v-btn variant="text" @click="showTroubleshoot = true">
             {{ connectionTexts.troubleshoot }}
@@ -98,6 +103,7 @@ const { t } = useI18n();
 const showTroubleshoot = ref(false);
 const {
   ui, midiStore, connectionTexts, showConnectionModal, onConnectionModalUpdate,
+  showDesktopDownload, desktopAppDownloadUrl,
   showProgramLoadModal, programLoadProgress, currentProgramLoadName,
   showSequenceLoadModal, sequenceLoadProgress, sequenceLoadStatus,
 } = useAppShell();

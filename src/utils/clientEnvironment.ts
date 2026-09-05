@@ -1,6 +1,9 @@
 export type ClientBrowser = 'chrome' | 'other'
 export type ClientOs = 'windows' | 'macos' | 'other'
 
+export const DESKTOP_APP_DOWNLOAD_URL =
+  'https://github.com/mosynthkey/volcafm2-tools/releases/latest/download/volca-fm2-tools-macOS.dmg'
+
 export const WINDOWS_MIDI_HELP_URL =
   'https://devblogs.microsoft.com/windows-music-dev/windows-midi-services-rollout-known-issues-and-workarounds/'
 

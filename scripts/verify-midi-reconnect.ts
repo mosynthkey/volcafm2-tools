@@ -3,7 +3,9 @@ import {
   isStaleDetectGeneration,
   midiStateChangeAction,
   nextDetectGeneration,
+  matchingMidiOutputName,
   portNamesFrom,
+  waitForMidiPorts,
   selectedPortDisconnected,
   desktopMidiBootAction,
   shouldAutoReloadMidiDocument,
@@ -12,6 +14,7 @@ import {
   clearAutoReloadMidi,
   MIDI_AUTO_RELOAD_KEY,
 } from '../src/midi/midiAccessSession'
+import { DESKTOP_APP_DOWNLOAD_URL } from '../src/utils/clientEnvironment'
 
 const first = nextDetectGeneration(0)
 const second = nextDetectGeneration(first)
@@ -25,6 +28,17 @@ assert.deepEqual(portNamesFrom([
   { name: '', state: 'connected' },
   { name: null, state: 'disconnected' },
 ]), ['volca fm2'])
+
+assert.equal(matchingMidiOutputName('Volt 476', ['NTS-3 kaoss pad kit MIDI OUT', 'Volt 476']), 'Volt 476')
+assert.equal(matchingMidiOutputName('NTS-3 kaoss pad kit MIDI IN', [
+  'NTS-3 kaoss pad kit MIDI OUT',
+  'NTS-3 kaoss pad kit SOUND',
+  'Volt 476',
+]), 'NTS-3 kaoss pad kit MIDI OUT')
+assert.equal(matchingMidiOutputName('NTS-3 kaoss pad kit XY/KNOB', [
+  'NTS-3 kaoss pad kit MIDI OUT',
+  'NTS-3 kaoss pad kit SOUND',
+]), null)
 
 assert.equal(selectedPortDisconnected('volca fm2', [
   { name: 'volca fm2', state: 'disconnected' },
@@ -55,11 +69,40 @@ assert.equal(midiStateChangeAction({
   selectedDisconnected: false,
 }), 'refresh')
 assert.equal(midiStateChangeAction({
+  isDeviceReady: false,
+  isBusy: true,
+  portState: 'connected',
+  selectedDisconnected: false,
+  newPortAppeared: true,
+}), 'rescan')
+assert.equal(midiStateChangeAction({
   isDeviceReady: true,
   isBusy: false,
   portState: 'connected',
   selectedDisconnected: false,
 }), 'refresh')
+
+{
+  const immediate = await waitForMidiPorts({
+    hasPorts: () => true,
+    subscribe: () => () => {},
+    timeoutMs: 50,
+  })
+  assert.equal(immediate, true)
+  let notified = false
+  const late = waitForMidiPorts({
+    hasPorts: () => notified,
+    subscribe: onChange => {
+      setTimeout(() => {
+        notified = true
+        onChange()
+      }, 10)
+      return () => {}
+    },
+    timeoutMs: 200,
+  })
+  assert.equal(await late, true)
+}
 
 assert.equal(desktopMidiBootAction({ isDesktop: false, didAutoReload: true }), 'init')
 assert.equal(desktopMidiBootAction({ isDesktop: true, didAutoReload: false }), 'init')
@@ -93,5 +136,10 @@ assert.equal(memory.get(MIDI_AUTO_RELOAD_KEY), '1')
 assert.equal(readDidAutoReloadMidi(storage), true)
 clearAutoReloadMidi(storage)
 assert.equal(readDidAutoReloadMidi(storage), false)
+
+assert.equal(
+  DESKTOP_APP_DOWNLOAD_URL,
+  'https://github.com/mosynthkey/volcafm2-tools/releases/latest/download/volca-fm2-tools-macOS.dmg',
+)
 
 console.log('verify-midi-reconnect: ok')

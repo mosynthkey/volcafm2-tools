@@ -10,8 +10,41 @@ export const nextDetectGeneration = (current: number) => current + 1
 
 export const isStaleDetectGeneration = (started: number, current: number) => started !== current
 
+export const waitForMidiPorts = (input: {
+  hasPorts: () => boolean
+  subscribe: (onChange: () => void) => () => void
+  timeoutMs: number
+}) => new Promise<boolean>(resolve => {
+  if (input.hasPorts()) {
+    resolve(true)
+    return
+  }
+  let finished = false
+  const finish = (found: boolean) => {
+    if (finished) return
+    finished = true
+    unsubscribe()
+    clearTimeout(timer)
+    resolve(found)
+  }
+  const unsubscribe = input.subscribe(() => {
+    if (input.hasPorts()) finish(true)
+  })
+  const timer = setTimeout(() => finish(input.hasPorts()), input.timeoutMs)
+})
+
 export const portNamesFrom = (ports: Iterable<MidiPortLike>) =>
   [...ports].map(port => port.name ?? '').filter(Boolean)
+
+/** Pair a MIDI input with an output. Exact name first; then "MIDI IN" → "MIDI OUT". */
+export const matchingMidiOutputName = (inputName: string, outputNames: Iterable<string>) => {
+  const names = [...outputNames]
+  if (names.includes(inputName)) return inputName
+  const midiInPrefix = inputName.match(/^(.*) MIDI IN$/i)?.[1]
+  if (!midiInPrefix) return null
+  const midiOutName = `${midiInPrefix} MIDI OUT`
+  return names.includes(midiOutName) ? midiOutName : null
+}
 
 export const selectedPortDisconnected = (selectedName: string | null, ports: Iterable<MidiPortLike>) => {
   if (!selectedName) return false
@@ -23,9 +56,12 @@ export const midiStateChangeAction = (input: {
   isBusy: boolean
   portState: string
   selectedDisconnected: boolean
+  newPortAppeared?: boolean
 }): MidiStateChangeAction => {
   if (input.selectedDisconnected) return 'mark-disconnected'
-  if (input.portState === 'connected' && !input.isDeviceReady && !input.isBusy) return 'rescan'
+  if (input.portState === 'connected' && !input.isDeviceReady && (!input.isBusy || input.newPortAppeared)) {
+    return 'rescan'
+  }
   return 'refresh'
 }
 

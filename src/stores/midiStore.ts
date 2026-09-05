@@ -16,6 +16,7 @@ import {
     selectedPortDisconnected,
     shouldAutoReloadMidiDocument,
     desktopMidiBootAction,
+    waitForMidiPorts,
 } from '@/midi/midiAccessSession';
 import { isDesktopApp } from '@/utils/runtime';
 import { formatMidiBytes, MidiTransport } from '@/midi/midiTransport';
@@ -149,6 +150,7 @@ export const useMidiStore = defineStore('midi', () => {
 
     const bindInput = (input: MIDIInput, access: MIDIAccess) => {
         const assembler = createSysexAssembler();
+        void input.open().catch(error => log(`MIDI input open failed "${input.name}": ${error}`));
         input.onmidimessage = (event: MIDIMessageEvent) => {
             const eventData = event.data;
             if (!eventData) return;
@@ -171,18 +173,20 @@ export const useMidiStore = defineStore('midi', () => {
         if (rescanTimer !== null) clearTimeout(rescanTimer);
         rescanTimer = setTimeout(() => {
             rescanTimer = null;
-            if (!isDeviceReadyState(connectionState.value)
-                && connectionState.value !== MIDIConnectionState.SEARCHING
-                && connectionState.value !== MIDIConnectionState.INITIALIZING) {
-                void detectVolcaFM2();
-            }
+            if (isDeviceReadyState(connectionState.value)) return;
+            if (connectionState.value === MIDIConnectionState.INITIALIZING) return;
+            void detectVolcaFM2();
         }, 300);
     };
 
     const handleStateChange = (port: MIDIPort) => {
         const access = midiAccess.value;
         if (!access) return;
+        const previousInputs = new Set(midiInputs.value);
+        const previousOutputs = new Set(midiOutputs.value);
         refreshPortLists();
+        const newPortAppeared = midiInputs.value.some(name => !previousInputs.has(name))
+            || midiOutputs.value.some(name => !previousOutputs.has(name));
         if (port.type === 'input' && port.state === 'connected') bindInput(port as MIDIInput, access);
         const selectedDisconnected = selectedPortDisconnected(selectedMidiIn.value, access.inputs.values())
             || selectedPortDisconnected(selectedMidiOut.value, access.outputs.values());
@@ -193,6 +197,7 @@ export const useMidiStore = defineStore('midi', () => {
                 || connectionState.value === MIDIConnectionState.RECEIVING,
             portState: port.state,
             selectedDisconnected,
+            newPortAppeared,
         });
         log(`MIDI ${port.type} "${port.name ?? ''}" ${port.state}/${port.connection}.`);
         if (action === 'mark-disconnected') {
@@ -223,20 +228,40 @@ export const useMidiStore = defineStore('midi', () => {
         window.location.reload();
     };
 
-    const attachAccess = (access: MIDIAccess) => {
+    const attachAccess = async (access: MIDIAccess) => {
         midiAccess.value = access;
         needsDocumentReload.value = false;
+        transport.bindStateChange(handleStateChange);
         refreshPortLists();
         log(`MIDI initialized. inputs=[${midiInputs.value.join(', ')}] outputs=[${midiOutputs.value.join(', ')}]`);
+        if (midiInputs.value.length === 0 && midiOutputs.value.length === 0) {
+            log('No MIDI ports yet; waiting up to 2s for Chrome to enumerate them...');
+            const found = await waitForMidiPorts({
+                hasPorts: () => access.inputs.size > 0 || access.outputs.size > 0,
+                subscribe: onChange => {
+                    access.addEventListener('statechange', onChange);
+                    return () => access.removeEventListener('statechange', onChange);
+                },
+                timeoutMs: 2000,
+            });
+            refreshPortLists();
+            log(found
+                ? `MIDI ports appeared. inputs=[${midiInputs.value.join(', ')}] outputs=[${midiOutputs.value.join(', ')}]`
+                : 'MIDI ports did not appear within 2s.');
+        }
+        await transport.openAllPorts((port, error) => {
+            const name = port.name ?? '';
+            if (error) log(`MIDI ${port.type} open failed "${name}": ${error}`);
+            else log(`MIDI ${port.type} "${name}" ${port.state}/${port.connection}.`);
+        });
         access.inputs.forEach(input => bindInput(input, access));
-        transport.bindStateChange(handleStateChange);
     };
 
     const initMIDI = () => runMidiSession(async () => {
         connectionState.value = MIDIConnectionState.INITIALIZING;
         try {
-            attachAccess(await transport.initialize());
-            detectVolcaFM2();
+            await attachAccess(await transport.initialize());
+            await detectVolcaFM2();
         } catch (err) {
             log(`MIDI init error: ${err}`);
             needsDocumentReload.value = true;
@@ -251,8 +276,8 @@ export const useMidiStore = defineStore('midi', () => {
         selectedMidiOut.value = null;
         log('Reconnecting MIDI (close ports, requestMIDIAccess again)...');
         try {
-            attachAccess(await transport.initialize());
-            detectVolcaFM2();
+            await attachAccess(await transport.initialize());
+            await detectVolcaFM2();
         } catch (err) {
             log(`MIDI reconnect error: ${err}`);
             needsDocumentReload.value = true;
@@ -302,6 +327,8 @@ export const useMidiStore = defineStore('midi', () => {
                 void ensureAllProgramDumps()
                     .then(() => ensureAllSequenceDumps())
                     .catch(error => log(`Device reference preload failed: ${error}`));
+            } else {
+                log(`Device Inquiry Reply from "${input.name}" matched volca fm2, but no paired MIDI output was found. outputs=[${transport.outputNames().join(', ')}]`);
             }
         } else if (isProgramDump(data)) {
             connectionState.value = MIDIConnectionState.RECEIVING;
@@ -411,8 +438,11 @@ export const useMidiStore = defineStore('midi', () => {
         connectionState.value = MIDIConnectionState.SEARCHING;
         log('Searching for volca fm2 (sending Device Inquiry to all outputs)...');
 
-        midiAccess.value?.outputs.forEach((output: MIDIOutput) => {
-            output.send(createDeviceInquiry());
+        const inquiry = createDeviceInquiry();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await transport.sendToAll(inquiry, (outputName, error) => {
+            if (error) log(`Device Inquiry send failed on "${outputName}": ${error}`);
+            else log(`TX Device Inquiry to "${outputName}": ${formatMidiBytes(inquiry)}`);
         });
 
         setTimeout(() => {
