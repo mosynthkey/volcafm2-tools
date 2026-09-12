@@ -20,14 +20,16 @@ export const useMidiConnectionView = () => {
             ? t('app.connection.errorTitle')
             : t('app.connection.title'),
         step1: t('app.connection.step1'),
-        step2: t(isDesktopApp ? 'app.connection.step2Desktop' : 'app.connection.step2'),
+        step2: t('app.connection.step2'),
         step3: t('app.connection.step3'),
+        desktopMessage: t('app.connection.desktopMessage'),
         reconnect: t('app.connection.reconnect'),
         retry: t('app.connection.retry'),
         troubleshoot: t('app.connection.troubleshoot'),
         desktopHint: t('app.connection.desktopHint'),
         desktopDownload: t('app.connection.desktopDownload'),
     }));
+    const showBrowserConnectionHelp = !isDesktopApp;
     const showDesktopDownload = !isDesktopApp;
     const desktopAppDownloadUrl = DESKTOP_APP_DOWNLOAD_URL;
     const showConnectionModal = computed(() =>
@@ -74,6 +76,7 @@ export const useMidiConnectionView = () => {
         sidebarToggleLabel,
         connectionTexts,
         showConnectionModal,
+        showBrowserConnectionHelp,
         showDesktopDownload,
         desktopAppDownloadUrl,
         onConnectionModalUpdate,
