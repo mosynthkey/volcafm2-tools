@@ -36,6 +36,7 @@ npm run desktop:package # Build a macOS .dmg / .zip into dist-desktop/
 ```
 
 Signed and notarized macOS installers are built by GitHub Actions on `v*` tags (`Release Desktop Apps`). Required secrets: `MACOS_CERTIFICATE_P12_BASE64`, `MACOS_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`.
+Packaged builds check GitHub Releases for updates (`electron-updater`) and prompt to restart when a new version is downloaded.
 
 ## Support
 
