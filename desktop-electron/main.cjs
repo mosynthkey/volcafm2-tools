@@ -3,6 +3,7 @@
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 const { app, BrowserWindow, Menu, dialog, net, protocol, session, shell } = require('electron')
+const { setupAutoUpdater } = require('./autoUpdate.cjs')
 
 const APP_SCHEME = 'app'
 const APP_HOST = 'volcafm2'
@@ -95,6 +96,7 @@ app.whenReady().then(() => {
   allowMidiPermissions()
   setupMenu()
   void createWindow()
+  setupAutoUpdater()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createWindow()

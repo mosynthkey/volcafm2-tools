@@ -71,22 +71,46 @@ jobs:
           spctl --assess --type execute --verbose=2 "$APP_PATH"
           xcrun stapler validate "$APP_PATH"
 
+      - name: Verify update metadata
+        run: |
+          set -euo pipefail
+          test -f dist-desktop/latest-mac.yml
+          test -f dist-desktop/volca-fm2-tools-macos.zip
+          test -f dist-desktop/volca-fm2-tools-macos.zip.blockmap
+          test -f dist-desktop/volca-fm2-tools-macOS.dmg
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: volca-fm2-tools-macos-notarized
           path: |
             dist-desktop/volca-fm2-tools-macos.zip
+            dist-desktop/volca-fm2-tools-macos.zip.blockmap
             dist-desktop/volca-fm2-tools-macOS.dmg
+            dist-desktop/volca-fm2-tools-macOS.dmg.blockmap
+            dist-desktop/latest-mac.yml
+          if-no-files-found: error
 
       - name: Attach to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1 \
             || gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
-          gh release upload "${{ github.ref_name }}" \
-            dist-desktop/volca-fm2-tools-macos.zip \
-            dist-desktop/volca-fm2-tools-macOS.dmg \
+          assets=(
+            dist-desktop/volca-fm2-tools-macos.zip
+            dist-desktop/volca-fm2-tools-macOS.dmg
+            dist-desktop/latest-mac.yml
+          )
+          for candidate in \
+            dist-desktop/volca-fm2-tools-macos.zip.blockmap \
+            dist-desktop/volca-fm2-tools-macOS.dmg.blockmap
+          do
+            if [[ -f "$candidate" ]]; then
+              assets+=("$candidate")
+            fi
+          done
+          gh release upload "${{ github.ref_name }}" "${assets[@]}" \
             --repo "${{ github.repository }}" --clobber

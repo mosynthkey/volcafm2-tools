@@ -7,6 +7,10 @@
   "author": "Masaki Ono",
   "packageManager": "npm@11.15.0",
   "main": "desktop-electron/main.cjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mosynthkey/volcafm2-tools.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
@@ -36,6 +40,7 @@
     "@lucide/vue": "^1.31.0",
     "@mdi/font": "^7.4.47",
     "@types/webmidi": "^2.1.0",
+    "electron-updater": "^6.8.9",
     "pinia": "^3.0.1",
     "vue": "^3.4.31",
     "vue-i18n": "^11.4.8",
@@ -99,6 +104,13 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "mosynthkey",
+        "repo": "volcafm2-tools"
+      }
+    ]
   }
 }
