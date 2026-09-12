@@ -5,7 +5,11 @@ import { useMidiStore } from '@/stores/midiStore';
 import { useUiStore } from '@/stores/uiStore';
 import { NUM_OF_SEQUENCES } from '@/types/sequence';
 import { isDesktopApp } from '@/utils/runtime';
-import { DESKTOP_APP_DOWNLOAD_URL } from '@/utils/clientEnvironment';
+import {
+    DESKTOP_APP_DOWNLOAD_URL,
+    MIN_CHROME_MAJOR,
+    detectChromeMajorVersion,
+} from '@/utils/clientEnvironment';
 
 export const useMidiConnectionView = () => {
     const midiStore = useMidiStore();
@@ -15,18 +19,29 @@ export const useMidiConnectionView = () => {
     const sidebarToggleLabel = computed(() => ui.sidebarCollapsed
         ? t('app.expandSidebar')
         : t('app.collapseSidebar'));
+    const chromeMajorVersion = typeof navigator === 'undefined'
+        ? null
+        : detectChromeMajorVersion(navigator.userAgent);
+    const chromeMessageParams = { minVersion: MIN_CHROME_MAJOR } as const;
+    const chromeMessageParamsWithCurrent = chromeMajorVersion == null
+        ? null
+        : { minVersion: MIN_CHROME_MAJOR, currentVersion: chromeMajorVersion };
     const connectionTexts = computed(() => ({
         title: midiStore.connectionState === MIDIConnectionState.ERROR
             ? t('app.connection.errorTitle')
             : t('app.connection.title'),
         step1: t('app.connection.step1'),
-        step2: t('app.connection.step2'),
+        step2: chromeMessageParamsWithCurrent
+            ? t('app.connection.step2WithCurrent', chromeMessageParamsWithCurrent)
+            : t('app.connection.step2', chromeMessageParams),
         step3: t('app.connection.step3'),
         desktopMessage: t('app.connection.desktopMessage'),
         reconnect: t('app.connection.reconnect'),
         retry: t('app.connection.retry'),
         troubleshoot: t('app.connection.troubleshoot'),
-        desktopHint: t('app.connection.desktopHint'),
+        desktopHint: chromeMessageParamsWithCurrent
+            ? t('app.connection.desktopHintWithCurrent', chromeMessageParamsWithCurrent)
+            : t('app.connection.desktopHint', chromeMessageParams),
         desktopDownload: t('app.connection.desktopDownload'),
     }));
     const showBrowserConnectionHelp = !isDesktopApp;

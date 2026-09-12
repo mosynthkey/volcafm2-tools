@@ -25,7 +25,7 @@
       </label>
     </div>
     <div class="troubleshoot-advice" role="note">
-      <p v-if="advice.useChrome">{{ t('app.connection.useChrome') }}</p>
+      <p v-if="advice.useChrome">{{ useChromeMessage }}</p>
       <p v-if="advice.windowsHelp">
         {{ t('app.connection.windowsHelp') }}
         <a :href="WINDOWS_MIDI_HELP_URL" target="_blank" rel="noopener noreferrer">
@@ -35,7 +35,7 @@
       <p v-if="advice.restart">
         {{ isDesktopApp ? t('app.connection.restartDesktop') : t('app.connection.restartBrowser') }}
       </p>
-      <p v-if="!isDesktopApp">{{ t('app.connection.desktopHint') }}</p>
+      <p v-if="!isDesktopApp">{{ desktopHintMessage }}</p>
       <a
         v-if="!isDesktopApp"
         :href="DESKTOP_APP_DOWNLOAD_URL"
@@ -52,6 +52,7 @@ import { useI18n } from 'vue-i18n'
 import AppDialog from '@/components/dialogs/AppDialog.vue'
 import {
   DESKTOP_APP_DOWNLOAD_URL,
+  MIN_CHROME_MAJOR,
   WINDOWS_MIDI_HELP_URL,
   detectChromeMajorVersion,
   detectClientBrowser,
@@ -76,11 +77,32 @@ const browserItems = computed(() => BROWSERS.map(value => ({
 const osItems = computed(() => OSES.map(value => ({
   value, title: t(`app.connection.oses.${value}`),
 })))
+const chromeMajorVersion = detectChromeMajorVersion(ua)
 const advice = computed(() => midiTroubleshootAdvice({
   browser: browser.value,
   os: os.value,
-  chromeMajorVersion: detectChromeMajorVersion(ua),
+  chromeMajorVersion,
 }))
+const useChromeMessage = computed(() => {
+  const minVersion = MIN_CHROME_MAJOR
+  if (browser.value === 'chrome' && chromeMajorVersion != null) {
+    return t('app.connection.useChromeWithCurrent', {
+      minVersion,
+      currentVersion: chromeMajorVersion,
+    })
+  }
+  return t('app.connection.useChrome', { minVersion })
+})
+const desktopHintMessage = computed(() => {
+  const minVersion = MIN_CHROME_MAJOR
+  if (chromeMajorVersion != null) {
+    return t('app.connection.desktopHintWithCurrent', {
+      minVersion,
+      currentVersion: chromeMajorVersion,
+    })
+  }
+  return t('app.connection.desktopHint', { minVersion })
+})
 
 watch(open, isOpen => {
   if (!isOpen) return

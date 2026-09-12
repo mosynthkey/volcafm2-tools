@@ -14,10 +14,10 @@ A web and desktop editor for KORG volca fm2 Programs and Sequences, with DX7 Sys
 
 ## Requirements
 
-Use Google Chrome 153 or later, or the [macOS desktop app](https://github.com/mosynthkey/volcafm2-tools/releases/latest).
+Use Google Chrome ver 153 or later, or the [macOS desktop app](https://github.com/mosynthkey/volcafm2-tools/releases/latest).
 To communicate with a volca fm2, connect both MIDI IN and MIDI OUT through a MIDI interface.
 
-If Chrome 153 or later cannot find a connected volca fm2, use the desktop app.
+If Chrome ver 153 or later cannot find a connected volca fm2, use the desktop app.
 
 ## Development
 
